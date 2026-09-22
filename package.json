@@ -1,0 +1,21 @@
+{
+  "name": "repair-log",
+  "version": "1.0.0",
+  "description": "Self-hosted repair ticket CRM for a phone repair shop",
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "create-admin": "node create-admin.js"
+  },
+  "dependencies": {
+    "better-sqlite3": "^13.0.0",
+    "bcrypt": "^6.0.0",
+    "express": "^4.19.2",
+    "express-session": "^1.18.0",
+    "better-sqlite3-session-store": "^0.1.0",
+    "dotenv": "^16.4.5"
+  },
+  "overrides": {
+    "qs": "^6.16.0"
+  }
+}

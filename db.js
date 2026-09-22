@@ -1,0 +1,119 @@
+const path = require('path');
+const fs = require('fs');
+const Database = require('better-sqlite3');
+
+const DATA_DIR = path.join(__dirname, 'data');
+if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
+
+const DB_PATH = path.join(DATA_DIR, 'repair-log.db');
+const db = new Database(DB_PATH);
+
+db.pragma('journal_mode = WAL');
+
+db.exec(`
+  CREATE TABLE IF NOT EXISTS users (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    username TEXT UNIQUE NOT NULL,
+    password_hash TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  CREATE TABLE IF NOT EXISTS tickets (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_no INTEGER UNIQUE NOT NULL,
+    customer_name TEXT NOT NULL,
+    phone_contact TEXT NOT NULL,
+    date_received TEXT NOT NULL,
+    date_returned TEXT,
+    phone_model TEXT NOT NULL,
+    status TEXT NOT NULL DEFAULT 'за сервиз',
+    description TEXT NOT NULL,
+    comment TEXT,
+    repair_performed TEXT,
+    loaner_phone TEXT,
+    pravim TEXT NOT NULL DEFAULT 'circle',
+    kaparo REAL,
+    service_price REAL,
+    customer_price REAL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- One per change, for accountability: who did what, to which
+  -- ticket, and when. "changes" holds a JSON snapshot or diff.
+  CREATE TABLE IF NOT EXISTS audit_log (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER,
+    ticket_no INTEGER NOT NULL,
+    action TEXT NOT NULL,          -- 'created' | 'updated' | 'deleted'
+    changes TEXT NOT NULL,          -- JSON
+    performed_by TEXT NOT NULL,     -- username
+    performed_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Single-row table holding the shop's configurable settings as JSON:
+  -- statuses, which table columns are shown, the two print templates,
+  -- and the base phone-model suggestion list.
+  CREATE TABLE IF NOT EXISTS settings (
+    id INTEGER PRIMARY KEY CHECK (id = 1),
+    data TEXT NOT NULL,
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+
+  -- Note: the "sessions" table itself is created automatically by
+  -- better-sqlite3-session-store on startup, with the schema it needs.
+`);
+
+// Migration for databases created before "date_returned" existed.
+const ticketColumns = db.prepare("PRAGMA table_info(tickets)").all().map(c => c.name);
+if (!ticketColumns.includes('date_returned')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN date_returned TEXT');
+}
+// Migration for databases created before comment/repair/loaner-phone existed.
+for (const col of ['comment', 'repair_performed', 'loaner_phone']) {
+  if (!ticketColumns.includes(col)) {
+    db.exec(`ALTER TABLE tickets ADD COLUMN ${col} TEXT`);
+  }
+}
+// Migration for databases created before the "pravim" tri-state marker existed.
+if (!ticketColumns.includes('pravim')) {
+  db.exec("ALTER TABLE tickets ADD COLUMN pravim TEXT NOT NULL DEFAULT 'circle'");
+}
+// Migration for databases created before "kaparo" (deposit) existed.
+if (!ticketColumns.includes('kaparo')) {
+  db.exec('ALTER TABLE tickets ADD COLUMN kaparo REAL');
+}
+
+// Seed default settings on first run.
+const DEFAULT_SETTINGS = {
+  shopName: 'CrazyPhone',
+  shopTagline: 'аксесоари и сервиз',
+  statuses: ['за сервиз', 'в сервиз', 'чака клиент', 'издаден'],
+  columns: ['customer', 'model', 'issue', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
+  printCustomer: {
+    header: 'СЕРВИЗНА КАРТА',
+    footer: 'МАГАЗИНЪТ И СЕРВИЗЪТ НЕ НОСЯТ ОТГОВОРНОСТ ЗА:\nИЗГУБЕНА ПРИ РЕМОНТА ИНФОРМАЦИЯ ОТ МОБИЛНИТЕ АПАРАТИ\nАПАРАТИ НЕПОТЪРСЕНИ ДО 1 МЕСЕЦ ОТ ДАТАТА НА ПРИЕМАНЕ'
+  },
+  devices: [
+    'iPhone 17 Pro Max', 'iPhone 17 Pro', 'iPhone 17', 'iPhone 16 Pro Max', 'iPhone 16 Pro', 'iPhone 16',
+    'iPhone 15 Pro Max', 'iPhone 15 Pro', 'iPhone 15', 'iPhone 14 Pro Max', 'iPhone 14 Pro', 'iPhone 14',
+    'iPhone 13 Pro Max', 'iPhone 13 Pro', 'iPhone 13', 'iPhone 13 mini', 'iPhone 12', 'iPhone 11',
+    'iPhone SE (2022)', 'iPhone XR',
+    'Samsung Galaxy S25 Ultra', 'Samsung Galaxy S25', 'Samsung Galaxy S24 Ultra', 'Samsung Galaxy S24',
+    'Samsung Galaxy S23 Ultra', 'Samsung Galaxy S23', 'Samsung Galaxy A55', 'Samsung Galaxy A54',
+    'Samsung Galaxy A35', 'Samsung Galaxy Z Flip 6', 'Samsung Galaxy Z Fold 6', 'Samsung Galaxy Note 20',
+    'Xiaomi Redmi Note 13', 'Xiaomi Redmi Note 12', 'Xiaomi 14', 'Xiaomi 13T', 'Xiaomi Poco X6',
+    'Huawei P60', 'Huawei Mate 50', 'Huawei Nova 11',
+    'Google Pixel 9', 'Google Pixel 8', 'Google Pixel 7',
+    'OnePlus 12', 'OnePlus Nord 3',
+    'Oppo Reno 11', 'Oppo A98',
+    'Motorola Edge 40'
+  ]
+};
+
+const existingSettings = db.prepare('SELECT id FROM settings WHERE id = 1').get();
+if (!existingSettings) {
+  db.prepare('INSERT INTO settings (id, data) VALUES (1, ?)').run(JSON.stringify(DEFAULT_SETTINGS));
+}
+
+module.exports = db;

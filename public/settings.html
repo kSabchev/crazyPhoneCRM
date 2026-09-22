@@ -1,0 +1,106 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Настройки — Сервизен дневник</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap" id="settingsScreen" style="display:none;">
+
+  <header>
+    <div class="brand">
+      <h1>Настройки</h1>
+      <span class="tag">статуси, колони, шаблони за печат и устройства</span>
+    </div>
+    <div class="header-right">
+      <div class="who">
+        <span id="whoAmI"></span>
+        <button class="link-btn" id="backBtn">← Обратно към поръчките</button>
+        <button class="link-btn" id="logoutBtn">Изход</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="settings-section">
+    <h2>Име на сервиза</h2>
+    <div class="section-sub">Показва се на разпечатките, заедно с логото.</div>
+    <div class="field">
+      <label for="shopNameInput">Име</label>
+      <input type="text" id="shopNameInput" placeholder="Името на вашия сервиз">
+    </div>
+    <div class="field">
+      <label for="shopTaglineInput">Слоган</label>
+      <input type="text" id="shopTaglineInput" placeholder="напр. аксесоари и сервиз">
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Статуси</h2>
+    <div class="section-sub">Възможните статуси за всяка поръчка. Пренаредете със стрелките — редът тук е редът, показван в падащите менюта.</div>
+    <div class="editable-list" id="statusList"></div>
+    <div class="add-row">
+      <input type="text" id="newStatusInput" placeholder="Добавете нов статус, напр. Очаква одобрение">
+      <button class="btn secondary" id="addStatusBtn">Добави</button>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Колони в таблицата</h2>
+    <div class="section-sub">Изберете кои колони да се показват в основната таблица. Номерът на поръчката винаги се показва.</div>
+    <div class="checkbox-grid" id="columnGrid"></div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Разпечатка за клиента</h2>
+    <div class="section-sub">
+      Полетата на тази разпечатка са фиксирани — съответстват на хартиената сервизна
+      карта на сервиза (номер, клиент, модел и марка, описание на повредата, оборотен
+      телефон, капаро, дата на приемане). Можете да редактирате само заглавието и
+      текста на предупреждението в долния край.
+    </div>
+    <div class="field">
+      <label for="custHeader">Заглавие на документа</label>
+      <input type="text" id="custHeader">
+    </div>
+    <div class="field" style="margin-top:14px;">
+      <label for="custFooter">Предупреждение в долния край</label>
+      <textarea id="custFooter" placeholder="напр. условия за отговорност..."></textarea>
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Разпечатка за сервиза</h2>
+    <div class="section-sub">
+      Отпечатва се като малък стикер (5×3 см за баркод принтер), който се залепя на
+      телефона: име на сервиза, номер на поръчката и описанието на повредата. Форматът
+      е фиксиран — няма какво да се настройва тук.
+    </div>
+  </div>
+
+  <div class="settings-section">
+    <h2>Предложения за модели телефони</h2>
+    <div class="section-sub">
+      Началният списък с модели, предлагани при въвеждане. Моделите, използвани в реални
+      поръчки, автоматично се добавят към предложенията — този списък е само базовият набор.
+    </div>
+    <div class="editable-list" id="deviceList"></div>
+    <div class="add-row">
+      <input type="text" id="newDeviceInput" placeholder="Добавете модел телефон, напр. Samsung Galaxy S25">
+      <button class="btn secondary" id="addDeviceBtn">Добави</button>
+    </div>
+  </div>
+
+  <div class="save-bar">
+    <span class="save-status" id="saveStatus"></span>
+    <button class="btn secondary" id="resetBtn">Отхвърли промените</button>
+    <button class="btn" id="saveBtn">Запази промените</button>
+  </div>
+
+</div>
+
+<script src="settings.js"></script>
+</body>
+</html>
