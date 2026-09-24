@@ -85,14 +85,52 @@ This app is safe to expose to the internet as written, but you should:
 
 ## Backups (including nightly to a NAS)
 
-The entire database is one file: `data/repair-log.db`.
+The entire database is one file: `data/repair-log.db`. Two equivalent backup
+scripts are included — use whichever matches how you're running the app.
 
-`backup.sh` does two things each time it runs:
+Both do the same two things each time they run:
 
-1. Copies the database into `backups/` locally, with a timestamp, keeping
-   only the most recent 30.
-2. If a NAS path is mounted, also copies that same backup there — so a
-   drive failure on the server doesn't take the backups down with it.
+1. Copy the database into `backups/` locally, with a timestamp (using
+   SQLite's own online backup mechanism, which is safe to run while the app
+   is live — it won't grab a half-written file). Every nightly backup is
+   kept indefinitely; nothing is ever deleted automatically.
+2. If a NAS path is configured, also copy that same backup there — so a
+   drive failure on the server doesn't take the backups down with it. A NAS
+   that's unreachable that night logs a warning instead of failing the whole
+   backup.
+
+### If the app is running on Windows — `backup.js`
+
+Run manually with `node backup.js`. No extra tools needed — it reuses the
+`better-sqlite3` dependency the app already has installed.
+
+**One-time setup — point it at your NAS.** The most reliable way on Windows
+is a direct UNC path rather than a mapped drive letter, because a scheduled
+task often can't see drive letters that were mapped in an interactive login
+session. Open `backup.js` and edit the `NAS_BACKUP_DIR` line near the top:
+
+```js
+const NAS_BACKUP_DIR = process.env.NAS_BACKUP_DIR || '\\\\NAS-NAME\\backups\\repair-log';
+```
+
+**Schedule it nightly with Task Scheduler:**
+
+1. Open Task Scheduler → **Create Basic Task**
+2. Name it "Repair Log Backup", trigger **Daily**, time e.g. 2:00 AM
+3. Action: **Start a program**
+   - Program/script: `C:\Program Files\nodejs\node.exe`
+   - Add arguments: `backup.js`
+   - Start in: your project folder, e.g. `D:\coding\crazyCRMv1\repair-log`
+     (this matters — without it, `backup.js` can't find `data\repair-log.db`)
+4. If you set a NAS path, open the task's **Properties** afterward and
+   select **Run whether user is logged on or not**, entering a real Windows
+   account's credentials — not the default SYSTEM account, which has no
+   network identity and can't authenticate to a NAS share at all.
+
+Run `node backup.js` manually once first to confirm it works before trusting
+it to the schedule.
+
+### If the app is running on Linux — `backup.sh`
 
 **One-time setup — mount your NAS share on the server.** How you do this
 depends on your NAS: for a typical SMB/CIFS share:
@@ -202,7 +240,8 @@ repair-log/
   server.js          Express app: auth routes + ticket API + settings API
   db.js              SQLite schema/setup
   create-admin.js     CLI to create/reset a login account
-  backup.sh           Database backup script (local + NAS)
+  backup.sh           Database backup script for Linux (local + NAS)
+  backup.js            Database backup script for Windows (local + NAS)
   public/
     index.html        Login screen + main app + print capture targets
     settings.html      Admin settings page

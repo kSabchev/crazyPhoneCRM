@@ -4,9 +4,8 @@
 # file — see README). Run manually, or schedule nightly with cron:
 #   0 2 * * * /path/to/repair-log/backup.sh
 #
-# Keeps the most recent 30 local backups and deletes older ones.
-# The NAS copy is left to accumulate — manage retention on the NAS itself
-# if you want it pruned too.
+# Every nightly backup is kept indefinitely — nothing is ever deleted
+# automatically, locally or on the NAS.
 
 set -e
 cd "$(dirname "$0")"
@@ -22,9 +21,6 @@ FILENAME="repair-log_$TIMESTAMP.db"
 
 sqlite3 data/repair-log.db ".backup 'backups/$FILENAME'"
 echo "Local backup saved: backups/$FILENAME"
-
-# Keep only the 30 most recent local backups
-ls -1t backups/*.db | tail -n +31 | xargs -r rm --
 echo "Local backups kept: $(ls backups/*.db | wc -l)"
 
 # Copy to the NAS if it's reachable (mounted). This won't fail the whole

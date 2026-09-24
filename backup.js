@@ -1,0 +1,56 @@
+// Backs up the repair log database safely (using SQLite's own online backup
+// API, which is safe to run while the app is live) to a local backups/
+// folder, then optionally also copies it to a NAS path if NAS_BACKUP_DIR is
+// set below or as an environment variable. Every nightly backup is kept
+// indefinitely — nothing is ever deleted automatically.
+//
+// Run manually with:  node backup.js
+// Schedule nightly with Windows Task Scheduler — see README for setup.
+
+const path = require('path');
+const fs = require('fs');
+const Database = require('better-sqlite3');
+
+const DB_PATH = path.join(__dirname, 'data', 'repair-log.db');
+const LOCAL_BACKUP_DIR = path.join(__dirname, 'backups');
+
+// Point this at your NAS, e.g. '\\\\NAS-NAME\\backups\\repair-log' or a
+// mapped drive like 'Z:\\repair-log'. Leave as null to skip the NAS copy.
+const NAS_BACKUP_DIR = process.env.NAS_BACKUP_DIR || null;
+
+async function main() {
+  if (!fs.existsSync(DB_PATH)) {
+    console.error(`ERROR: database not found at ${DB_PATH}`);
+    process.exit(1);
+  }
+  fs.mkdirSync(LOCAL_BACKUP_DIR, { recursive: true });
+
+  const timestamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
+  const filename = `repair-log_${timestamp}.db`;
+  const localPath = path.join(LOCAL_BACKUP_DIR, filename);
+
+  const db = new Database(DB_PATH, { readonly: true });
+  try {
+    await db.backup(localPath);
+  } finally {
+    db.close();
+  }
+  console.log(`Local backup saved: ${localPath}`);
+
+  // Copy to the NAS if configured. This must not crash the whole backup if
+  // the NAS happens to be unreachable that night — log a warning instead.
+  if (NAS_BACKUP_DIR) {
+    try {
+      fs.mkdirSync(NAS_BACKUP_DIR, { recursive: true });
+      fs.copyFileSync(localPath, path.join(NAS_BACKUP_DIR, filename));
+      console.log(`Copied to NAS: ${path.join(NAS_BACKUP_DIR, filename)}`);
+    } catch (err) {
+      console.error(`WARNING: could not reach NAS backup path (${NAS_BACKUP_DIR}): ${err.message}`);
+    }
+  }
+}
+
+main().catch(err => {
+  console.error('Backup failed:', err);
+  process.exit(1);
+});
