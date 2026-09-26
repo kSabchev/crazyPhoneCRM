@@ -1,21 +1,28 @@
 // Backs up the repair log database safely (using SQLite's own online backup
 // API, which is safe to run while the app is live) to a local backups/
-// folder, then optionally also copies it to a NAS path if NAS_BACKUP_DIR is
-// set below or as an environment variable. Every nightly backup is kept
-// indefinitely — nothing is ever deleted automatically.
+// folder, then optionally also copies it to a NAS path set via
+// NAS_BACKUP_DIR in .env. Every nightly backup is kept indefinitely —
+// nothing is ever deleted automatically.
 //
 // Run manually with:  node backup.js
 // Schedule nightly with Windows Task Scheduler — see README for setup.
 
+require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
-const DB_PATH = path.join(__dirname, 'data', 'repair-log.db');
-const LOCAL_BACKUP_DIR = path.join(__dirname, 'backups');
+// Same DATA_ROOT override as db.js — see the comment there. Keeping the
+// logic identical across files means the database, backups, and
+// pre-restore safety copies all move together if you ever set it.
+const BASE_DIR = process.env.DATA_ROOT ? path.resolve(process.env.DATA_ROOT) : __dirname;
 
-// Point this at your NAS, e.g. '\\\\NAS-NAME\\backups\\repair-log' or a
-// mapped drive like 'Z:\\repair-log'. Leave as null to skip the NAS copy.
+const DB_PATH = path.join(BASE_DIR, 'data', 'repair-log.db');
+const LOCAL_BACKUP_DIR = path.join(BASE_DIR, 'backups');
+
+// Set NAS_BACKUP_DIR in .env (not here) so it survives every future code
+// update untouched — see .env.example for the exact format needed for a
+// UNC path with backslashes/Cyrillic/spaces.
 const NAS_BACKUP_DIR = process.env.NAS_BACKUP_DIR || null;
 
 async function main() {

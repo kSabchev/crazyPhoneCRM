@@ -1,8 +1,15 @@
+require('dotenv').config();
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
-const DATA_DIR = path.join(__dirname, 'data');
+// DATA_ROOT lets the database, backups, and pre-restore safety copies all
+// live outside the versioned app folder (e.g. a stable D:\CrazyPhoneData),
+// so redeploying a new code version never touches them at all. Optional —
+// defaults to the app folder itself, exactly as before, if not set.
+const BASE_DIR = process.env.DATA_ROOT ? path.resolve(process.env.DATA_ROOT) : __dirname;
+
+const DATA_DIR = path.join(BASE_DIR, 'data');
 if (!fs.existsSync(DATA_DIR)) fs.mkdirSync(DATA_DIR, { recursive: true });
 
 const DB_PATH = path.join(DATA_DIR, 'repair-log.db');

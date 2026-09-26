@@ -83,6 +83,58 @@ This app is safe to expose to the internet as written, but you should:
 4. **Create one account per staff member** rather than sharing a single login,
    so you always know who made a change.
 
+## Updating to a new version
+
+When you get a new version of the app (a new zip), here's the safe procedure.
+
+**Short answer on stopping the service first: yes, always.** Node doesn't
+keep the `.js` files themselves locked open the way it locks the database
+file (so Windows won't throw an error if you overwrite them while the
+service is running) — but the *running* process keeps executing the old
+code already loaded into memory regardless, and won't pick up new files
+until it restarts. Copying files in while it's live risks an inconsistent
+in-between state if the service happens to restart mid-copy (e.g. it
+crashes and NSSM auto-restarts it right as you're partway through). Stop it
+first; it's a small planned few seconds of downtime either way.
+
+1. **Take a fresh backup**, even though the scheduled ones already run
+   twice a day: `node backup.js`. Cheap insurance right before any change.
+2. **Stop the service**: `nssm stop RepairLog`, then confirm with
+   `nssm status RepairLog` — wait for `SERVICE_STOPPED`.
+3. **Extract the new version to a fresh folder** (don't unzip on top of the
+   live one) — e.g. `C:\crazyPhoneCRM\crazyPhoneCRM-<date>`. This keeps the
+   old version around untouched until you're sure the new one works, and
+   avoids any partial-overwrite risk entirely.
+4. **Copy your `.env` file** from the old folder into the new one. This is
+   the one file that must survive every update — it carries your
+   `SESSION_SECRET` (regenerating it logs everyone out) and, if you're
+   using them, `NAS_BACKUP_DIR` and `DATA_ROOT` (see below).
+5. **If you're *not* using `DATA_ROOT`** (the database lives inside the app
+   folder, under `data\`, which is the default): copy the old folder's
+   `data\` folder into the new one too. This is the one manual step that
+   `DATA_ROOT` exists to eliminate — see the box below.
+6. **Install dependencies in the new folder**: `npm install`. Needed even
+   if you think nothing changed — safe to run regardless.
+7. **Point NSSM at the new folder**:
+   `nssm set RepairLog AppDirectory "C:\crazyPhoneCRM\crazyPhoneCRM-<date>"`
+8. **Start it back up**: `nssm start RepairLog`, then actually open the app
+   and check your data is there before moving on.
+9. Once you've confirmed everything looks right, the old versioned folder
+   can be deleted (or just kept around a while as a fallback — it costs
+   nothing to leave it).
+
+> **Tip — set `DATA_ROOT` once and skip steps 5 forever after.** By
+> default, the database, local backups, and pre-restore safety copies all
+> live *inside* the versioned app folder, which is exactly why they need
+> manual copying on every update. Setting `DATA_ROOT` in `.env` to a stable
+> folder outside any versioned copy (e.g. `DATA_ROOT=D:\CrazyPhoneData`)
+> moves all of that there permanently — every future version of the app
+> folder just points at the same external data, with nothing to copy, ever
+> again. To adopt it: stop the service, move your existing `data\` folder's
+> *contents* into the new location (so you end up with
+> `D:\CrazyPhoneData\data\repair-log.db`), add the `DATA_ROOT` line to
+> `.env`, and start the service back up.
+
 ## Backups (including nightly to a NAS)
 
 The entire database is one file: `data/repair-log.db`. Two equivalent backup
@@ -104,14 +156,21 @@ Both do the same two things each time they run:
 Run manually with `node backup.js`. No extra tools needed — it reuses the
 `better-sqlite3` dependency the app already has installed.
 
-**One-time setup — point it at your NAS.** The most reliable way on Windows
-is a direct UNC path rather than a mapped drive letter, because a scheduled
-task often can't see drive letters that were mapped in an interactive login
-session. Open `backup.js` and edit the `NAS_BACKUP_DIR` line near the top:
+**One-time setup — point it at your NAS.** Set `NAS_BACKUP_DIR` in `.env`
+(not in `backup.js` itself — keeping it out of the code means it survives
+every future update automatically, see "Updating to a new version" below).
+A direct UNC path is most reliable, rather than a mapped drive letter,
+because a scheduled task often can't see drive letters that were mapped in
+an interactive login session. No quotes needed, and — unlike in a `.js`
+file — backslashes in `.env` are never treated as escape characters, so
+Cyrillic characters and spaces need no special handling either:
 
-```js
-const NAS_BACKUP_DIR = process.env.NAS_BACKUP_DIR || '\\\\NAS-NAME\\backups\\repair-log';
 ```
+NAS_BACKUP_DIR=\\NAS-NAME\backups\repair-log
+```
+
+This project's `.env` should already have this set to
+`\\crazyphone\MainStorage\CrazyPhone\БазаДанни Сервиз`.
 
 **Schedule it nightly with Task Scheduler:**
 
@@ -173,6 +232,41 @@ crontab -e
 Check `backup.log` occasionally — if the NAS is ever unreachable at backup
 time, the script logs a warning there instead of failing silently.
 
+## Restoring from a backup
+
+`restore.js` restores a chosen backup as the live database. **Stop the app
+(or the `RepairLog` Windows service) first** — restoring into a database
+file the server has open can corrupt it.
+
+If you forget, `restore.js` doesn't just crash — the safety backup of your
+current database still completes fine (SQLite allows concurrent reads even
+while the app has the file open), but replacing the live file will fail on
+Windows with an `EBUSY` error, since Windows won't let a locked file be
+deleted or overwritten. The script retries a few times automatically in
+case the lock was just about to clear, and if it still fails, tells you
+plainly what to check — nothing is lost either way; your original database
+is left untouched until the swap can actually succeed.
+
+```
+node restore.js                 # lists available backups
+node restore.js latest          # restores the most recent one
+node restore.js <filename>      # restores a specific one
+```
+
+It never destroys the current database outright: before restoring, it
+safely backs up whatever's currently live into `data/pre-restore/`, so a
+mistaken restore is always recoverable. That safety copy is taken with the
+same online backup API `backup.js` uses — never a raw file copy — because
+SQLite's WAL mode can leave a meaningful amount of recent, real data sitting
+in a `-wal` file that hasn't been folded into the main `.db` file yet
+(SQLite only does this automatically once the WAL grows large enough, which
+can take a while on a lightly-used database). A raw file copy or deletion
+at that point silently discards that data; the backup API doesn't.
+
+After restoring, start the app back up and confirm the data looks right
+before trusting it — the restore doesn't verify the backup's contents for
+you.
+
 ## Settings page
 
 Click **Settings** in the header to configure:
@@ -208,6 +302,22 @@ would need a role system added on top of this.
   ticket.
 - **Search** filters across customer name, phone number, model, ticket
   number, and description as you type. The status dropdown narrows further.
+- **Live updates**: when anyone creates, edits, or deletes a ticket (or an
+  admin changes Settings), every other open browser tab refreshes on its
+  own within a moment — no manual reload needed, even across different
+  computers. If someone has a ticket open for editing when this happens,
+  their in-progress changes aren't touched; only the underlying table
+  refreshes in the background.
+- **Presence indicator**: while someone has a ticket open, other staff see
+  a small badge on that row showing who's currently looking at it, and a
+  warning banner if they open the same ticket too. This is informational
+  only — it never blocks anyone from opening or saving a ticket, since two
+  people sometimes legitimately need to look at the same one.
+- **Customer phone numbers are click-to-call** (`tel:` links), in both the
+  table and the ticket modal. What actually happens when clicked depends on
+  what's installed on that computer to handle phone calls (a softphone, a
+  paired-phone integration, etc.) — the app just hands off to whatever's
+  registered for that.
 - From an open ticket, **Print for customer** generates a small service-card
   PDF (100×95mm) matching the shop's paper card — client, model, damage
   description, loaner phone, deposit, and intake date, with the shop's logo
@@ -242,6 +352,7 @@ repair-log/
   create-admin.js     CLI to create/reset a login account
   backup.sh           Database backup script for Linux (local + NAS)
   backup.js            Database backup script for Windows (local + NAS)
+  restore.js            Restores a backup as the live database
   public/
     index.html        Login screen + main app + print capture targets
     settings.html      Admin settings page
