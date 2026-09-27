@@ -288,8 +288,18 @@ function openNew(){
   document.getElementById('printServiceBtn').style.display = 'none';
   document.getElementById('historySection').style.display = 'none';
   document.getElementById('editingBanner').style.display = 'none';
+  setEditOnlyFieldsVisible(false);
   document.getElementById('overlay').classList.add('open');
   document.getElementById('f_customer').focus();
+}
+
+// "Извършен ремонт", "Правим", and the call button only make sense once a
+// ticket already exists — nothing to call yet and no repair work has
+// happened yet at the moment a new ticket is being created.
+function setEditOnlyFieldsVisible(visible){
+  document.querySelectorAll('.edit-only-field').forEach(el => {
+    el.style.display = visible ? '' : 'none';
+  });
 }
 
 function openEdit(id){
@@ -313,6 +323,7 @@ function openEdit(id){
   document.getElementById('f_repair').value = t.repair_performed || '';
   document.getElementById('f_loaner').value = t.loaner_phone || 'Не';
   setPravimButton(t.pravim || 'circle');
+  setEditOnlyFieldsVisible(true);
   document.getElementById('deleteBtn').style.display = 'inline-block';
   document.getElementById('printCustomerBtn').style.display = 'inline-block';
   document.getElementById('printServiceBtn').style.display = 'inline-block';
