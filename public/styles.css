@@ -159,6 +159,42 @@ tbody tr:hover{background:#FBF7EF;}
   outline:2px solid var(--copper);outline-offset:-1px;background:var(--panel);
 }
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
+
+.editing-banner{
+  background:var(--status-waiting-bg);color:var(--status-waiting-bg,#3F2E00);
+  border:1px solid var(--status-waiting);border-radius:4px;
+  padding:10px 12px;margin-bottom:16px;font-size:13px;font-weight:600;
+  color:#3F2E00;
+}
+
+.phone-input-row{display:flex;gap:8px;}
+.phone-input-row input{flex:1;}
+.call-btn{
+  display:flex;align-items:center;justify-content:center;
+  width:40px;flex-shrink:0;border:1px solid var(--line);border-radius:3px;
+  background:var(--paper);text-decoration:none;font-size:16px;
+}
+.call-btn:hover{background:var(--copper-soft);border-color:var(--copper);}
+
+.editing-badge{
+  display:inline-block;font-size:10.5px;font-weight:700;color:#3F2E00;
+  background:var(--status-waiting-bg);border:1px solid var(--status-waiting);
+  border-radius:10px;padding:1px 7px;margin-top:3px;white-space:nowrap;
+}
+
+/* Dedicated click-to-call table column — its own cell/target rather than a
+   link sharing space inside the (also clickable) customer cell, since a
+   small link competing with the row's own click handler was unreliable. */
+.call-cell{text-align:center;}
+.call-icon-btn{
+  display:inline-flex;align-items:center;justify-content:center;
+  width:30px;height:30px;border-radius:50%;
+  font-size:15px;border:1.5px solid var(--copper);color:var(--copper);
+  background:transparent;text-decoration:none;cursor:pointer;
+  transition:transform .1s;
+}
+.call-icon-btn:hover{background:var(--copper-soft);transform:scale(1.1);}
+
 .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap;gap:10px;}
 .modal-actions .right{display:flex;gap:10px;flex-wrap:wrap;}
 

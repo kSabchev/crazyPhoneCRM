@@ -3,6 +3,7 @@ let originalSettings = null;
 
 const COLUMN_LABELS = {
   customer: 'Клиент',
+  callBtn: 'Обаждане',
   model: 'Модел',
   issue: 'Проблем',
   comment: 'Коментар',
