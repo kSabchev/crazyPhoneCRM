@@ -96,7 +96,7 @@ const DEFAULT_SETTINGS = {
   shopName: 'CrazyPhone',
   shopTagline: 'аксесоари и сервиз',
   statuses: ['за сервиз', 'в сервиз', 'чака клиент', 'издаден'],
-  columns: ['customer', 'model', 'issue', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
+  columns: ['customer', 'callBtn', 'model', 'issue', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
   printCustomer: {
     header: 'СЕРВИЗНА КАРТА',
     footer: 'МАГАЗИНЪТ И СЕРВИЗЪТ НЕ НОСЯТ ОТГОВОРНОСТ ЗА:\nИЗГУБЕНА ПРИ РЕМОНТА ИНФОРМАЦИЯ ОТ МОБИЛНИТЕ АПАРАТИ\nАПАРАТИ НЕПОТЪРСЕНИ ДО 1 МЕСЕЦ ОТ ДАТАТА НА ПРИЕМАНЕ'

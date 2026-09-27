@@ -138,7 +138,7 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 // ---- Settings routes ----
-const COLUMN_KEYS = ['customer', 'model', 'issue', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'dateIn', 'dateReturned', 'servicePrice', 'customerPrice'];
+const COLUMN_KEYS = ['customer', 'callBtn', 'model', 'issue', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'dateIn', 'dateReturned', 'servicePrice', 'customerPrice'];
 
 function getSettings() {
   const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();

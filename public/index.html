@@ -63,6 +63,7 @@
         <tr>
           <th>№</th>
           <th data-col="customer">Клиент</th>
+          <th data-col="callBtn">Обаждане</th>
           <th data-col="model">Модел</th>
           <th data-col="issue">Проблем</th>
           <th data-col="comment">Коментар</th>
@@ -91,6 +92,7 @@
   <div class="modal">
     <h2 id="modalTitle">Нова сервизна поръчка</h2>
     <div class="sub" id="modalSub">Регистрирайте телефон, приет за ремонт.</div>
+    <div class="editing-banner" id="editingBanner" style="display:none;"></div>
 
     <div class="field">
       <label for="f_customer">Име на клиента</label>
@@ -100,7 +102,10 @@
     <div class="row2">
       <div class="field">
         <label for="f_phone">Телефон за контакт</label>
-        <input type="text" id="f_phone" placeholder="напр. 0888 123 456">
+        <div class="phone-input-row">
+          <input type="text" id="f_phone" placeholder="напр. 0888 123 456">
+          <a href="#" id="f_phone_call" class="call-btn" title="Обади се">📞</a>
+        </div>
       </div>
       <div class="field">
         <label for="f_date">Дата на приемане</label>

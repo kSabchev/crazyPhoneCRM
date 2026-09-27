@@ -1,6 +1,8 @@
 let tickets = [];
 let editingTicket = null;
 let settings = null;
+let liveEvents = null;
+let currentUsername = null;
 
 const statusStyles = {
   'за сервиз': ['var(--status-forservice)','var(--status-forservice-bg)'],
@@ -10,7 +12,7 @@ const statusStyles = {
 };
 const FALLBACK_STATUS_STYLE = ['var(--status-neutral)','var(--status-neutral-bg)'];
 
-const COLUMN_KEYS = ['customer','model','issue','comment','repairPerformed','loanerPhone','pravim','status','kaparo','servicePrice','customerPrice','dateIn','dateReturned'];
+const COLUMN_KEYS = ['customer','callBtn','model','issue','comment','repairPerformed','loanerPhone','pravim','status','kaparo','servicePrice','customerPrice','dateIn','dateReturned'];
 
 const PRAVIM_SYMBOLS = { circle: '○', tick: '✓', cross: '✗' };
 const PRAVIM_CYCLE = ['circle', 'tick', 'cross'];
@@ -36,12 +38,38 @@ function showLogin(){
 }
 
 async function showApp(username){
+  currentUsername = username;
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';
   document.getElementById('whoAmI').textContent = username;
   await loadSettings();
   await loadDevices();
   loadTickets();
+  connectLiveUpdates();
+}
+
+// Server-Sent Events: the server pushes a message the instant any user
+// creates, edits, or deletes a ticket, or changes settings — so every open
+// tab refreshes automatically instead of needing a manual page reload. The
+// browser reconnects on its own if the connection ever drops.
+function connectLiveUpdates(){
+  if(liveEvents) return; // already connected
+  liveEvents = new EventSource('/api/events');
+  liveEvents.onmessage = (e)=>{
+    if(e.data === 'tickets'){
+      loadTickets();
+    } else if(e.data === 'settings'){
+      loadSettings().then(()=>{ loadDevices(); render(); });
+    }
+  };
+  // EventSource retries on its own; no special error handling needed here.
+}
+
+function disconnectLiveUpdates(){
+  if(liveEvents){
+    liveEvents.close();
+    liveEvents = null;
+  }
 }
 
 document.getElementById('loginForm').addEventListener('submit', async (e)=>{
@@ -68,6 +96,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e)=>{
 });
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  disconnectLiveUpdates();
   await fetch('/api/auth/logout', { method:'POST' });
   showLogin();
 });
@@ -175,11 +204,16 @@ function render(){
     const dv = (key) => visible.includes(key) ? '' : ' style="display:none;"';
     body.innerHTML = filtered.map(t=>{
       const [fg,bg] = statusStyles[t.status] || FALLBACK_STATUS_STYLE;
+      const editingBadge = (t.editing_by && t.editing_by !== currentUsername)
+        ? `<div class="editing-badge">👁 ${escapeHtml(t.editing_by)}</div>` : '';
       return `<tr onclick="openEdit(${t.id})">
-        <td class="ticket-no">#${t.ticket_no}</td>
+        <td class="ticket-no">#${t.ticket_no}${editingBadge}</td>
         <td${dv('customer')}>
           <div class="cust-name">${escapeHtml(t.customer_name)}</div>
           <div class="cust-phone">${escapeHtml(t.phone_contact)}</div>
+        </td>
+        <td${dv('callBtn')} class="call-cell" onclick="event.stopPropagation()">
+          <a href="${telHref(t.phone_contact)}" class="call-icon-btn" title="Обади се на ${escapeHtml(t.phone_contact)}">📞</a>
         </td>
         <td${dv('model')}>${escapeHtml(t.phone_model)}</td>
         <td class="desc-cell"${dv('issue')} title="${escapeHtml(t.description)}">${escapeHtml(t.description) || '—'}</td>
@@ -236,6 +270,7 @@ function openNew(){
   document.getElementById('modalSub').textContent = 'Регистрирайте телефон, приет за ремонт.';
   document.getElementById('f_customer').value = '';
   document.getElementById('f_phone').value = '';
+  document.getElementById('f_phone_call').href = '#';
   document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
   document.getElementById('f_date_returned').value = '';
   document.getElementById('f_model').value = '';
@@ -252,6 +287,7 @@ function openNew(){
   document.getElementById('printCustomerBtn').style.display = 'none';
   document.getElementById('printServiceBtn').style.display = 'none';
   document.getElementById('historySection').style.display = 'none';
+  document.getElementById('editingBanner').style.display = 'none';
   document.getElementById('overlay').classList.add('open');
   document.getElementById('f_customer').focus();
 }
@@ -264,6 +300,7 @@ function openEdit(id){
   document.getElementById('modalSub').textContent = 'Редактирайте детайлите, обновете статуса или разпечатайте копие.';
   document.getElementById('f_customer').value = t.customer_name;
   document.getElementById('f_phone').value = t.phone_contact;
+  document.getElementById('f_phone_call').href = telHref(t.phone_contact);
   document.getElementById('f_date').value = t.date_received;
   document.getElementById('f_date_returned').value = t.date_returned || '';
   document.getElementById('f_model').value = t.phone_model;
@@ -286,11 +323,36 @@ function openEdit(id){
   document.getElementById('historyToggle').classList.remove('open');
   document.getElementById('historyCount').textContent = '';
   loadTicketHistory(t.id);
+
+  const banner = document.getElementById('editingBanner');
+  if(t.editing_by && t.editing_by !== currentUsername){
+    banner.textContent = `Внимание: в момента се преглежда от ${t.editing_by}`;
+    banner.style.display = 'block';
+  } else {
+    banner.style.display = 'none';
+  }
+  markEditingStart(t.id);
 }
 
 function closeModal(){
   document.getElementById('overlay').classList.remove('open');
+  if(editingTicket) markEditingStop(editingTicket.id);
   editingTicket = null;
+}
+
+// "Currently being worked on" presence — informational only, never blocks
+// anyone from opening or saving a ticket. Lets other open tabs see who's
+// looking at a ticket right now.
+function markEditingStart(id){
+  fetch(`/api/tickets/${id}/editing/start`, { method:'POST' }).catch(()=>{});
+}
+function markEditingStop(id){
+  fetch(`/api/tickets/${id}/editing/stop`, { method:'POST' }).catch(()=>{});
+}
+
+function telHref(phone){
+  const digits = (phone || '').replace(/[^\d+]/g, '');
+  return digits ? `tel:${digits}` : '#';
 }
 
 function setPravimButton(value){
@@ -590,5 +652,8 @@ document.getElementById('printServiceBtn').addEventListener('click', ()=>printCo
 document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
 document.getElementById('searchInput').addEventListener('input', render);
 document.getElementById('statusFilter').addEventListener('change', render);
+document.getElementById('f_phone').addEventListener('input', (e)=>{
+  document.getElementById('f_phone_call').href = telHref(e.target.value);
+});
 
 checkSession();
