@@ -117,6 +117,8 @@ first; it's a small planned few seconds of downtime either way.
    if you think nothing changed — safe to run regardless.
 7. **Point NSSM at the new folder**:
    `nssm set RepairLog AppDirectory "C:\crazyPhoneCRM\crazyPhoneCRM-<date>"`
+   (the nightly backup task automatically follows this — see `run-backup.bat`
+   in the Backups section — so there's no separate Task Scheduler step here)
 8. **Start it back up**: `nssm start RepairLog`, then actually open the app
    and check your data is there before moving on.
 9. Once you've confirmed everything looks right, the old versioned folder
@@ -172,19 +174,46 @@ NAS_BACKUP_DIR=\\NAS-NAME\backups\repair-log
 This project's `.env` should already have this set to
 `\\crazyphone\MainStorage\CrazyPhone\БазаДанни Сервиз`.
 
-**Schedule it nightly with Task Scheduler:**
+**Schedule it with Task Scheduler**, pointed at the stable wrapper rather
+than `node.exe` directly, so redeploying to a new folder never requires
+touching Task Scheduler again:
 
-1. Open Task Scheduler → **Create Basic Task**
-2. Name it "Repair Log Backup", trigger **Daily**, time e.g. 2:00 AM
-3. Action: **Start a program**
-   - Program/script: `C:\Program Files\nodejs\node.exe`
-   - Add arguments: `backup.js`
-   - Start in: your project folder, e.g. `D:\coding\crazyCRMv1\repair-log`
-     (this matters — without it, `backup.js` can't find `data\repair-log.db`)
-4. If you set a NAS path, open the task's **Properties** afterward and
+1. Edit `NSSM_PATH` near the top of `run-backup.bat` if your `nssm.exe`
+   isn't at `C:\nssm\win64\nssm.exe`, then place `run-backup.bat` somewhere
+   stable, **outside** any versioned app folder — e.g. `C:\CrazyPhoneCRM\`.
+2. Run it once by hand (double-click it, or run it from a terminal) and
+   confirm it prints `Local backup saved: ...` rather than an error, before
+   trusting it to a schedule.
+3. In an elevated PowerShell, register the schedule (this example matches
+   what this project actually runs — twice daily, every day except Sunday;
+   adjust the days/times for your own needs):
+   ```powershell
+   $Action = New-ScheduledTaskAction -Execute "C:\CrazyPhoneCRM\run-backup.bat"
+   $Days = "Monday","Tuesday","Wednesday","Thursday","Friday","Saturday"
+   $Trigger1 = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Days -At "15:00"
+   $Trigger2 = New-ScheduledTaskTrigger -Weekly -DaysOfWeek $Days -At "21:00"
+   Register-ScheduledTask -TaskName "Repair Log Backup" -Action $Action `
+     -Trigger $Trigger1,$Trigger2 -RunLevel Highest `
+     -Description "Backs up the repair log database at 15:00 and 21:00, every day except Sunday"
+   ```
+4. If you're using a NAS path, open the task's **Properties** afterward and
    select **Run whether user is logged on or not**, entering a real Windows
    account's credentials — not the default SYSTEM account, which has no
-   network identity and can't authenticate to a NAS share at all.
+   network identity and can't authenticate to a NAS share at all. (The
+   `RepairLog` service itself doesn't need anyone logged in to run, so
+   without this, the backup task can silently stop firing if the PC ever
+   sits at the lock screen unattended — see the redeploy note below for
+   why this matters even more once folders start changing.)
+
+**Why the wrapper matters**: pointing Task Scheduler directly at
+`node.exe` with a specific folder as its working directory (an earlier,
+simpler version of this setup did exactly that) means every redeploy to a
+new folder silently breaks the backup job — either it keeps backing up an
+increasingly stale copy of the database in the old folder, or it starts
+failing outright once that folder is deleted. `run-backup.bat` avoids this
+by asking NSSM where `RepairLog` is *currently* running from — the same
+`AppDirectory` your redeploy procedure already updates — rather than
+hardcoding a path of its own.
 
 Run `node backup.js` manually once first to confirm it works before trusting
 it to the schedule.
@@ -352,6 +381,8 @@ repair-log/
   create-admin.js     CLI to create/reset a login account
   backup.sh           Database backup script for Linux (local + NAS)
   backup.js            Database backup script for Windows (local + NAS)
+  run-backup.bat        Stable Task Scheduler entry point (Windows) — finds
+                         the current app folder via NSSM automatically
   restore.js            Restores a backup as the live database
   public/
     index.html        Login screen + main app + print capture targets
