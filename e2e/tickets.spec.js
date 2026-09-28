@@ -26,6 +26,14 @@ test('the new-ticket form has sensible defaults and hides repair-progress fields
   await expect(page.locator('#historySection')).toBeHidden();
 });
 
+test('just after midnight, a new ticket defaults to today, not yesterday', async ({ page }) => {
+  // 00:30 in Sofia is still the previous day in UTC.
+  await page.clock.setFixedTime(new Date('2026-09-29T00:30:00+03:00'));
+  await page.reload();
+  await page.click('#newTicketBtn');
+  await expect(page.locator('#f_date')).toHaveValue('2026-09-29');
+});
+
 test('creating a ticket through the form adds it to the table', async ({ page }) => {
   const name = uniqueName();
   await page.click('#newTicketBtn');

@@ -360,6 +360,23 @@ separate "admin" role — every signed-in account can reach Settings and
 change these; if you want only certain staff to have that access, that
 would need a role system added on top of this.
 
+## Reports page
+
+**Справки** in the header opens reports for a chosen period (this month, the
+last 3 or 12 months, this year, or any dates). All amounts are in €.
+
+- **Revenue and profit by month.** A ticket counts in the month it was
+  *returned* to the customer (Дата на връщане), since that is when it is paid.
+  Profit = Продажна цена − Изкупна цена.
+- **Turnaround.** Median and average days from received to returned.
+- **Time in status.** How long tickets sit in each status, worked out from
+  the change history. No extra data entry is needed.
+- **Open tickets right now,** the ten waiting longest, and the deposits
+  (капаро) currently held.
+- **Data check.** Lists tickets that make the numbers less accurate, such as
+  returned without a price, or "издаден" with no return date, so they can be
+  fixed.
+
 ## How it works day-to-day
 
 - **New Ticket** registers a phone: customer name, phone contact, date
@@ -419,6 +436,7 @@ repair-log/
   server.js          Entry point — starts the app on PORT
   app.js             Express app: auth routes + ticket API + settings API
   db.js              SQLite schema/setup
+  reports.js         Calculations behind the reports page
   create-admin.js     CLI to create/reset a login account
   backup.sh           Database backup script for Linux (local + NAS)
   backup.js            Database backup script for Windows (local + NAS)
@@ -428,9 +446,11 @@ repair-log/
   public/
     index.html        Login screen + main app + print capture targets
     settings.html      Admin settings page
+    reports.html       Reports page
     styles.css
     app.js             Main app frontend logic (incl. PDF generation)
     settings.js         Settings page frontend logic
+    reports.js          Reports page frontend logic (incl. the chart)
     assets/logo.png     Shop logo, used on the customer print
     vendor/              html2canvas + jsPDF (self-hosted, no CDN)
   test/                API + backup/restore tests (npm test)
