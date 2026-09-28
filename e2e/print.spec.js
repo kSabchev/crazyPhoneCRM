@@ -34,7 +34,7 @@ async function capturePdf(page) {
 test('the customer copy is a 100 × 95 mm landscape card', async ({ page }) => {
   const t = await createTicketViaApi(page, { description: 'Счупен дисплей и заден капак' });
   await page.reload();
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   await page.click('#printCustomerBtn');
 
   const { width, height, pdf } = await capturePdf(page);
@@ -55,7 +55,7 @@ test('the customer copy is a 100 × 95 mm landscape card', async ({ page }) => {
 test('the service label is a 50 × 30 mm sticker', async ({ page }) => {
   const t = await createTicketViaApi(page, { description: 'Смяна на батерия' });
   await page.reload();
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   await page.click('#printServiceBtn');
 
   const { width, height } = await capturePdf(page);
@@ -65,4 +65,15 @@ test('the service label is a 50 × 30 mm sticker', async ({ page }) => {
   const label = page.locator('#printServiceTemplate');
   await expect(label).toContainText(`№ ${t.ticket_no}`);
   await expect(label).toContainText('Смяна на батерия');
+});
+
+test('printing also works from the buttons at the top of the form', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.locator('#topActions [data-action="print-service"]').click();
+
+  const { width, height } = await capturePdf(page);
+  expect(width).toBeCloseTo(50, 0);
+  expect(height).toBeCloseTo(30, 0);
 });

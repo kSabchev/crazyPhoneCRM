@@ -85,7 +85,7 @@ test('editing a ticket updates the table and records history', async ({ page }) 
   const t = await createTicketViaApi(page);
   await page.reload();
 
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   await expectModalOpen(page);
   await expect(page.locator('#modalTitle')).toHaveText(`Поръчка #${t.ticket_no}`);
   await expect(page.locator('#f_customer')).toHaveValue(t.customer_name);
@@ -113,7 +113,7 @@ test('choosing "издаден" fills in today as the return date', async ({ pag
   const t = await createTicketViaApi(page);
   await page.reload();
 
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   await expect(page.locator('#f_date_returned')).toHaveValue('');
   await page.selectOption('#f_status', 'в сервиз');
   await expect(page.locator('#f_date_returned')).toHaveValue('');
@@ -129,23 +129,135 @@ test('choosing "издаден" keeps a return date that is already filled in', 
   const t = await createTicketViaApi(page, { dateReturned: '2026-08-15' });
   await page.reload();
 
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   await page.selectOption('#f_status', 'издаден');
   await expect(page.locator('#f_date_returned')).toHaveValue('2026-08-15');
+});
+
+// Same local-date rule as the server (both run on this machine).
+function todayDisplay() {
+  const d = new Date();
+  return `${String(d.getDate()).padStart(2, '0')}.${String(d.getMonth() + 1).padStart(2, '0')}.${d.getFullYear()}`;
+}
+
+test('clicking a status opens a dropdown that saves without opening the ticket', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await r.locator('.status-cell .badge').click();
+  await expectModalClosed(page);
+  const select = r.locator('.status-select');
+  await expect(select).toBeVisible();
+  await expect(select).toHaveValue('за сервиз');
+  await expect(select.locator('option')).toHaveText(['за сервиз', 'в сервиз', 'чака клиент', 'издаден']);
+
+  await select.selectOption('чака клиент');
+  await expect(r.locator('.status-select')).toHaveCount(0);
+  await expect(r.locator('.badge')).toHaveText('чака клиент');
+  await expectModalClosed(page);
+
+  await page.reload();
+  await expect(row(page, t.customer_name).locator('.badge')).toHaveText('чака клиент');
+});
+
+test('quick-changing the status to "издаден" sets today as the return date', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await r.locator('.status-cell .badge').click();
+  await r.locator('.status-select').selectOption('издаден');
+  await expect(r.locator('.badge')).toHaveText('издаден');
+  await expect(r).toContainText(todayDisplay());
+});
+
+test('quick status keeps a return date that is already set', async ({ page }) => {
+  const t = await createTicketViaApi(page, { dateReturned: '2026-08-15' });
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await r.locator('.status-cell .badge').click();
+  await r.locator('.status-select').selectOption('издаден');
+  await expect(r.locator('.badge')).toHaveText('издаден');
+  await expect(r).toContainText('15.08.2026');
+});
+
+test('Escape or clicking elsewhere closes the status dropdown without saving', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await r.locator('.status-cell .badge').click();
+  // The first Escape closes the browser's open option list; the second
+  // closes the dropdown itself.
+  await r.locator('.status-select').press('Escape');
+  await page.keyboard.press('Escape');
+  await expect(r.locator('.status-select')).toHaveCount(0);
+  await expect(r.locator('.badge')).toHaveText('за сервиз');
+
+  await r.locator('.status-cell .badge').click();
+  await expect(r.locator('.status-select')).toBeVisible();
+  await page.click('#searchInput');
+  await expect(r.locator('.status-select')).toHaveCount(0);
+  await expect(r.locator('.badge')).toHaveText('за сервиз');
+  await expectModalClosed(page);
+});
+
+test('when editing, the action buttons are also at the top of the form', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+
+  await page.click('#newTicketBtn');
+  await expect(page.locator('#topActions')).toBeHidden();
+  await page.click('#cancelBtn');
+
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  const top = page.locator('#topActions');
+  await expect(top).toBeVisible();
+  await expect(top.locator('button')).toHaveText([
+    'Изтрий поръчката', 'Разпечатай за клиента', 'Разпечатай за сервиза', 'Отказ', 'Запази поръчката'
+  ]);
+  // Directly under the subtitle, above the first field.
+  const subBox = await page.locator('#modalSub').boundingBox();
+  const topBox = await top.boundingBox();
+  const fieldBox = await page.locator('#f_customer').boundingBox();
+  expect(topBox.y).toBeGreaterThan(subBox.y);
+  expect(topBox.y).toBeLessThan(fieldBox.y);
+
+  await page.fill('#f_comment', 'запазено от горния бутон');
+  await top.locator('[data-action="save"]').click();
+  await expectModalClosed(page);
+  await expect(row(page, t.customer_name)).toContainText('запазено от горния бутон');
+});
+
+test('the top Отказ and Изтрий buttons work like the bottom ones', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.locator('#topActions [data-action="cancel"]').click();
+  await expectModalClosed(page);
+
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  page.once('dialog', d => d.accept());
+  await page.locator('#topActions [data-action="delete"]').click();
+  await expectModalClosed(page);
+  await expect(row(page, t.customer_name)).toHaveCount(0);
 });
 
 test('deleting asks for confirmation; cancelling keeps the ticket', async ({ page }) => {
   const t = await createTicketViaApi(page);
   await page.reload();
 
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   page.once('dialog', d => d.dismiss());
   await page.click('#deleteBtn');
   await expectModalOpen(page);
   await page.click('#cancelBtn');
   await expect(row(page, t.customer_name)).toHaveCount(1);
 
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   page.once('dialog', d => d.accept());
   await page.click('#deleteBtn');
   await expectModalClosed(page);

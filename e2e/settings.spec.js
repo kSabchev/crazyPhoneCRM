@@ -58,7 +58,7 @@ test('the shop name from settings is printed on the customer card', async ({ pag
   await page.goto('/');
   const t = await createTicketViaApi(page);
   await page.reload();
-  await row(page, t.customer_name).click();
+  await row(page, t.customer_name).locator('.ticket-no').click();
   await page.click('#printCustomerBtn');
   await expect(page.locator('#printCustomerTemplate')).toContainText('Тест Сервиз');
 });

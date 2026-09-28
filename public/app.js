@@ -236,7 +236,11 @@ function render(){
         <td class="desc-cell"${dv('repairPerformed')} title="${escapeHtml(t.repair_performed)}">${escapeHtml(t.repair_performed) || '—'}</td>
         <td${dv('loanerPhone')}>${escapeHtml(t.loaner_phone)}</td>
         <td${dv('pravim')} class="pravim-cell" onclick="togglePravim(event, ${t.id})"><span class="pravim-toggle pravim-${t.pravim||'circle'}">${PRAVIM_SYMBOLS[t.pravim||'circle']}</span></td>
-        <td${dv('status')}><span class="badge" style="color:${fg};background:${bg};">${escapeHtml(t.status)}</span></td>
+        <td${dv('status')} class="status-cell" onclick="startStatusEdit(event, ${t.id})">${
+          quickStatusId === t.id
+            ? statusSelectHtml(t)
+            : `<span class="badge" style="color:${fg};background:${bg};" title="Щракнете за смяна на статуса">${escapeHtml(t.status)}</span>`
+        }</td>
         <td${dv('kaparo')}>${escapeHtml(t.kaparo)}</td>
         <td class="price"${dv('servicePrice')}>${fmtPrice(t.service_price)}</td>
         <td class="price"${dv('customerPrice')}>${fmtPrice(t.customer_price)}</td>
@@ -246,8 +250,70 @@ function render(){
     }).join('');
   }
 
+  // A live refresh redraws the table; keep an open quick-status dropdown
+  // focused so a colleague's change doesn't interrupt picking a status.
+  const openSelect = body.querySelector('.status-select');
+  if(openSelect && !openSelect.contains(document.activeElement)) openSelect.focus();
+
   renderStats();
 }
+
+// ---------- Quick status change from the table ----------
+// Clicking a status badge swaps it for a dropdown; picking a status saves
+// immediately without opening the ticket. The server fills in today's
+// return date when the new status is "издаден" (same rule as the form).
+let quickStatusId = null;
+
+function statusSelectHtml(t){
+  const options = settings ? settings.statuses.slice() : [];
+  // Keep a status that was since removed from settings selectable as-is.
+  if(!options.includes(t.status)) options.unshift(t.status);
+  return `<select class="status-select" aria-label="Статус на поръчка #${t.ticket_no}"
+      onchange="saveQuickStatus(${t.id}, this.value)" onkeydown="if(event.key==='Escape') cancelStatusEdit()">
+    ${options.map(s=>`<option value="${escapeHtml(s)}"${s===t.status?' selected':''}>${escapeHtml(s)}</option>`).join('')}
+  </select>`;
+}
+
+function startStatusEdit(e, id){
+  e.stopPropagation();
+  if(quickStatusId === id) return; // clicks inside the open dropdown
+  quickStatusId = id;
+  render();
+  const sel = document.querySelector('#tableBody .status-select');
+  if(!sel) return;
+  sel.focus();
+  try { sel.showPicker(); } catch(_) { /* older browsers: focused, opens on next click/keypress */ }
+}
+
+function cancelStatusEdit(){
+  if(quickStatusId === null) return;
+  quickStatusId = null;
+  render();
+}
+
+async function saveQuickStatus(id, status){
+  quickStatusId = null;
+  const t = tickets.find(x=>x.id===id);
+  if(t) t.status = status; // show the new badge straight away
+  render();
+
+  const res = await fetch(`/api/tickets/${id}`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ status })
+  });
+  if(res.status === 401){ showLogin(); return; }
+  if(!res.ok){
+    const data = await res.json().catch(()=>({}));
+    alert(data.error || 'Статусът не можа да бъде запазен.');
+  }
+  loadTickets(); // picks up the auto-set return date, or reverts on error
+}
+
+// Clicking anywhere outside the open dropdown closes it without saving.
+document.addEventListener('click', (e)=>{
+  if(quickStatusId !== null && !e.target.closest('.status-select')) cancelStatusEdit();
+});
 
 function renderStats(){
   const total = tickets.length;
@@ -302,6 +368,7 @@ function openNew(){
   document.getElementById('printCustomerBtn').style.display = 'none';
   document.getElementById('printServiceBtn').style.display = 'none';
   document.getElementById('historySection').style.display = 'none';
+  document.getElementById('topActions').style.display = 'none';
   document.getElementById('editingBanner').style.display = 'none';
   setEditOnlyFieldsVisible(false);
   document.getElementById('overlay').classList.add('open');
@@ -339,6 +406,7 @@ function openEdit(id){
   document.getElementById('f_loaner').value = t.loaner_phone || 'Не';
   setPravimButton(t.pravim || 'circle');
   setEditOnlyFieldsVisible(true);
+  document.getElementById('topActions').style.display = 'flex';
   document.getElementById('deleteBtn').style.display = 'inline-block';
   document.getElementById('printCustomerBtn').style.display = 'inline-block';
   document.getElementById('printServiceBtn').style.display = 'inline-block';
@@ -670,11 +738,18 @@ async function printCopy(kind){
 
 // ---------- Wire up ----------
 document.getElementById('newTicketBtn').addEventListener('click', openNew);
-document.getElementById('cancelBtn').addEventListener('click', closeModal);
-document.getElementById('saveBtn').addEventListener('click', saveTicket);
-document.getElementById('deleteBtn').addEventListener('click', deleteTicket);
-document.getElementById('printCustomerBtn').addEventListener('click', ()=>printCopy('customer'));
-document.getElementById('printServiceBtn').addEventListener('click', ()=>printCopy('service'));
+// The ticket modal has the same buttons at the top and bottom; both sets
+// are wired by their data-action.
+const MODAL_ACTIONS = {
+  'cancel': closeModal,
+  'save': saveTicket,
+  'delete': deleteTicket,
+  'print-customer': ()=>printCopy('customer'),
+  'print-service': ()=>printCopy('service')
+};
+document.querySelectorAll('#overlay [data-action]').forEach(btn=>{
+  btn.addEventListener('click', MODAL_ACTIONS[btn.dataset.action]);
+});
 document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
 document.getElementById('searchInput').addEventListener('input', render);
 document.getElementById('statusFilter').addEventListener('change', render);

@@ -385,7 +385,11 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
   price = what the customer pays).
 - Click any row to **edit** it — update the status as the repair progresses,
   set the date returned once it's handed back, fix a detail, or delete the
-  ticket.
+  ticket. The Delete / Print / Cancel / Save buttons are at both the top
+  and the bottom of an open ticket.
+- Click a **status** in the table to change it straight from a dropdown,
+  without opening the ticket. Changing it to "издаден" (here or in the
+  ticket form) fills in today as the return date, unless one is already set.
 - **Search** filters across customer name, phone number, model, ticket
   number, and description as you type. The status dropdown narrows further.
 - **Live updates**: when anyone creates, edits, or deletes a ticket (or an
