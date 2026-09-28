@@ -92,11 +92,17 @@ This app is safe to expose to the internet as written, but you should:
 1. **Put it behind HTTPS.** Use a reverse proxy (e.g. nginx or Caddy) with a
    TLS certificate (Let's Encrypt is free), and uncomment `secure: true` on
    the cookie settings in `app.js` once HTTPS is in place.
+   Also set `TRUST_PROXY=loopback` in `.env`, so the login rate limit (10
+   failed attempts per IP per 15 minutes) counts each user separately rather
+   than everyone as the proxy's address.
 2. **Set a strong, unique `SESSION_SECRET`** in `.env` — don't use the example.
 3. **Don't commit `.env` or the `data/` folder** — `.gitignore` already
    excludes both.
 4. **Create one account per staff member** rather than sharing a single login,
    so you always know who made a change.
+5. **Monitor `GET /health`** if you want uptime alerts. It needs no login and
+   returns `{"status":"ok"}` only when the app is responding *and* the
+   database is readable (503 otherwise).
 
 ## Updating to a new version
 
