@@ -1,0 +1,39 @@
+name: Tests
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+# A newer push to the same PR cancels the run still going for the old one.
+concurrency:
+  group: tests-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: ${{ matrix.os }} / Node ${{ matrix.node }}
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        # Windows is what the shop runs (NSSM service), and restore.js has
+        # Windows-specific file-locking handling; Linux covers backup.sh
+        # style deployments.
+        os: [windows-latest, ubuntu-latest]
+        node: [22, 24]
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: ${{ matrix.node }}
+          cache: npm
+
+      # bcrypt and better-sqlite3 ship prebuilt binaries for Windows and
+      # Linux; skipping install scripts uses those instead of compiling
+      # from source (same as npm 12's default behaviour locally).
+      - run: npm ci --ignore-scripts
+
+      - run: npm test
