@@ -208,4 +208,4 @@ function buildReport(db, { from, to, today }) {
   };
 }
 
-module.exports = { buildReport, parseKaparo, monthsBetween };
+module.exports = { buildReport, parseKaparo, monthsBetween, COMPLETED_STATUS };

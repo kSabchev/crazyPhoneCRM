@@ -108,6 +108,32 @@ test('editing a ticket updates the table and records history', async ({ page }) 
   await expect(page.locator('#historyList')).toContainText('Статус');
 });
 
+test('choosing "издаден" fills in today as the return date', async ({ page }) => {
+  await page.clock.setFixedTime(new Date('2026-10-02T12:00:00+03:00'));
+  const t = await createTicketViaApi(page);
+  await page.reload();
+
+  await row(page, t.customer_name).click();
+  await expect(page.locator('#f_date_returned')).toHaveValue('');
+  await page.selectOption('#f_status', 'в сервиз');
+  await expect(page.locator('#f_date_returned')).toHaveValue('');
+  await page.selectOption('#f_status', 'издаден');
+  await expect(page.locator('#f_date_returned')).toHaveValue('2026-10-02');
+
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+  await expect(row(page, t.customer_name)).toContainText('02.10.2026');
+});
+
+test('choosing "издаден" keeps a return date that is already filled in', async ({ page }) => {
+  const t = await createTicketViaApi(page, { dateReturned: '2026-08-15' });
+  await page.reload();
+
+  await row(page, t.customer_name).click();
+  await page.selectOption('#f_status', 'издаден');
+  await expect(page.locator('#f_date_returned')).toHaveValue('2026-08-15');
+});
+
 test('deleting asks for confirmation; cancelling keeps the ticket', async ({ page }) => {
   const t = await createTicketViaApi(page);
   await page.reload();

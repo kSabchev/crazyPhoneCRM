@@ -6,7 +6,7 @@ const SqliteStore = require('better-sqlite3-session-store')(session);
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const db = require('./db');
-const { buildReport } = require('./reports');
+const { buildReport, COMPLETED_STATUS } = require('./reports');
 
 const app = express();
 
@@ -377,7 +377,7 @@ app.post('/api/tickets', requireAuth, (req, res) => {
       t.customerName,
       t.phoneContact,
       t.dateReceived,
-      t.dateReturned || null,
+      t.dateReturned || (t.status === COMPLETED_STATUS ? localToday() : null),
       t.phoneModel,
       t.status || 'за сервиз',
       t.description,
@@ -443,6 +443,13 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
   };
   if (t.servicePrice === undefined) next.service_price = existing.service_price;
   if (t.customerPrice === undefined) next.customer_price = existing.customer_price;
+
+  // Marking a ticket "издаден" means it was handed back today, unless a
+  // return date is already set or was sent. Keeps reports accurate even
+  // when the status is changed without touching the date field.
+  if (next.status === COMPLETED_STATUS && existing.status !== COMPLETED_STATUS && !next.date_returned) {
+    next.date_returned = localToday();
+  }
 
   db.prepare(
     `UPDATE tickets SET
