@@ -149,6 +149,12 @@ async function loadTickets(){
 
 // Dates are stored as yyyy-mm-dd (native <input type="date"> value format).
 // Displayed as dd.mm.yyyy throughout the app, regardless of browser locale.
+// Today as yyyy-mm-dd in the browser's own time zone. (toISOString() is UTC,
+// which gave yesterday's date for tickets opened between midnight and ~3am.)
+function localDateString(d){
+  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+}
+
 function fmtDate(d){
   if(!d) return '—';
   const parts = d.split('-');
@@ -271,7 +277,7 @@ function openNew(){
   document.getElementById('f_customer').value = '';
   document.getElementById('f_phone').value = '';
   document.getElementById('f_phone_call').href = '#';
-  document.getElementById('f_date').value = new Date().toISOString().slice(0,10);
+  document.getElementById('f_date').value = localDateString(new Date());
   document.getElementById('f_date_returned').value = '';
   document.getElementById('f_model').value = '';
   document.getElementById('f_status').value = (settings && settings.statuses[0]) || 'за сервиз';
