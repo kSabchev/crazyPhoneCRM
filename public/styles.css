@@ -125,6 +125,9 @@ tbody tr:hover{background:#FBF7EF;}
 .desc-cell{max-width:150px;color:var(--ink-soft);font-size:12.5px;white-space:normal;word-break:break-word;}
 .price{font-variant-numeric:tabular-nums;white-space:nowrap;}
 .badge{display:inline-block;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;}
+.status-cell{cursor:pointer;}
+.status-cell .badge:hover{box-shadow:0 0 0 2px var(--copper-soft);}
+.status-select{padding:4px 6px;border:1px solid var(--copper);border-radius:3px;font-size:12.5px;background:var(--panel);color:var(--ink);cursor:pointer;}
 .pravim-cell{text-align:center;cursor:pointer;}
 .pravim-toggle{
   display:inline-flex;align-items:center;justify-content:center;
@@ -197,6 +200,12 @@ tbody tr:hover{background:#FBF7EF;}
 
 .modal-actions{display:flex;justify-content:space-between;align-items:center;margin-top:24px;padding-top:18px;border-top:1px solid var(--line);flex-wrap:wrap;gap:10px;}
 .modal-actions .right{display:flex;gap:10px;flex-wrap:wrap;}
+/* Top copy of the modal buttons: separated from the fields below it. */
+.modal-actions-top{margin-top:0;padding-top:0;border-top:none;padding-bottom:18px;border-bottom:1px solid var(--line);margin-bottom:20px;}
+.modal-actions-top .right{gap:8px;}
+.modal-actions-top .btn{padding:7px 12px;font-size:13px;}
+/* Room for the top action row on one line on desktop. */
+#overlay .modal{max-width:760px;}
 
 /* History / activity log */
 .history-section{margin-bottom:8px;}

@@ -93,6 +93,18 @@
   <div class="modal">
     <h2 id="modalTitle">Нова сервизна поръчка</h2>
     <div class="sub" id="modalSub">Регистрирайте телефон, приет за ремонт.</div>
+    <!-- Same actions as the bottom bar, shown when editing so they're reachable without scrolling. -->
+    <div class="modal-actions modal-actions-top" id="topActions" style="display:none;">
+      <div class="left">
+        <button class="btn danger" data-action="delete">Изтрий поръчката</button>
+      </div>
+      <div class="right">
+        <button class="btn print-btn secondary" data-action="print-customer">Разпечатай за клиента</button>
+        <button class="btn print-btn secondary" data-action="print-service">Разпечатай за сервиза</button>
+        <button class="btn secondary" data-action="cancel">Отказ</button>
+        <button class="btn" data-action="save">Запази поръчката</button>
+      </div>
+    </div>
     <div class="editing-banner" id="editingBanner" style="display:none;"></div>
 
     <div class="field">
@@ -180,13 +192,13 @@
 
     <div class="modal-actions">
       <div class="left">
-        <button class="btn danger" id="deleteBtn" style="display:none;">Изтрий поръчката</button>
+        <button class="btn danger" id="deleteBtn" data-action="delete" style="display:none;">Изтрий поръчката</button>
       </div>
       <div class="right">
-        <button class="btn print-btn secondary" id="printCustomerBtn" style="display:none;">Разпечатай за клиента</button>
-        <button class="btn print-btn secondary" id="printServiceBtn" style="display:none;">Разпечатай за сервиза</button>
-        <button class="btn secondary" id="cancelBtn">Отказ</button>
-        <button class="btn" id="saveBtn">Запази поръчката</button>
+        <button class="btn print-btn secondary" id="printCustomerBtn" data-action="print-customer" style="display:none;">Разпечатай за клиента</button>
+        <button class="btn print-btn secondary" id="printServiceBtn" data-action="print-service" style="display:none;">Разпечатай за сервиза</button>
+        <button class="btn secondary" id="cancelBtn" data-action="cancel">Отказ</button>
+        <button class="btn" id="saveBtn" data-action="save">Запази поръчката</button>
       </div>
     </div>
   </div>

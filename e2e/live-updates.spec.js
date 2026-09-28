@@ -37,7 +37,7 @@ test('opening a ticket shows "being viewed by" to others, and clears on close', 
   const t = await createTicketViaApi(alice);
   await expect(row(bob, t.customer_name)).toHaveCount(1);
 
-  await row(bob, t.customer_name).click();
+  await row(bob, t.customer_name).locator('.ticket-no').click();
   await expectModalOpen(bob);
   await expect(row(alice, t.customer_name).locator('.editing-badge')).toHaveText('👁 bob');
   // bob never sees a badge for his own open ticket.
@@ -51,10 +51,10 @@ test('opening a ticket someone else has open shows a warning banner', async () =
   const t = await createTicketViaApi(alice);
   await expect(row(bob, t.customer_name)).toHaveCount(1);
 
-  await row(bob, t.customer_name).click();
+  await row(bob, t.customer_name).locator('.ticket-no').click();
   await expect(row(alice, t.customer_name).locator('.editing-badge')).toBeVisible();
 
-  await row(alice, t.customer_name).click();
+  await row(alice, t.customer_name).locator('.ticket-no').click();
   await expect(alice.locator('#editingBanner')).toBeVisible();
   await expect(alice.locator('#editingBanner')).toContainText('bob');
 });
@@ -63,7 +63,7 @@ test('an open ticket keeps unsaved typing while other changes stream in', async 
   const mine = await createTicketViaApi(bob);
   await expect(row(bob, mine.customer_name)).toHaveCount(1);
 
-  await row(bob, mine.customer_name).click();
+  await row(bob, mine.customer_name).locator('.ticket-no').click();
   await bob.fill('#f_comment', 'клиентът ще дойде в петък');
 
   // alice's change triggers a live table refresh in bob's tab.
@@ -86,6 +86,21 @@ test('changes made while a screen was disconnected appear once it reconnects', a
 
   await bob.evaluate(() => connectLiveUpdates());
   await expect(row(bob, t.customer_name)).toHaveCount(1);
+});
+
+test('a colleague\'s change does not close an open status dropdown', async () => {
+  const t = await createTicketViaApi(bob);
+  const r = row(bob, t.customer_name);
+  await expect(r).toHaveCount(1);
+  await r.locator('.status-cell .badge').click();
+  await expect(r.locator('.status-select')).toBeVisible();
+
+  const other = await createTicketViaApi(alice);
+  await expect(row(bob, other.customer_name)).toHaveCount(1);
+  await expect(r.locator('.status-select')).toBeVisible();
+
+  await r.locator('.status-select').selectOption('в сервиз');
+  await expect(row(alice, t.customer_name).locator('.badge')).toHaveText('в сервиз');
 });
 
 test('a settings change reaches other open sessions', async () => {
