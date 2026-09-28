@@ -81,6 +81,10 @@ runner. Every test file gets its own throwaway database in the system temp
 folder, so running tests never touches `data/` or `backups/`, and it's
 safe to run on the shop PC while the app is live.
 
+The same tests run automatically on GitHub (Windows and Linux, Node 22 and
+24) for every pull request and every push to `main` — see
+`.github/workflows/test.yml`.
+
 ## Deploying for real use
 
 This app is safe to expose to the internet as written, but you should:
