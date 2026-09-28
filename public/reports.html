@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="bg">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Справки — CrazyPhone</title>
+<link rel="stylesheet" href="styles.css">
+</head>
+<body>
+
+<div class="wrap" id="reportsScreen" style="display:none;">
+
+  <header>
+    <div class="brand">
+      <h1>Справки</h1>
+      <span class="tag">приходи, срокове за ремонт и текуща натовареност</span>
+    </div>
+    <div class="header-right">
+      <div class="who">
+        <span id="whoAmI"></span>
+        <button class="link-btn" id="backBtn">← Обратно към поръчките</button>
+        <button class="link-btn" id="logoutBtn">Изход</button>
+      </div>
+    </div>
+  </header>
+
+  <div class="report-controls">
+    <div class="preset-group" id="presets">
+      <button class="btn secondary" data-preset="month">Този месец</button>
+      <button class="btn secondary" data-preset="3m">Последните 3 месеца</button>
+      <button class="btn secondary" data-preset="year">Тази година</button>
+      <button class="btn secondary" data-preset="12m">Последните 12 месеца</button>
+    </div>
+    <div class="range-group">
+      <label>От <input type="date" id="fromInput"></label>
+      <label>До <input type="date" id="toInput"></label>
+      <button class="btn" id="applyBtn">Покажи</button>
+    </div>
+  </div>
+  <div class="report-error" id="reportError"></div>
+
+  <div class="kpi-grid" id="kpis"></div>
+
+  <div class="settings-section report-section">
+    <h2>Приходи и печалба по месеци</h2>
+    <div class="section-sub">По месец на връщане на телефона на клиента. Печалба = продажна цена − изкупна цена.</div>
+    <div class="viz-legend" id="revenueLegend">
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--series-1)"></span>Приходи</span>
+      <span class="legend-item"><span class="legend-swatch" style="background:var(--series-2)"></span>Печалба</span>
+    </div>
+    <div class="viz-chart" id="revenueChart"></div>
+    <div class="viz-tooltip" id="revenueTooltip" role="status"></div>
+    <div class="table-wrap report-table">
+      <table>
+        <thead><tr><th>Месец</th><th class="num">Върнати</th><th class="num">С цена</th><th class="num">Приходи</th><th class="num">Разходи</th><th class="num">Печалба</th></tr></thead>
+        <tbody id="revenueTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="report-columns">
+    <div class="settings-section report-section">
+      <h2>Време в статус</h2>
+      <div class="section-sub">Средно колко дни поръчките са стояли в даден статус, преди да преминат в следващия (преходи в избрания период).</div>
+      <div class="table-wrap report-table">
+        <table>
+          <thead><tr><th>Статус</th><th class="num">Средно дни</th><th class="num">Брой</th></tr></thead>
+          <tbody id="statusTimeTable"></tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="settings-section report-section">
+      <h2>Отворени поръчки в момента</h2>
+      <div class="section-sub">Всички незавършени поръчки, независимо от избрания период.</div>
+      <div class="table-wrap report-table">
+        <table>
+          <thead><tr><th>Статус</th><th class="num">Брой</th><th class="num">Най-стара (дни)</th></tr></thead>
+          <tbody id="workloadTable"></tbody>
+        </table>
+      </div>
+    </div>
+  </div>
+
+  <div class="settings-section report-section">
+    <h2>Най-дълго чакащи</h2>
+    <div class="section-sub">Десетте отворени поръчки, приети най-отдавна.</div>
+    <div class="table-wrap report-table">
+      <table>
+        <thead><tr><th>№</th><th>Клиент</th><th>Модел</th><th>Статус</th><th class="num">Дни</th></tr></thead>
+        <tbody id="oldestTable"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <div class="settings-section report-section">
+    <h2>Проверка на данните</h2>
+    <div class="section-sub">Поръчки с липсващи или нечетими данни, които правят горните числа по-неточни.</div>
+    <div id="dataQuality"></div>
+  </div>
+</div>
+
+<script src="reports.js"></script>
+</body>
+</html>

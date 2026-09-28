@@ -101,6 +101,9 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   showLogin();
 });
 
+document.getElementById('reportsBtn').addEventListener('click', ()=>{
+  window.location.href = '/reports.html';
+});
 document.getElementById('settingsBtn').addEventListener('click', ()=>{
   window.location.href = '/settings.html';
 });

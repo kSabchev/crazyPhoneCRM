@@ -6,6 +6,7 @@ const SqliteStore = require('better-sqlite3-session-store')(session);
 const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const db = require('./db');
+const { buildReport } = require('./reports');
 
 const app = express();
 
@@ -505,6 +506,33 @@ app.get('/api/audit', requireAuth, (req, res) => {
     .all();
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
+
+// ---- Reports ----
+// Today's date in the server's local time zone (the shop's), as YYYY-MM-DD.
+function localToday() {
+  const d = new Date();
+  return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+app.get('/api/reports', requireAuth, (req, res) => {
+  const today = localToday();
+  const from = req.query.from || `${today.slice(0, 4)}-01-01`;
+  const to = req.query.to || today;
+  if (!isValidDate(from) || !isValidDate(to)) {
+    return res.status(400).json({ error: 'Невалиден период' });
+  }
+  if (from > to) {
+    return res.status(400).json({ error: 'Началната дата е след крайната' });
+  }
+  if (daysBetweenDates(from, to) > 10 * 366) {
+    return res.status(400).json({ error: 'Периодът е твърде дълъг (най-много 10 години)' });
+  }
+  res.json(buildReport(db, { from, to, today }));
+});
+
+function daysBetweenDates(from, to) {
+  return (Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / (24 * 60 * 60 * 1000);
+}
 
 // ---- Static frontend ----
 app.use(express.static(path.join(__dirname, 'public')));

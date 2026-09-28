@@ -333,3 +333,77 @@ tbody tr:hover{background:#FBF7EF;}
 @media (max-width:720px){
   .checkbox-grid{grid-template-columns:1fr 1fr;}
 }
+
+/* ---- Reports page ---- */
+:root{
+  /* Chart series — validated categorical pair (CVD + contrast on white). */
+  --series-1:#2a78d6;  /* revenue */
+  --series-2:#eb6834;  /* profit */
+  --grid:#ECE7DC;
+}
+.report-controls{display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap;margin-bottom:8px;}
+.preset-group,.range-group{display:flex;gap:8px;flex-wrap:wrap;align-items:center;}
+.preset-group .btn{padding:8px 12px;font-size:13px;}
+.preset-group .btn.active{border-color:var(--ink);background:var(--panel);font-weight:600;}
+.range-group label{font-size:13px;color:var(--ink-soft);display:flex;align-items:center;gap:6px;}
+.range-group input{padding:8px 10px;border:1px solid var(--line);border-radius:3px;font-size:14px;background:var(--panel);}
+.report-error{color:var(--status-parts);font-size:13px;min-height:18px;margin-bottom:8px;}
+
+.kpi-grid{display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:12px;margin-bottom:20px;}
+.kpi{background:var(--panel);border:1px solid var(--line);border-radius:4px;padding:14px 16px;}
+.kpi-label{font-size:12px;color:var(--ink-soft);font-weight:600;}
+.kpi-value{font-family:Georgia,serif;font-size:26px;font-weight:600;margin:6px 0 4px;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.kpi-sub{font-size:12px;color:var(--ink-soft);}
+
+.report-section{position:relative;}
+.report-columns{display:grid;grid-template-columns:1fr 1fr;gap:20px;}
+.report-columns .report-section{margin-bottom:20px;}
+
+.viz-legend{display:flex;gap:16px;font-size:13px;color:var(--ink);margin-bottom:8px;}
+.legend-item{display:inline-flex;align-items:center;gap:6px;}
+.legend-swatch{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:6px;vertical-align:baseline;}
+.legend-item .legend-swatch{margin-right:0;}
+.viz-chart{width:100%;margin-bottom:16px;}
+.viz-chart svg{display:block;}
+.viz-chart .grid{stroke:var(--grid);stroke-width:1;}
+.viz-chart .grid.zero{stroke:var(--ink-soft);}
+.viz-chart .axis-label{font-size:11px;fill:var(--ink-soft);font-variant-numeric:tabular-nums;}
+.viz-chart .bar-revenue{fill:var(--series-1);}
+.viz-chart .bar-profit{fill:var(--series-2);}
+.viz-chart .hover-band{fill:transparent;}
+.viz-chart .month.hover .hover-band{fill:#F4EFE4;}
+.viz-tooltip{
+  position:absolute;pointer-events:none;opacity:0;
+  background:var(--panel);border:1px solid var(--line);border-radius:4px;
+  box-shadow:0 4px 14px rgba(0,0,0,.08);padding:8px 10px;font-size:12.5px;color:var(--ink);
+  line-height:1.6;white-space:nowrap;z-index:5;
+}
+.viz-tooltip.show{opacity:1;}
+.viz-tooltip .tip-title{font-weight:600;}
+.viz-tooltip .tip-sub{color:var(--ink-soft);}
+.viz-tooltip b{font-variant-numeric:tabular-nums;}
+
+.report-table{border-radius:3px;}
+.report-table tbody tr{cursor:default;}
+.report-table tbody tr:hover{background:none;}
+.report-table .num{text-align:right;font-variant-numeric:tabular-nums;white-space:nowrap;}
+.report-table .total-row td{font-weight:600;background:#FBFAF6;}
+.report-table .empty-cell{color:var(--ink-soft);text-align:center;}
+
+.quality-row{display:grid;grid-template-columns:24px 1fr auto;gap:4px 10px;align-items:center;padding:10px 0;border-bottom:1px solid var(--line);font-size:13.5px;}
+.quality-row:last-child{border-bottom:none;}
+.quality-icon{display:inline-flex;align-items:center;justify-content:center;width:20px;height:20px;border-radius:50%;font-size:12px;font-weight:700;}
+.quality-row.ok .quality-icon{background:var(--status-ready-bg);color:var(--status-ready);}
+.quality-row.warn .quality-icon{background:var(--status-parts-bg);color:var(--status-parts);}
+.quality-count{font-weight:600;font-variant-numeric:tabular-nums;}
+.quality-row.ok .quality-count{color:var(--ink-soft);font-weight:400;}
+.quality-refs{grid-column:2 / 4;font-size:12.5px;color:var(--ink-soft);}
+
+@media (max-width:900px){
+  .report-columns{grid-template-columns:1fr;}
+}
+@media (max-width:480px){
+  .kpi-grid{grid-template-columns:1fr 1fr;gap:8px;}
+  .kpi{padding:10px 12px;}
+  .kpi-value{font-size:19px;}
+}
