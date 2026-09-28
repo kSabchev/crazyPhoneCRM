@@ -81,8 +81,27 @@ runner. Every test file gets its own throwaway database in the system temp
 folder, so running tests never touches `data/` or `backups/`, and it's
 safe to run on the shop PC while the app is live.
 
-The same tests run automatically on GitHub (Windows and Linux, Node 22 and
-24) for every pull request and every push to `main` — see
+Browser tests (Playwright) drive the real app in Chromium: login, the
+ticket form, two staff members seeing each other's changes live, the
+"being viewed by" indicator, printing (checks the PDF page sizes), and
+settings. First time only, download the browser:
+
+```bash
+npx playwright install chromium
+```
+
+Then:
+
+```bash
+npm run test:e2e
+```
+
+They start their own copy of the server on port 3100 with a throwaway
+database, so they are also safe to run next to the live app.
+
+Both suites run automatically on GitHub (API tests on Windows and Linux,
+Node 22 and 24; browser tests on Linux) for every pull request and every
+push to `main` — see
 `.github/workflows/test.yml`.
 
 ## Deploying for real use
@@ -414,6 +433,7 @@ repair-log/
     settings.js         Settings page frontend logic
     assets/logo.png     Shop logo, used on the customer print
     vendor/              html2canvas + jsPDF (self-hosted, no CDN)
-  test/                Automated tests (npm test)
+  test/                API + backup/restore tests (npm test)
+  e2e/                 Browser tests (npm run test:e2e)
   data/                repair-log.db lives here (created on first run)
 ```
