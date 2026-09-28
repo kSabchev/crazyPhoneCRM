@@ -62,7 +62,13 @@ function connectLiveUpdates(){
       loadSettings().then(()=>{ loadDevices(); render(); });
     }
   };
-  // EventSource retries on its own; no special error handling needed here.
+  // EventSource retries on its own. Changes made while the stream wasn't
+  // connected (the moment between page load and connecting, a server
+  // restart, Wi-Fi drop, laptop sleep) are never re-sent, so reload
+  // everything each time it (re)connects to catch up.
+  liveEvents.onopen = ()=>{
+    loadSettings().then(()=>{ loadDevices(); loadTickets(); });
+  };
 }
 
 function disconnectLiveUpdates(){
