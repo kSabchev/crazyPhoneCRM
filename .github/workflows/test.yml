@@ -37,3 +37,34 @@ jobs:
       - run: npm ci --ignore-scripts
 
       - run: npm test
+
+  e2e:
+    # Browser tests exercise the frontend, which doesn't vary by server OS,
+    # so one Linux run is enough.
+    name: Browser tests (Chromium)
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run test:e2e
+        env:
+          CI: true
+
+      # Screenshots, traces and the HTML report, to see what went wrong.
+      - uses: actions/upload-artifact@v4
+        if: failure()
+        with:
+          name: playwright-report
+          path: |
+            playwright-report/
+            test-results/
+          retention-days: 14
