@@ -62,7 +62,13 @@ function connectLiveUpdates(){
       loadSettings().then(()=>{ loadDevices(); render(); });
     }
   };
-  // EventSource retries on its own; no special error handling needed here.
+  // EventSource retries on its own. Changes made while the stream wasn't
+  // connected (the moment between page load and connecting, a server
+  // restart, Wi-Fi drop, laptop sleep) are never re-sent, so reload
+  // everything each time it (re)connects to catch up.
+  liveEvents.onopen = ()=>{
+    loadSettings().then(()=>{ loadDevices(); loadTickets(); });
+  };
 }
 
 function disconnectLiveUpdates(){
@@ -672,6 +678,14 @@ document.getElementById('printServiceBtn').addEventListener('click', ()=>printCo
 document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
 document.getElementById('searchInput').addEventListener('input', render);
 document.getElementById('statusFilter').addEventListener('change', render);
+// Marking a ticket "издаден" fills in today's return date (if none is set
+// yet), so it's visible and can still be changed before saving.
+document.getElementById('f_status').addEventListener('change', (e)=>{
+  const returned = document.getElementById('f_date_returned');
+  if(e.target.value === COMPLETED_STATUS && !returned.value){
+    returned.value = localDateString(new Date());
+  }
+});
 document.getElementById('f_phone').addEventListener('input', (e)=>{
   document.getElementById('f_phone_call').href = telHref(e.target.value);
 });

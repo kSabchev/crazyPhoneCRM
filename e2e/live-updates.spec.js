@@ -77,6 +77,17 @@ test('an open ticket keeps unsaved typing while other changes stream in', async 
   await expect(row(alice, mine.customer_name)).toContainText('клиентът ще дойде в петък');
 });
 
+test('changes made while a screen was disconnected appear once it reconnects', async () => {
+  // Simulate bob's live connection dropping (server restart, Wi-Fi, sleep).
+  await bob.evaluate(() => disconnectLiveUpdates());
+  const t = await createTicketViaApi(alice);
+  await bob.waitForTimeout(500);
+  await expect(row(bob, t.customer_name)).toHaveCount(0);
+
+  await bob.evaluate(() => connectLiveUpdates());
+  await expect(row(bob, t.customer_name)).toHaveCount(1);
+});
+
 test('a settings change reaches other open sessions', async () => {
   const original = await (await alice.request.get('/api/settings')).json();
   try {

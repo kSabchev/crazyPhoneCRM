@@ -25,12 +25,12 @@ test('creating a ticket records a "created" entry with a full snapshot', async (
 test('an update records only the fields that actually changed', async () => {
   const t = (await agent.post('/api/tickets').send(validTicket())).body;
   await agent.put(`/api/tickets/${t.id}`)
-    .send({ status: 'издаден', customerName: t.customer_name })
+    .send({ status: 'в сервиз', customerName: t.customer_name })
     .expect(200);
 
   const history = (await agent.get(`/api/tickets/${t.id}/history`)).body;
   const update = history.find(h => h.action === 'updated');
-  assert.deepEqual(update.changes, { status: { from: 'за сервиз', to: 'издаден' } });
+  assert.deepEqual(update.changes, { status: { from: 'за сервиз', to: 'в сервиз' } });
 });
 
 test('an update that changes nothing adds no audit entry', async () => {
