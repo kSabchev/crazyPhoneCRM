@@ -4,9 +4,30 @@ const express = require('express');
 const session = require('express-session');
 const SqliteStore = require('better-sqlite3-session-store')(session);
 const bcrypt = require('bcrypt');
+const rateLimit = require('express-rate-limit');
 const db = require('./db');
 
 const app = express();
+
+// Behind a reverse proxy (nginx/Caddy on the same machine), every request
+// arrives from 127.0.0.1 — set TRUST_PROXY=loopback in .env so the login
+// rate limit sees each user's real IP instead of locking everyone out
+// together. Leave unset when browsers connect directly (e.g. Tailscale).
+if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
+
+// ---- Health check ----
+// For uptime monitoring / NSSM checks: confirms the process is serving
+// requests AND the database is readable, not just that node.exe exists.
+// No login required and reveals nothing beyond "ok".
+app.get('/health', (req, res) => {
+  try {
+    db.prepare('SELECT 1').get();
+    res.json({ status: 'ok' });
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Health check failed:`, err);
+    res.status(503).json({ status: 'error' });
+  }
+});
 
 if (!process.env.SESSION_SECRET) {
   console.warn(
@@ -109,7 +130,19 @@ app.post('/api/tickets/:id/editing/stop', requireAuth, (req, res) => {
 });
 
 // ---- Auth routes ----
-app.post('/api/auth/login', (req, res) => {
+// Slows down password guessing: after 10 failed logins from one IP within
+// 15 minutes, that IP is blocked from logging in until the window passes.
+// Successful logins don't count, so staff typos never add up over a day.
+const loginLimiter = rateLimit({
+  windowMs: 15 * 60 * 1000,
+  limit: 10,
+  skipSuccessfulRequests: true,
+  standardHeaders: 'draft-8',
+  legacyHeaders: false,
+  message: { error: 'Твърде много неуспешни опити за вход. Опитайте отново след 15 минути.' }
+});
+
+app.post('/api/auth/login', loginLimiter, (req, res) => {
   const { username, password } = req.body || {};
   if (!username || !password) {
     return res.status(400).json({ error: 'Потребителското име и паролата са задължителни' });
@@ -257,11 +290,77 @@ function normalizePravim(v, fallback) {
   return PRAVIM_VALUES.includes(v) ? v : fallback;
 }
 
+// ---- Ticket input validation ----
+// Required fields must be non-empty strings, text is length-capped so a
+// stray paste can't bloat the DB/print, dates must be real YYYY-MM-DD
+// dates (what <input type="date"> sends), prices must be numbers >= 0.
+const TICKET_TEXT_FIELDS = [
+  // [body key, label, max length, required]
+  ['customerName', 'Име на клиента', 200, true],
+  ['phoneContact', 'Телефон за контакт', 50, true],
+  ['phoneModel', 'Модел на телефона', 100, true],
+  ['description', 'Описание на проблема', 5000, true],
+  ['status', 'Статус', 100, false],
+  ['comment', 'Коментар', 5000, false],
+  ['repairPerformed', 'Извършен ремонт', 5000, false],
+  ['loanerPhone', 'Оборотен телефон', 200, false],
+  ['kaparo', 'Капаро', 50, false]
+];
+const TICKET_DATE_FIELDS = [
+  ['dateReceived', 'Дата на приемане', true],
+  ['dateReturned', 'Дата на връщане', false]
+];
+const TICKET_PRICE_FIELDS = [
+  ['servicePrice', 'Изкупна цена'],
+  ['customerPrice', 'Продажна цена']
+];
+
+function isValidDate(v) {
+  if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
+  const d = new Date(v + 'T00:00:00Z');
+  return !isNaN(d) && d.toISOString().slice(0, 10) === v;
+}
+
+// Returns an error message, or null if valid. With `partial` (edits),
+// fields left out of the body are fine — only the ones sent are checked.
+function validateTicketInput(t, { partial }) {
+  for (const [key, label, max, required] of TICKET_TEXT_FIELDS) {
+    let v = t[key];
+    if (v === undefined) {
+      if (required && !partial) return `${label} е задължително поле`;
+      continue;
+    }
+    if (v === null && !required) continue;
+    if (key === 'kaparo' && typeof v === 'number') v = String(v);
+    if (typeof v !== 'string') return `${label}: невалидна стойност`;
+    if (required && !v.trim()) return `${label} е задължително поле`;
+    if (v.length > max) return `${label} е твърде дълго (най-много ${max} символа)`;
+  }
+  for (const [key, label, required] of TICKET_DATE_FIELDS) {
+    const v = t[key];
+    if (v === undefined) {
+      if (required && !partial) return `${label} е задължително поле`;
+      continue;
+    }
+    if (v === '' || v === null) {
+      if (required) return `${label} е задължително поле`;
+      continue;
+    }
+    if (typeof v !== 'string' || !isValidDate(v)) return `${label}: невалидна дата`;
+  }
+  for (const [key, label] of TICKET_PRICE_FIELDS) {
+    const v = t[key];
+    if (v === undefined || v === null || v === '') continue;
+    const n = typeof v === 'number' || typeof v === 'string' ? Number(v) : NaN;
+    if (!Number.isFinite(n) || n < 0) return `${label}: невалидна сума`;
+  }
+  return null;
+}
+
 app.post('/api/tickets', requireAuth, (req, res) => {
   const t = req.body || {};
-  if (!t.customerName || !t.phoneContact || !t.phoneModel || !t.dateReceived || !t.description) {
-    return res.status(400).json({ error: 'Име на клиента, телефон за контакт, модел на телефона, дата на приемане и описание на проблема са задължителни' });
-  }
+  const invalid = validateTicketInput(t, { partial: false });
+  if (invalid) return res.status(400).json({ error: invalid });
 
   const nextNoRow = db.prepare('SELECT MAX(ticket_no) AS maxNo FROM tickets').get();
   const nextNo = (nextNoRow.maxNo || 0) + 1;
@@ -318,9 +417,8 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
 
   const t = req.body || {};
-  if (t.description !== undefined && !t.description) {
-    return res.status(400).json({ error: 'Описанието на проблема е задължително' });
-  }
+  const invalid = validateTicketInput(t, { partial: true });
+  if (invalid) return res.status(400).json({ error: invalid });
 
   const next = {
     customer_name: t.customerName ?? existing.customer_name,
@@ -333,11 +431,11 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
     comment: t.comment !== undefined ? t.comment : existing.comment,
     repair_performed: t.repairPerformed !== undefined ? t.repairPerformed : existing.repair_performed,
     loaner_phone: t.loanerPhone !== undefined
-      ? (t.loanerPhone.trim() ? t.loanerPhone.trim() : 'Не')
+      ? ((t.loanerPhone || '').trim() || 'Не')
       : existing.loaner_phone,
     pravim: t.pravim !== undefined ? normalizePravim(t.pravim, existing.pravim) : existing.pravim,
     kaparo: t.kaparo !== undefined
-      ? (String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не')
+      ? (String(t.kaparo ?? '').trim() || 'Не')
       : existing.kaparo,
     service_price: t.servicePrice === '' || t.servicePrice == null ? null : Number(t.servicePrice),
     customer_price: t.customerPrice === '' || t.customerPrice == null ? null : Number(t.customerPrice)
@@ -410,5 +508,20 @@ app.get('/api/audit', requireAuth, (req, res) => {
 
 // ---- Static frontend ----
 app.use(express.static(path.join(__dirname, 'public')));
+
+// ---- Error handler ----
+// Replaces Express's default HTML error page, which includes a full stack
+// trace unless NODE_ENV=production. Covers malformed JSON bodies (400),
+// oversized bodies (413) and any unexpected error thrown in a route (500).
+app.use((err, req, res, next) => {
+  const status = err.status || err.statusCode || 500;
+  if (status >= 500) {
+    console.error(`[${new Date().toISOString()}] ${req.method} ${req.originalUrl} failed:`, err);
+  }
+  if (res.headersSent) return next(err);
+  res.status(status).json({
+    error: status >= 500 ? 'Възникна грешка на сървъра. Опитайте отново.' : 'Невалидна заявка'
+  });
+});
 
 module.exports = app;

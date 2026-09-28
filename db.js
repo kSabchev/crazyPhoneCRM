@@ -91,6 +91,20 @@ if (!ticketColumns.includes('kaparo')) {
   db.exec('ALTER TABLE tickets ADD COLUMN kaparo REAL');
 }
 
+// Indexes for the queries that run constantly:
+// - the ticket list (every page load and every live update) sorts by
+//   date_received DESC, ticket_no DESC — this index returns rows already
+//   in that order instead of sorting the whole table each time;
+// - a ticket's history looks up audit_log by ticket_id;
+// - the global audit view takes the newest 200 entries by performed_at.
+// (No index on status yet: status filtering happens in the browser, so
+// the database never searches by it.)
+db.exec(`
+  CREATE INDEX IF NOT EXISTS idx_tickets_date_received ON tickets (date_received, ticket_no);
+  CREATE INDEX IF NOT EXISTS idx_audit_ticket_id ON audit_log (ticket_id);
+  CREATE INDEX IF NOT EXISTS idx_audit_performed_at ON audit_log (performed_at);
+`);
+
 // Seed default settings on first run.
 const DEFAULT_SETTINGS = {
   shopName: 'CrazyPhone',
