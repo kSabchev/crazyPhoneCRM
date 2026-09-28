@@ -70,13 +70,24 @@ pm2 save
 pm2 startup
 ```
 
+## Running the tests
+
+```bash
+npm test
+```
+
+Runs the API tests and the backup/restore tests using Node's built-in test
+runner. Every test file gets its own throwaway database in the system temp
+folder, so running tests never touches `data/` or `backups/`, and it's
+safe to run on the shop PC while the app is live.
+
 ## Deploying for real use
 
 This app is safe to expose to the internet as written, but you should:
 
 1. **Put it behind HTTPS.** Use a reverse proxy (e.g. nginx or Caddy) with a
    TLS certificate (Let's Encrypt is free), and uncomment `secure: true` on
-   the cookie settings in `server.js` once HTTPS is in place.
+   the cookie settings in `app.js` once HTTPS is in place.
 2. **Set a strong, unique `SESSION_SECRET`** in `.env` — don't use the example.
 3. **Don't commit `.env` or the `data/` folder** — `.gitignore` already
    excludes both.
@@ -376,7 +387,8 @@ signed-in account can view, create, edit, delete, and print any ticket.
 
 ```
 repair-log/
-  server.js          Express app: auth routes + ticket API + settings API
+  server.js          Entry point — starts the app on PORT
+  app.js             Express app: auth routes + ticket API + settings API
   db.js              SQLite schema/setup
   create-admin.js     CLI to create/reset a login account
   backup.sh           Database backup script for Linux (local + NAS)
@@ -392,5 +404,6 @@ repair-log/
     settings.js         Settings page frontend logic
     assets/logo.png     Shop logo, used on the customer print
     vendor/              html2canvas + jsPDF (self-hosted, no CDN)
+  test/                Automated tests (npm test)
   data/                repair-log.db lives here (created on first run)
 ```
