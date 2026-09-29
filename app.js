@@ -402,8 +402,7 @@ app.post('/api/tickets', requireAuth, (req, res) => {
       t.comment || '',
       t.repairPerformed || '',
       normalizeLoaner(t.loanerPhone),
-      // A ticket created already handed back has no use for the unlock code.
-      t.status === COMPLETED_STATUS ? null : normalizePassword(t.phonePassword),
+      normalizePassword(t.phonePassword),
       normalizePravim(t.pravim, 'circle'),
       t.kaparo && String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не',
       t.servicePrice === '' || t.servicePrice == null ? null : Number(t.servicePrice),
@@ -468,14 +467,8 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
   // Marking a ticket "издаден" means it was handed back today, unless a
   // return date is already set or was sent. Keeps reports accurate even
   // when the status is changed without touching the date field.
-  const becameCompleted = next.status === COMPLETED_STATUS && existing.status !== COMPLETED_STATUS;
-  if (becameCompleted && !next.date_returned) {
+  if (next.status === COMPLETED_STATUS && existing.status !== COMPLETED_STATUS && !next.date_returned) {
     next.date_returned = localToday();
-  }
-  // Once the phone is handed back the unlock code is no longer needed, so
-  // it isn't kept around.
-  if (becameCompleted) {
-    next.phone_password = null;
   }
 
   db.prepare(

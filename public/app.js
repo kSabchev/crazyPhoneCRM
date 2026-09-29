@@ -225,7 +225,7 @@ function render(){
         <td class="ticket-no">#${t.ticket_no}${editingBadge}</td>
         <td${dv('customer')}>
           <div class="cust-name">${escapeHtml(t.customer_name)}</div>
-          <div class="cust-phone">${escapeHtml(t.phone_contact)}</div>
+          <div class="cust-phone${isStandardPhone(t.phone_contact) ? '' : ' phone-nonstandard'}"${isStandardPhone(t.phone_contact) ? '' : ` title="${PHONE_HINT}"`}>${escapeHtml(t.phone_contact)}</div>
         </td>
         <td${dv('callBtn')} class="call-cell" onclick="event.stopPropagation()">
           <a href="${telHref(t.phone_contact)}" class="call-icon-btn" title="Обади се на ${escapeHtml(t.phone_contact)}">📞</a>
@@ -321,11 +321,13 @@ function renderStats(){
   const forService = tickets.filter(t=> t.status === 'за сервиз').length;
   const inService = tickets.filter(t=> t.status === 'в сервиз').length;
   const waiting = tickets.filter(t=> t.status === 'чака клиент').length;
+  const issued = tickets.filter(t=> t.status === COMPLETED_STATUS).length;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="num">${total}</div><div class="lbl">общо поръчки</div></div>
     <div class="stat"><div class="num" style="color:var(--status-forservice-text)">${forService}</div><div class="lbl">за сервиз</div></div>
     <div class="stat"><div class="num" style="color:var(--status-inservice-text)">${inService}</div><div class="lbl">в сервиза</div></div>
     <div class="stat"><div class="num" style="color:var(--status-waiting-text)">${waiting}</div><div class="lbl">чакат клиент</div></div>
+    <div class="stat"><div class="num" style="color:var(--status-issued-text)">${issued}</div><div class="lbl">издадени</div></div>
   `;
 }
 
@@ -371,7 +373,7 @@ function openNew(){
   document.getElementById('printServiceBtn').style.display = 'none';
   document.getElementById('historySection').style.display = 'none';
   document.getElementById('topActions').style.display = 'none';
-  document.getElementById('f_password_note').style.display = 'none';
+  markPhoneField();
   document.getElementById('editingBanner').style.display = 'none';
   setEditOnlyFieldsVisible(false);
   document.getElementById('overlay').classList.add('open');
@@ -411,7 +413,7 @@ function openEdit(id){
   setPravimButton(t.pravim || 'circle');
   setEditOnlyFieldsVisible(true);
   document.getElementById('topActions').style.display = 'flex';
-  document.getElementById('f_password_note').style.display = 'none';
+  markPhoneField();
   document.getElementById('deleteBtn').style.display = 'inline-block';
   document.getElementById('printCustomerBtn').style.display = 'inline-block';
   document.getElementById('printServiceBtn').style.display = 'inline-block';
@@ -447,6 +449,21 @@ function markEditingStart(id){
 }
 function markEditingStop(id){
   fetch(`/api/tickets/${id}/editing/stop`, { method:'POST' }).catch(()=>{});
+}
+
+// A Bulgarian number is 0 or +359 followed by 9 digits; spaces, dashes,
+// dots, slashes and brackets are ignored. Anything else is still saved
+// (foreign numbers, landlines with notes) but shown in red to catch typos.
+const PHONE_HINT = 'Номерът не е във формат 0XXXXXXXXX или +359XXXXXXXXX';
+function isStandardPhone(phone){
+  return /^(0|\+359)\d{9}$/.test(String(phone || '').replace(/[\s\-./()]/g, ''));
+}
+
+function markPhoneField(){
+  const input = document.getElementById('f_phone');
+  const bad = input.value.trim() !== '' && !isStandardPhone(input.value);
+  input.classList.toggle('phone-nonstandard', bad);
+  input.title = bad ? PHONE_HINT : '';
 }
 
 function telHref(phone){
@@ -770,20 +787,10 @@ document.getElementById('f_status').addEventListener('change', (e)=>{
   if(e.target.value === COMPLETED_STATUS && !returned.value){
     returned.value = localDateString(new Date());
   }
-  updatePasswordNote();
 });
-document.getElementById('f_password').addEventListener('input', updatePasswordNote);
-
-// The server clears the unlock code when a ticket becomes "издаден"; say so
-// in the form before saving rather than silently dropping what was typed.
-function updatePasswordNote(){
-  const becomingCompleted = document.getElementById('f_status').value === COMPLETED_STATUS
-    && (!editingTicket || editingTicket.status !== COMPLETED_STATUS);
-  const hasPassword = document.getElementById('f_password').value.trim() !== '';
-  document.getElementById('f_password_note').style.display = becomingCompleted && hasPassword ? 'block' : 'none';
-}
 document.getElementById('f_phone').addEventListener('input', (e)=>{
   document.getElementById('f_phone_call').href = telHref(e.target.value);
+  markPhoneField();
 });
 
 checkSession();
