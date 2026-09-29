@@ -158,6 +158,9 @@ tbody tr:hover{background:#FBF7EF;}
   font-size:14px;font-family:inherit;color:var(--ink);background:var(--paper);
 }
 .field textarea{resize:vertical;min-height:70px;}
+.field-note{font-size:12px;color:var(--status-parts);margin-top:6px;}
+.password-cell{white-space:nowrap;}
+.password-value{font-family:Consolas,"Courier New",monospace;font-size:12.5px;}
 .field input:focus, .field select:focus, .field textarea:focus{
   outline:2px solid var(--copper);outline-offset:-1px;background:var(--panel);
 }
@@ -300,6 +303,7 @@ tbody tr:hover{background:#FBF7EF;}
   min-height:0;
 }
 .label-issue{font-size:2.6mm;line-height:1.3;word-break:break-word;}
+.label-password{font-weight:700;font-size:2.6mm;line-height:1.2;margin-bottom:0.6mm;word-break:break-all;}
 
 /* ---- Settings page ---- */
 .settings-section{

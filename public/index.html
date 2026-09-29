@@ -67,9 +67,10 @@
           <th data-col="callBtn">Обаждане</th>
           <th data-col="model">Модел</th>
           <th data-col="issue">Проблем</th>
+          <th data-col="password">Парола</th>
           <th data-col="comment">Коментар</th>
           <th data-col="repairPerformed">Извършен ремонт</th>
-          <th data-col="loanerPhone">Оборотен телефон</th>
+          <th data-col="loanerPhone" title="Оборотен телефон">Об. тел</th>
           <th data-col="pravim">Правим</th>
           <th data-col="status">Статус</th>
           <th data-col="kaparo">Капаро</th>
@@ -166,6 +167,12 @@
     </div>
 
     <div class="field">
+      <label for="f_password">Парола <span class="hint">(код или шаблон за отключване — изтрива се, когато поръчката стане „издаден“)</span></label>
+      <input type="text" id="f_password" autocomplete="off" spellcheck="false" placeholder="напр. 1234 или Г-образен шаблон">
+      <div class="field-note" id="f_password_note" style="display:none;">Паролата ще бъде изтрита при запазване, защото статусът е „издаден“.</div>
+    </div>
+
+    <div class="field">
       <label for="f_comment">Коментар <span class="hint">(незадължително)</span></label>
       <textarea id="f_comment" placeholder="Допълнителни бележки..."></textarea>
     </div>
@@ -176,8 +183,11 @@
     </div>
 
     <div class="field">
-      <label for="f_loaner">Оборотен телефон <span class="hint">(по подразбиране: Не)</span></label>
-      <input type="text" id="f_loaner" placeholder="напр. модел на предоставения оборотен телефон">
+      <label for="f_loaner">Оборотен телефон</label>
+      <select id="f_loaner">
+        <option value="не">не</option>
+        <option value="да">да</option>
+      </select>
     </div>
 
     <div class="field edit-only-field">

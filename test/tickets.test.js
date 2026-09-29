@@ -18,7 +18,8 @@ test('creating a ticket assigns sequential numbers and applies defaults', async 
   assert.equal(first.body.status, 'за сервиз');
   assert.equal(first.body.pravim, 'circle');
   assert.equal(first.body.kaparo, 'Не');
-  assert.equal(first.body.loaner_phone, 'Не');
+  assert.equal(first.body.loaner_phone, 'не');
+  assert.equal(first.body.phone_password, null);
   assert.equal(first.body.service_price, null);
   assert.equal(first.body.customer_price, null);
   assert.equal(first.body.date_returned, null);

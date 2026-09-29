@@ -77,3 +77,27 @@ test('printing also works from the buttons at the top of the form', async ({ pag
   expect(width).toBeCloseTo(50, 0);
   expect(height).toBeCloseTo(30, 0);
 });
+
+test('the service label shows the unlock code; the customer card does not', async ({ page }) => {
+  const t = await createTicketViaApi(page, { phonePassword: 'Z-шаблон 7' });
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+
+  await page.click('#printServiceBtn');
+  await capturePdf(page);
+  await expect(page.locator('#printServiceTemplate')).toContainText('Парола: Z-шаблон 7');
+
+  await page.evaluate(() => { window.__openedUrls = []; });
+  await page.click('#printCustomerBtn');
+  await capturePdf(page);
+  await expect(page.locator('#printCustomerTemplate')).not.toContainText('Z-шаблон 7');
+});
+
+test('the service label has no password line when none is set', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.click('#printServiceBtn');
+  await capturePdf(page);
+  await expect(page.locator('#printServiceTemplate .label-password')).toHaveCount(0);
+});

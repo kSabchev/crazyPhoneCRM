@@ -38,6 +38,7 @@ db.exec(`
     comment TEXT,
     repair_performed TEXT,
     loaner_phone TEXT,
+    phone_password TEXT,
     pravim TEXT NOT NULL DEFAULT 'circle',
     kaparo REAL,
     service_price REAL,
@@ -90,6 +91,38 @@ if (!ticketColumns.includes('pravim')) {
 if (!ticketColumns.includes('kaparo')) {
   db.exec('ALTER TABLE tickets ADD COLUMN kaparo REAL');
 }
+// Migration for databases created before "phone_password" (the customer's
+// unlock code) existed. Also shows its new table column, since the saved
+// column list would otherwise leave it hidden.
+const addedPasswordColumn = !ticketColumns.includes('phone_password');
+if (addedPasswordColumn) {
+  db.exec('ALTER TABLE tickets ADD COLUMN phone_password TEXT');
+}
+
+// "Оборотен телефон" used to be free text (often the loaner's model); it is
+// now a да/не choice. Convert any other value: "Не"/empty -> "не", anything
+// else -> "да" with the original text appended to the comment so nothing
+// is lost. Runs on every start but only touches values not yet converted.
+const legacyLoaners = db.prepare(
+  "SELECT id, loaner_phone, comment FROM tickets WHERE loaner_phone IS NULL OR loaner_phone NOT IN ('да', 'не')"
+).all();
+if (legacyLoaners.length) {
+  const setLoaner = db.prepare('UPDATE tickets SET loaner_phone = ?, comment = ? WHERE id = ?');
+  db.transaction(() => {
+    for (const t of legacyLoaners) {
+      const text = (t.loaner_phone || '').trim();
+      const lower = text.toLowerCase();
+      if (lower === '' || lower === 'не') {
+        setLoaner.run('не', t.comment, t.id);
+      } else if (lower === 'да') {
+        setLoaner.run('да', t.comment, t.id);
+      } else {
+        const note = `Оборотен телефон: ${text}`;
+        setLoaner.run('да', t.comment ? `${t.comment}\n${note}` : note, t.id);
+      }
+    }
+  })();
+}
 
 // Indexes for the queries that run constantly:
 // - the ticket list (every page load and every live update) sorts by
@@ -110,7 +143,7 @@ const DEFAULT_SETTINGS = {
   shopName: 'CrazyPhone',
   shopTagline: 'аксесоари и сервиз',
   statuses: ['за сервиз', 'в сервиз', 'чака клиент', 'издаден'],
-  columns: ['customer', 'callBtn', 'model', 'issue', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
+  columns: ['customer', 'callBtn', 'model', 'issue', 'password', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
   printCustomer: {
     header: 'СЕРВИЗНА КАРТА',
     footer: 'МАГАЗИНЪТ И СЕРВИЗЪТ НЕ НОСЯТ ОТГОВОРНОСТ ЗА:\nИЗГУБЕНА ПРИ РЕМОНТА ИНФОРМАЦИЯ ОТ МОБИЛНИТЕ АПАРАТИ\nАПАРАТИ НЕПОТЪРСЕНИ ДО 1 МЕСЕЦ ОТ ДАТАТА НА ПРИЕМАНЕ'
@@ -135,6 +168,12 @@ const DEFAULT_SETTINGS = {
 const existingSettings = db.prepare('SELECT id FROM settings WHERE id = 1').get();
 if (!existingSettings) {
   db.prepare('INSERT INTO settings (id, data) VALUES (1, ?)').run(JSON.stringify(DEFAULT_SETTINGS));
+} else if (addedPasswordColumn) {
+  const saved = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
+  if (!saved.columns.includes('password')) {
+    saved.columns.push('password');
+    db.prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify(saved));
+  }
 }
 
 module.exports = db;
