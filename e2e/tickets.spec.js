@@ -363,31 +363,91 @@ test('the history says the password changed without showing it', async ({ page }
   await expect(historyList).not.toContainText('9999');
 });
 
-test('choosing "издаден" warns that the password will be cleared, and saving clears it', async ({ page }) => {
+test('saving an order as "издаден" keeps its password', async ({ page }) => {
   const t = await createTicketViaApi(page, { phonePassword: '4321' });
   await page.reload();
   await row(page, t.customer_name).locator('.ticket-no').click();
-
-  const note = page.locator('#f_password_note');
-  await expect(note).toBeHidden();
   await page.selectOption('#f_status', 'издаден');
-  await expect(note).toBeVisible();
-  await page.selectOption('#f_status', 'в сервиз');
-  await expect(note).toBeHidden();
-  await page.selectOption('#f_status', 'издаден');
-
   await page.click('#saveBtn');
   await expectModalClosed(page);
-  await expect(row(page, t.customer_name).locator('.password-cell')).toHaveText('—');
+  await expect(row(page, t.customer_name).locator('.password-cell')).toHaveText('4321');
 });
 
-test('the quick status change to "издаден" also clears the password', async ({ page }) => {
+test('the quick status change to "издаден" keeps the password', async ({ page }) => {
   const t = await createTicketViaApi(page, { phonePassword: '4321' });
   await page.reload();
   const r = row(page, t.customer_name);
-  await expect(r.locator('.password-cell')).toHaveText('4321');
-
   await r.locator('.status-cell .badge').click();
   await r.locator('.status-select').selectOption('издаден');
-  await expect(r.locator('.password-cell')).toHaveText('—');
+  await expect(r.locator('.badge')).toHaveText('издаден');
+  await expect(r.locator('.password-cell')).toHaveText('4321');
+});
+
+test('the header counts orders in "издаден"', async ({ page }) => {
+  const stat = page.locator('#stats .stat', { hasText: 'издадени' }).locator('.num');
+  await expect(stat).toHaveText(/^\d+$/);
+  const before = Number(await stat.textContent());
+
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await expect(stat).toHaveText(String(before));
+  await row(page, t.customer_name).locator('.status-cell .badge').click();
+  await row(page, t.customer_name).locator('.status-select').selectOption('издаден');
+  await expect(stat).toHaveText(String(before + 1));
+
+  const labels = await page.locator('#stats .lbl').allInnerTexts();
+  expect(labels[labels.length - 1]).toBe('издадени');
+});
+
+test('phone numbers not in 0/+359 + 9 digit form are red, but still saved', async ({ page }) => {
+  const good = [
+    await createTicketViaApi(page, { phoneContact: '0888 123 456' }),
+    await createTicketViaApi(page, { phoneContact: '+359 88 812 3456' }),
+    await createTicketViaApi(page, { phoneContact: '0888-123-456' })
+  ];
+  const bad = [
+    await createTicketViaApi(page, { phoneContact: '0888 123 45' }),        // 8 digits after 0
+    await createTicketViaApi(page, { phoneContact: '+359 888 123 4567' }),  // 10 digits after +359
+    await createTicketViaApi(page, { phoneContact: '888123456' }),          // no leading 0
+    await createTicketViaApi(page, { phoneContact: '+49 30 1234567' })      // foreign
+  ];
+  await page.reload();
+
+  for (const t of good) {
+    await expect(row(page, t.customer_name).locator('.cust-phone')).not.toHaveClass(/phone-nonstandard/);
+  }
+  for (const t of bad) {
+    const phone = row(page, t.customer_name).locator('.cust-phone');
+    await expect(phone).toHaveClass(/phone-nonstandard/);
+    await expect(phone).toHaveCSS('color', 'rgb(220, 38, 38)');
+    await expect(phone).toHaveAttribute('title', /0XXXXXXXXX/);
+  }
+});
+
+test('the phone field turns red while typing a nonstandard number, and saving still works', async ({ page }) => {
+  const name = uniqueName();
+  await page.click('#newTicketBtn');
+  const phone = page.locator('#f_phone');
+  await expect(phone).not.toHaveClass(/phone-nonstandard/);
+
+  await phone.fill('0888 12');
+  await expect(phone).toHaveClass(/phone-nonstandard/);
+  await phone.fill('0888 123 456');
+  await expect(phone).not.toHaveClass(/phone-nonstandard/);
+  await phone.fill('12345');
+  await expect(phone).toHaveClass(/phone-nonstandard/);
+
+  await page.fill('#f_customer', name);
+  await page.fill('#f_model', 'iPhone 14');
+  await page.fill('#f_desc', 'тест');
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+  await expect(row(page, name).locator('.cust-phone')).toHaveText('12345');
+
+  // Reopening shows the warning straight away; a new order starts clean.
+  await row(page, name).locator('.ticket-no').click();
+  await expect(phone).toHaveClass(/phone-nonstandard/);
+  await page.click('#cancelBtn');
+  await page.click('#newTicketBtn');
+  await expect(phone).not.toHaveClass(/phone-nonstandard/);
 });

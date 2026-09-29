@@ -158,7 +158,9 @@ tbody tr:hover{background:#FBF7EF;}
   font-size:14px;font-family:inherit;color:var(--ink);background:var(--paper);
 }
 .field textarea{resize:vertical;min-height:70px;}
-.field-note{font-size:12px;color:var(--status-parts);margin-top:6px;}
+/* Phone numbers not in 0XXXXXXXXX / +359XXXXXXXXX form: a warning, not an error. */
+.phone-nonstandard{color:#DC2626 !important;}
+.field input.phone-nonstandard{border-color:#DC2626;}
 .password-cell{white-space:nowrap;}
 .password-value{font-family:Consolas,"Courier New",monospace;font-size:12.5px;}
 .field input:focus, .field select:focus, .field textarea:focus{

@@ -58,31 +58,19 @@ test('an edit that leaves the unlock code alone does not mention it in the histo
   assert.equal(update.changes.phone_password, undefined);
 });
 
-test('marking a ticket издаден clears the unlock code', async () => {
+test('status changes, including to издаден, keep the unlock code', async () => {
   const t = await create({ phonePassword: '1234' });
-  const res = await agent.put(`/api/tickets/${t.id}`).send({ status: 'издаден' }).expect(200);
-  assert.equal(res.body.phone_password, null);
-  const update = (await history(t.id)).find(e => e.action === 'updated');
-  assert.deepEqual(update.changes.phone_password, { changed: true });
-});
-
-test('it is cleared even if the full form sends the code along with издаден', async () => {
-  const t = await create({ phonePassword: '1234' });
-  const res = await agent.put(`/api/tickets/${t.id}`)
-    .send({ ...validTicket(), status: 'издаден', phonePassword: '1234', loanerPhone: 'не' })
-    .expect(200);
-  assert.equal(res.body.phone_password, null);
-});
-
-test('other status changes keep the unlock code', async () => {
-  const t = await create({ phonePassword: '1234' });
-  const res = await agent.put(`/api/tickets/${t.id}`).send({ status: 'в сервиз' }).expect(200);
+  let res = await agent.put(`/api/tickets/${t.id}`).send({ status: 'в сервиз' }).expect(200);
   assert.equal(res.body.phone_password, '1234');
+  res = await agent.put(`/api/tickets/${t.id}`).send({ status: 'издаден' }).expect(200);
+  assert.equal(res.body.phone_password, '1234');
+  const update = (await history(t.id)).find(e => e.changes.status && e.changes.status.to === 'издаден');
+  assert.equal(update.changes.phone_password, undefined);
 });
 
-test('a ticket created as издаден keeps no unlock code', async () => {
+test('a ticket created as издаден keeps its unlock code', async () => {
   const t = await create({ status: 'издаден', phonePassword: '1234' });
-  assert.equal(t.phone_password, null);
+  assert.equal(t.phone_password, '1234');
 });
 
 test('the loaner phone is да or не, defaulting to не', async () => {
