@@ -171,7 +171,7 @@ app.get('/api/auth/me', (req, res) => {
 });
 
 // ---- Settings routes ----
-const COLUMN_KEYS = ['customer', 'callBtn', 'model', 'issue', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'dateIn', 'dateReturned', 'servicePrice', 'customerPrice'];
+const COLUMN_KEYS = ['customer', 'callBtn', 'model', 'issue', 'password', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'dateIn', 'dateReturned', 'servicePrice', 'customerPrice'];
 
 function getSettings() {
   const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();
@@ -268,6 +268,7 @@ const TRACKED_FIELDS = [
   ['phone_model', 'Модел на телефона'],
   ['status', 'Статус'],
   ['description', 'Описание на проблема'],
+  ['phone_password', 'Парола'],
   ['comment', 'Коментар'],
   ['repair_performed', 'Извършен ремонт'],
   ['loaner_phone', 'Оборотен телефон'],
@@ -304,9 +305,21 @@ const TICKET_TEXT_FIELDS = [
   ['status', 'Статус', 100, false],
   ['comment', 'Коментар', 5000, false],
   ['repairPerformed', 'Извършен ремонт', 5000, false],
-  ['loanerPhone', 'Оборотен телефон', 200, false],
+  ['phonePassword', 'Парола', 100, false],
   ['kaparo', 'Капаро', 50, false]
 ];
+
+// "Оборотен телефон" is a да/не choice. Missing/empty means "не".
+const LOANER_VALUES = ['да', 'не'];
+function normalizeLoaner(v) {
+  const s = String(v ?? '').trim().toLowerCase();
+  return s === '' ? 'не' : s;
+}
+
+// The customer's unlock code: stored trimmed, empty means none.
+function normalizePassword(v) {
+  return String(v ?? '').trim() || null;
+}
 const TICKET_DATE_FIELDS = [
   ['dateReceived', 'Дата на приемане', true],
   ['dateReturned', 'Дата на връщане', false]
@@ -355,6 +368,11 @@ function validateTicketInput(t, { partial }) {
     const n = typeof v === 'number' || typeof v === 'string' ? Number(v) : NaN;
     if (!Number.isFinite(n) || n < 0) return `${label}: невалидна сума`;
   }
+  if (t.loanerPhone !== undefined && t.loanerPhone !== null) {
+    if (typeof t.loanerPhone !== 'string' || !LOANER_VALUES.includes(normalizeLoaner(t.loanerPhone))) {
+      return 'Оборотен телефон: изберете „да“ или „не“';
+    }
+  }
   return null;
 }
 
@@ -369,8 +387,8 @@ app.post('/api/tickets', requireAuth, (req, res) => {
   const result = db
     .prepare(
       `INSERT INTO tickets
-        (ticket_no, customer_name, phone_contact, date_received, date_returned, phone_model, status, description, comment, repair_performed, loaner_phone, pravim, kaparo, service_price, customer_price)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+        (ticket_no, customer_name, phone_contact, date_received, date_returned, phone_model, status, description, comment, repair_performed, loaner_phone, phone_password, pravim, kaparo, service_price, customer_price)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
     )
     .run(
       nextNo,
@@ -383,7 +401,9 @@ app.post('/api/tickets', requireAuth, (req, res) => {
       t.description,
       t.comment || '',
       t.repairPerformed || '',
-      t.loanerPhone && t.loanerPhone.trim() ? t.loanerPhone.trim() : 'Не',
+      normalizeLoaner(t.loanerPhone),
+      // A ticket created already handed back has no use for the unlock code.
+      t.status === COMPLETED_STATUS ? null : normalizePassword(t.phonePassword),
       normalizePravim(t.pravim, 'circle'),
       t.kaparo && String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не',
       t.servicePrice === '' || t.servicePrice == null ? null : Number(t.servicePrice),
@@ -403,6 +423,8 @@ app.post('/api/tickets', requireAuth, (req, res) => {
     comment: created.comment,
     repair_performed: created.repair_performed,
     loaner_phone: created.loaner_phone,
+    // Never the value itself — only whether one was entered.
+    phone_password_set: !!created.phone_password,
     pravim: created.pravim,
     kaparo: created.kaparo,
     service_price: created.service_price,
@@ -431,9 +453,8 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
     description: t.description ?? existing.description,
     comment: t.comment !== undefined ? t.comment : existing.comment,
     repair_performed: t.repairPerformed !== undefined ? t.repairPerformed : existing.repair_performed,
-    loaner_phone: t.loanerPhone !== undefined
-      ? ((t.loanerPhone || '').trim() || 'Не')
-      : existing.loaner_phone,
+    loaner_phone: t.loanerPhone !== undefined ? normalizeLoaner(t.loanerPhone) : existing.loaner_phone,
+    phone_password: t.phonePassword !== undefined ? normalizePassword(t.phonePassword) : existing.phone_password,
     pravim: t.pravim !== undefined ? normalizePravim(t.pravim, existing.pravim) : existing.pravim,
     kaparo: t.kaparo !== undefined
       ? (String(t.kaparo ?? '').trim() || 'Не')
@@ -447,29 +468,37 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
   // Marking a ticket "издаден" means it was handed back today, unless a
   // return date is already set or was sent. Keeps reports accurate even
   // when the status is changed without touching the date field.
-  if (next.status === COMPLETED_STATUS && existing.status !== COMPLETED_STATUS && !next.date_returned) {
+  const becameCompleted = next.status === COMPLETED_STATUS && existing.status !== COMPLETED_STATUS;
+  if (becameCompleted && !next.date_returned) {
     next.date_returned = localToday();
+  }
+  // Once the phone is handed back the unlock code is no longer needed, so
+  // it isn't kept around.
+  if (becameCompleted) {
+    next.phone_password = null;
   }
 
   db.prepare(
     `UPDATE tickets SET
       customer_name = ?, phone_contact = ?, date_received = ?, date_returned = ?, phone_model = ?,
-      status = ?, description = ?, comment = ?, repair_performed = ?, loaner_phone = ?, pravim = ?,
-      kaparo = ?, service_price = ?, customer_price = ?,
+      status = ?, description = ?, comment = ?, repair_performed = ?, loaner_phone = ?, phone_password = ?,
+      pravim = ?, kaparo = ?, service_price = ?, customer_price = ?,
       updated_at = datetime('now')
      WHERE id = ?`
   ).run(
     next.customer_name, next.phone_contact, next.date_received, next.date_returned,
     next.phone_model, next.status, next.description, next.comment, next.repair_performed, next.loaner_phone,
-    next.pravim, next.kaparo, next.service_price, next.customer_price,
+    next.phone_password, next.pravim, next.kaparo, next.service_price, next.customer_price,
     req.params.id
   );
 
-  // Record only what actually changed, for a readable audit trail.
+  // Record only what actually changed, for a readable audit trail. The
+  // unlock code is sensitive: the history only notes that it changed,
+  // never the old or new value.
   const diff = {};
   for (const [col] of TRACKED_FIELDS) {
     if (String(existing[col] ?? '') !== String(next[col] ?? '')) {
-      diff[col] = { from: existing[col], to: next[col] };
+      diff[col] = col === 'phone_password' ? { changed: true } : { from: existing[col], to: next[col] };
     }
   }
   if (Object.keys(diff).length > 0) {

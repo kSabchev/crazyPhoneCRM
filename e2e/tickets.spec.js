@@ -14,7 +14,8 @@ test('the new-ticket form has sensible defaults and hides repair-progress fields
   await expect(page.locator('#modalTitle')).toHaveText('Нова сервизна поръчка');
   await expect(page.locator('#f_date')).toHaveValue(/^\d{4}-\d{2}-\d{2}$/);
   await expect(page.locator('#f_kaparo')).toHaveValue('Не');
-  await expect(page.locator('#f_loaner')).toHaveValue('Не');
+  await expect(page.locator('#f_loaner')).toHaveValue('не');
+  await expect(page.locator('#f_password')).toHaveValue('');
   await expect(page.locator('#f_status')).toHaveValue('за сервиз');
 
   // Only meaningful once the ticket exists.
@@ -314,4 +315,79 @@ test('the activity log lists recent changes by user', async ({ page }) => {
   await expect(page.locator('#activityList')).toContainText(`#${t.ticket_no}`);
   await page.click('#closeActivityBtn');
   await expect(page.locator('#activityOverlay')).not.toHaveClass(/\bopen\b/);
+});
+
+test('Парола sits between Проблем and Коментар, and the loaner column is "Об. тел"', async ({ page }) => {
+  const headers = await page.locator('thead th').allInnerTexts();
+  const i = headers.indexOf('Проблем');
+  expect(headers.slice(i, i + 3)).toEqual(['Проблем', 'Парола', 'Коментар']);
+  expect(headers).toContain('Об. тел');
+  expect(headers).not.toContain('Оборотен телефон');
+});
+
+test('the unlock code and loaner phone are entered in the form and shown in the table', async ({ page }) => {
+  const name = uniqueName();
+  await page.click('#newTicketBtn');
+  await expect(page.locator('#f_loaner option')).toHaveText(['не', 'да']);
+  await page.fill('#f_customer', name);
+  await page.fill('#f_phone', '0888 111 222');
+  await page.fill('#f_model', 'iPhone 14');
+  await page.fill('#f_desc', 'Не пали');
+  await page.fill('#f_password', '2580');
+  await page.selectOption('#f_loaner', 'да');
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+
+  const r = row(page, name);
+  await expect(r.locator('.password-cell')).toHaveText('2580');
+  await expect(r).toContainText('да');
+
+  await r.locator('.ticket-no').click();
+  await expect(page.locator('#f_password')).toHaveValue('2580');
+  await expect(page.locator('#f_loaner')).toHaveValue('да');
+});
+
+test('the history says the password changed without showing it', async ({ page }) => {
+  const t = await createTicketViaApi(page, { phonePassword: '1111' });
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.fill('#f_password', '9999');
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.click('#historyToggle');
+  const historyList = page.locator('#historyList');
+  await expect(historyList).toContainText('Паролата е променена.');
+  await expect(historyList).not.toContainText('1111');
+  await expect(historyList).not.toContainText('9999');
+});
+
+test('choosing "издаден" warns that the password will be cleared, and saving clears it', async ({ page }) => {
+  const t = await createTicketViaApi(page, { phonePassword: '4321' });
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+
+  const note = page.locator('#f_password_note');
+  await expect(note).toBeHidden();
+  await page.selectOption('#f_status', 'издаден');
+  await expect(note).toBeVisible();
+  await page.selectOption('#f_status', 'в сервиз');
+  await expect(note).toBeHidden();
+  await page.selectOption('#f_status', 'издаден');
+
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+  await expect(row(page, t.customer_name).locator('.password-cell')).toHaveText('—');
+});
+
+test('the quick status change to "издаден" also clears the password', async ({ page }) => {
+  const t = await createTicketViaApi(page, { phonePassword: '4321' });
+  await page.reload();
+  const r = row(page, t.customer_name);
+  await expect(r.locator('.password-cell')).toHaveText('4321');
+
+  await r.locator('.status-cell .badge').click();
+  await r.locator('.status-select').selectOption('издаден');
+  await expect(r.locator('.password-cell')).toHaveText('—');
 });

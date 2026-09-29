@@ -77,10 +77,10 @@ test('an edit validates only the fields it sends', async () => {
   await agent.put(`/api/tickets/${t.id}`).send({ dateReturned: '2026-09-10' }).expect(200);
 });
 
-test('an edit with null loaner phone / kaparo resets them to "Не"', async () => {
-  const t = (await agent.post('/api/tickets').send(validTicket({ loanerPhone: 'Nokia', kaparo: '20' }))).body;
+test('an edit with null loaner phone / kaparo resets them to "не" / "Не"', async () => {
+  const t = (await agent.post('/api/tickets').send(validTicket({ loanerPhone: 'да', kaparo: '20' }))).body;
   const res = await agent.put(`/api/tickets/${t.id}`).send({ loanerPhone: null, kaparo: null }).expect(200);
-  assert.equal(res.body.loaner_phone, 'Не');
+  assert.equal(res.body.loaner_phone, 'не');
   assert.equal(res.body.kaparo, 'Не');
 });
 

@@ -12,7 +12,7 @@ const statusStyles = {
 };
 const FALLBACK_STATUS_STYLE = ['var(--status-neutral)','var(--status-neutral-bg)'];
 
-const COLUMN_KEYS = ['customer','callBtn','model','issue','comment','repairPerformed','loanerPhone','pravim','status','kaparo','servicePrice','customerPrice','dateIn','dateReturned'];
+const COLUMN_KEYS = ['customer','callBtn','model','issue','password','comment','repairPerformed','loanerPhone','pravim','status','kaparo','servicePrice','customerPrice','dateIn','dateReturned'];
 
 const PRAVIM_SYMBOLS = { circle: '○', tick: '✓', cross: '✗' };
 const PRAVIM_CYCLE = ['circle', 'tick', 'cross'];
@@ -232,6 +232,7 @@ function render(){
         </td>
         <td${dv('model')}>${escapeHtml(t.phone_model)}</td>
         <td class="desc-cell"${dv('issue')} title="${escapeHtml(t.description)}">${escapeHtml(t.description) || '—'}</td>
+        <td class="password-cell"${dv('password')}>${t.phone_password ? `<span class="password-value">${escapeHtml(t.phone_password)}</span>` : '—'}</td>
         <td class="desc-cell"${dv('comment')} title="${escapeHtml(t.comment)}">${escapeHtml(t.comment) || '—'}</td>
         <td class="desc-cell"${dv('repairPerformed')} title="${escapeHtml(t.repair_performed)}">${escapeHtml(t.repair_performed) || '—'}</td>
         <td${dv('loanerPhone')}>${escapeHtml(t.loaner_phone)}</td>
@@ -362,13 +363,15 @@ function openNew(){
   document.getElementById('f_desc').value = '';
   document.getElementById('f_comment').value = '';
   document.getElementById('f_repair').value = '';
-  document.getElementById('f_loaner').value = 'Не';
+  document.getElementById('f_loaner').value = 'не';
+  document.getElementById('f_password').value = '';
   setPravimButton('circle');
   document.getElementById('deleteBtn').style.display = 'none';
   document.getElementById('printCustomerBtn').style.display = 'none';
   document.getElementById('printServiceBtn').style.display = 'none';
   document.getElementById('historySection').style.display = 'none';
   document.getElementById('topActions').style.display = 'none';
+  document.getElementById('f_password_note').style.display = 'none';
   document.getElementById('editingBanner').style.display = 'none';
   setEditOnlyFieldsVisible(false);
   document.getElementById('overlay').classList.add('open');
@@ -403,10 +406,12 @@ function openEdit(id){
   document.getElementById('f_desc').value = t.description || '';
   document.getElementById('f_comment').value = t.comment || '';
   document.getElementById('f_repair').value = t.repair_performed || '';
-  document.getElementById('f_loaner').value = t.loaner_phone || 'Не';
+  document.getElementById('f_loaner').value = t.loaner_phone === 'да' ? 'да' : 'не';
+  document.getElementById('f_password').value = t.phone_password || '';
   setPravimButton(t.pravim || 'circle');
   setEditOnlyFieldsVisible(true);
   document.getElementById('topActions').style.display = 'flex';
+  document.getElementById('f_password_note').style.display = 'none';
   document.getElementById('deleteBtn').style.display = 'inline-block';
   document.getElementById('printCustomerBtn').style.display = 'inline-block';
   document.getElementById('printServiceBtn').style.display = 'inline-block';
@@ -473,7 +478,8 @@ function collectForm(){
     description: document.getElementById('f_desc').value.trim(),
     comment: document.getElementById('f_comment').value.trim(),
     repairPerformed: document.getElementById('f_repair').value.trim(),
-    loanerPhone: document.getElementById('f_loaner').value.trim(),
+    loanerPhone: document.getElementById('f_loaner').value,
+    phonePassword: document.getElementById('f_password').value.trim(),
     pravim: document.getElementById('f_pravim').dataset.value
   };
 }
@@ -529,6 +535,7 @@ const FIELD_LABELS = {
   comment: 'Коментар',
   repair_performed: 'Извършен ремонт',
   loaner_phone: 'Оборотен телефон',
+  phone_password: 'Парола',
   pravim: 'Правим',
   kaparo: 'Капаро',
   service_price: 'Изкупна цена',
@@ -559,6 +566,8 @@ function describeEntry(entry, includeTicketRef){
     body = `Изтри поръчката (${escapeHtml(entry.changes.customer_name || '')}, ${escapeHtml(entry.changes.phone_model || '')}).`;
   } else {
     const lines = Object.entries(entry.changes).map(([field, {from, to}])=>{
+      // The unlock code itself is never stored in the history.
+      if(field === 'phone_password') return '<div class="change-line">Паролата е променена.</div>';
       const label = FIELD_LABELS[field] || field;
       const fromV = field === 'pravim' ? (PRAVIM_SYMBOLS[from] || '—') : ((from === null || from === '') ? '—' : escapeHtml(String(from)));
       const toV = field === 'pravim' ? (PRAVIM_SYMBOLS[to] || '—') : ((to === null || to === '') ? '—' : escapeHtml(String(to)));
@@ -679,6 +688,7 @@ function buildServiceLabelDoc(t){
     <div class="label-header">
       <div class="label-shop">${escapeHtml(settings.shopName)}</div>
       <div class="label-order">№ ${t.ticket_no}</div>
+      ${t.phone_password ? `<div class="label-password">Парола: ${escapeHtml(t.phone_password)}</div>` : ''}
     </div>
     <div class="label-issue-area">
       <div class="label-issue">${escapeHtml(t.description)}</div>
@@ -760,7 +770,18 @@ document.getElementById('f_status').addEventListener('change', (e)=>{
   if(e.target.value === COMPLETED_STATUS && !returned.value){
     returned.value = localDateString(new Date());
   }
+  updatePasswordNote();
 });
+document.getElementById('f_password').addEventListener('input', updatePasswordNote);
+
+// The server clears the unlock code when a ticket becomes "издаден"; say so
+// in the form before saving rather than silently dropping what was typed.
+function updatePasswordNote(){
+  const becomingCompleted = document.getElementById('f_status').value === COMPLETED_STATUS
+    && (!editingTicket || editingTicket.status !== COMPLETED_STATUS);
+  const hasPassword = document.getElementById('f_password').value.trim() !== '';
+  document.getElementById('f_password_note').style.display = becomingCompleted && hasPassword ? 'block' : 'none';
+}
 document.getElementById('f_phone').addEventListener('input', (e)=>{
   document.getElementById('f_phone_call').href = telHref(e.target.value);
 });

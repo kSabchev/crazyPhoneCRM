@@ -387,6 +387,13 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
   set the date returned once it's handed back, fix a detail, or delete the
   ticket. The Delete / Print / Cancel / Save buttons are at both the top
   and the bottom of an open ticket.
+- **Парола** holds the customer's unlock code (PIN or pattern). It is shown in
+  its own column and printed on the service label (not the customer card).
+  The change history only notes "Паролата е променена", never the code, and
+  the code is deleted automatically when the order becomes "издаден".
+- **Об. тел** (loaner phone) is a да/не choice. Older free-text entries were
+  converted on upgrade: a model name became "да", with the text kept in the
+  order's comment.
 - Click a **status** in the table to change it straight from a dropdown,
   without opening the ticket. Changing it to "издаден" (here or in the
   ticket form) fills in today as the return date, unless one is already set.
