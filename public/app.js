@@ -327,12 +327,16 @@ function renderStats(){
   const inService = tickets.filter(t=> t.status === 'в сервиз').length;
   const waiting = tickets.filter(t=> t.status === 'чака клиент').length;
   const issued = tickets.filter(t=> t.status === COMPLETED_STATUS).length;
+  const refused = tickets.filter(t=> t.status === 'отказан').length;
+  const forgotten = tickets.filter(t=> t.status === 'забравен').length;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="num">${total}</div><div class="lbl">общо поръчки</div></div>
     <div class="stat"><div class="num" style="color:var(--status-forservice-text)">${forService}</div><div class="lbl">за сервиз</div></div>
     <div class="stat"><div class="num" style="color:var(--status-inservice-text)">${inService}</div><div class="lbl">в сервиза</div></div>
     <div class="stat"><div class="num" style="color:var(--status-waiting-text)">${waiting}</div><div class="lbl">чакат клиент</div></div>
     <div class="stat"><div class="num" style="color:var(--status-issued-text)">${issued}</div><div class="lbl">издадени</div></div>
+    <div class="stat"><div class="num" style="color:var(--status-refused-bg)">${refused}</div><div class="lbl">отказани</div></div>
+    <div class="stat"><div class="num" style="color:var(--status-forgotten-bg)">${forgotten}</div><div class="lbl">забравени</div></div>
   `;
 }
 

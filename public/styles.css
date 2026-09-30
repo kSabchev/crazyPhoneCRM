@@ -75,7 +75,7 @@ header{
 .brand h1{font-family:Georgia,"Times New Roman",serif;font-size:30px;margin:0;letter-spacing:0.2px;}
 .brand .tag{font-size:13px;color:var(--ink-soft);border-left:1px solid var(--line);padding-left:12px;}
 .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
-.stats{display:flex;gap:22px;}
+.stats{display:flex;gap:22px;flex-wrap:wrap;justify-content:flex-end;}
 .stat{text-align:right;}
 .stat .num{font-size:22px;font-weight:600;line-height:1;font-family:Georgia,serif;}
 .stat .lbl{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
