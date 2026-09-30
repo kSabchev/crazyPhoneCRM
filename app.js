@@ -10,11 +10,28 @@ const { buildReport, COMPLETED_STATUS } = require('./reports');
 
 const app = express();
 
-// Behind a reverse proxy (nginx/Caddy on the same machine), every request
-// arrives from 127.0.0.1 — set TRUST_PROXY=loopback in .env so the login
-// rate limit sees each user's real IP instead of locking everyone out
-// together. Leave unset when browsers connect directly (e.g. Tailscale).
-if (process.env.TRUST_PROXY) app.set('trust proxy', process.env.TRUST_PROXY);
+// Behind a reverse proxy every request arrives from the proxy's address —
+// set TRUST_PROXY in .env so the login rate limit sees each user's real IP
+// instead of locking everyone out together, and so HTTPS is detected:
+//   loopback  nginx/Caddy on the same machine
+//   1         one proxy hop in front (hosting platforms such as Render)
+// Leave unset when browsers connect directly (e.g. over Tailscale).
+function parseTrustProxy(v) {
+  if (v === 'true') return true;
+  if (v === 'false') return false;
+  if (/^\d+$/.test(v)) return Number(v);
+  return v; // address/subnet list or a named range like "loopback"
+}
+if (process.env.TRUST_PROXY) app.set('trust proxy', parseTrustProxy(process.env.TRUST_PROXY));
+
+// ---- Demo mode ----
+// Public: tells the pages whether to show the DEMO banner and pre-fill the
+// demo login. Reveals nothing outside demo mode.
+app.get('/api/demo', (req, res) => {
+  if (process.env.DEMO_MODE !== 'true') return res.json({ demo: false });
+  const { DEMO_USERS } = require('./demo');
+  res.json({ demo: true, users: DEMO_USERS });
+});
 
 // ---- Health check ----
 // For uptime monitoring / NSSM checks: confirms the process is serving
@@ -47,8 +64,11 @@ app.use(
     cookie: {
       httpOnly: true,
       maxAge: 8 * 60 * 60 * 1000, // 8 hour login session
-      sameSite: 'lax'
-      // secure: true  <- enable this once the app is served over HTTPS
+      sameSite: 'lax',
+      // COOKIE_SECURE=true once the app is only reached over HTTPS: the
+      // login cookie is then never sent over plain HTTP. Behind a proxy
+      // that terminates HTTPS this also needs TRUST_PROXY.
+      secure: process.env.COOKIE_SECURE === 'true'
     }
   })
 );

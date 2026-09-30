@@ -16,6 +16,16 @@ process.on('unhandledRejection', reason => {
   process.exit(1);
 });
 
+// Public demo (e.g. on Render): start from fresh demo data every time.
+if (process.env.DEMO_MODE === 'true') {
+  try {
+    require('./demo').prepareDemo(require('./db'));
+  } catch (err) {
+    console.error(err.message);
+    process.exit(1);
+  }
+}
+
 app.listen(PORT, () => {
   console.log(`Repair log running at http://localhost:${PORT}`);
 });

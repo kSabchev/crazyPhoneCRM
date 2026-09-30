@@ -1,0 +1,28 @@
+# Render Blueprint for the public DEMO of CrazyPhone (not the shop's real
+# app). Render → New → Blueprint → pick this repo. See "Demo on Render" in
+# the README.
+services:
+  - type: web
+    name: crazyphone-demo
+    runtime: node
+    plan: free
+    # bcrypt and better-sqlite3 ship prebuilt Linux binaries, so install
+    # scripts (compiling from source) aren't needed; dev tools are skipped.
+    buildCommand: npm ci --omit=dev --ignore-scripts
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_VERSION
+        value: "24"
+      # Wipes and re-creates fake demo data on every start. Never set this
+      # for the real shop app.
+      - key: DEMO_MODE
+        value: "true"
+      - key: SESSION_SECRET
+        generateValue: true
+      # Render's proxy sits in front of the app: see real client IPs for
+      # the login rate limit, and detect HTTPS for secure cookies.
+      - key: TRUST_PROXY
+        value: "1"
+      - key: COOKIE_SECURE
+        value: "true"
