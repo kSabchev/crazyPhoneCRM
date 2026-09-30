@@ -396,7 +396,7 @@ test('the header counts orders in "издаден"', async ({ page }) => {
   await expect(stat).toHaveText(String(before + 1));
 
   const labels = await page.locator('#stats .lbl').allInnerTexts();
-  expect(labels[labels.length - 1]).toBe('издадени');
+  expect(labels.indexOf('издадени')).toBe(labels.indexOf('чакат клиент') + 1);
 });
 
 test('phone numbers not in 0/+359 + 9 digit form get a light red background, but are still saved', async ({ page }) => {
@@ -546,4 +546,28 @@ test('saving a comment keeps a colleague\'s other changes made meanwhile', async
 
   await expect(row(page, t.customer_name).locator('.comment-cell')).toHaveText('обадих се');
   await expect(row(page, t.customer_name).locator('.badge')).toHaveText('чака клиент');
+});
+
+test('the header counts "отказани" and "забравени", and the form offers both statuses', async ({ page }) => {
+  const stat = label => page.locator('#stats .stat', { hasText: label }).locator('.num');
+  const labels = await page.locator('#stats .lbl').allInnerTexts();
+  expect(labels.slice(-3)).toEqual(['издадени', 'отказани', 'забравени']);
+  await expect(stat('отказани')).toHaveCSS('color', 'rgb(71, 85, 105)');
+  await expect(stat('забравени')).toHaveCSS('color', 'rgb(154, 52, 18)');
+  const refusedBefore = Number(await stat('отказани').textContent());
+  const forgottenBefore = Number(await stat('забравени').textContent());
+
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await expect(page.locator('#f_status option')).toHaveText(['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен']);
+  await page.selectOption('#f_status', 'отказан');
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+  await expect(stat('отказани')).toHaveText(String(refusedBefore + 1));
+
+  await row(page, t.customer_name).locator('.status-cell .badge').click();
+  await row(page, t.customer_name).locator('.status-select').selectOption('забравен');
+  await expect(stat('забравени')).toHaveText(String(forgottenBefore + 1));
+  await expect(stat('отказани')).toHaveText(String(refusedBefore));
 });

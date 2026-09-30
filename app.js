@@ -7,6 +7,7 @@ const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { buildReport, COMPLETED_STATUS } = require('./reports');
+const { forgetStaleWaiting } = require('./auto-status');
 
 const app = express();
 
@@ -582,6 +583,19 @@ app.get('/api/reports', requireAuth, (req, res) => {
 function daysBetweenDates(from, to) {
   return (Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / (24 * 60 * 60 * 1000);
 }
+
+// ---- Scheduled maintenance ----
+// Called by server.js on start and hourly: orders waiting for the customer
+// for over 30 days become "забравен". Open screens refresh live.
+app.runMaintenance = () => {
+  const forgotten = forgetStaleWaiting(db);
+  if (forgotten.length) {
+    console.log(`[${new Date().toISOString()}] Marked ${forgotten.length} order(s) as "забравен" after 30+ days waiting: ` +
+      forgotten.map(t => `#${t.ticketNo}`).join(', '));
+    broadcastChange('tickets');
+  }
+  return forgotten;
+};
 
 // ---- Static frontend ----
 app.use(express.static(path.join(__dirname, 'public')));

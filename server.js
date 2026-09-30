@@ -29,3 +29,15 @@ if (process.env.DEMO_MODE === 'true') {
 app.listen(PORT, () => {
   console.log(`Repair log running at http://localhost:${PORT}`);
 });
+
+// Hourly housekeeping (see app.runMaintenance), plus once right away.
+// A failure is logged and retried next hour rather than crashing the app.
+function runMaintenance() {
+  try {
+    app.runMaintenance();
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Maintenance failed:`, err);
+  }
+}
+runMaintenance();
+setInterval(runMaintenance, 60 * 60 * 1000).unref();

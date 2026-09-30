@@ -431,6 +431,11 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
   refused) and **забравен** (phone never collected). Closed orders are left out
   of the "В процес" filter and the open-orders figures in reports. Only
   "издаден" fills in the return date automatically.
+- An order left in **"чака клиент" for more than 30 days** becomes "забравен"
+  automatically (checked on start and every hour). The history shows it as
+  done by "автоматично", and the server log lists the order numbers. The 30
+  days count from when it was last put into "чака клиент"; putting it back
+  into "чака клиент" starts a new 30 days.
 - Click a **status** in the table to change it straight from a dropdown,
   without opening the ticket. Changing it to "издаден" (here or in the
   ticket form) fills in today as the return date, unless one is already set.
