@@ -399,7 +399,7 @@ test('the header counts orders in "издаден"', async ({ page }) => {
   expect(labels[labels.length - 1]).toBe('издадени');
 });
 
-test('phone numbers not in 0/+359 + 9 digit form are red, but still saved', async ({ page }) => {
+test('phone numbers not in 0/+359 + 9 digit form get a light red background, but are still saved', async ({ page }) => {
   const good = [
     await createTicketViaApi(page, { phoneContact: '0888 123 456' }),
     await createTicketViaApi(page, { phoneContact: '+359 88 812 3456' }),
@@ -414,17 +414,20 @@ test('phone numbers not in 0/+359 + 9 digit form are red, but still saved', asyn
   await page.reload();
 
   for (const t of good) {
-    await expect(row(page, t.customer_name).locator('.cust-phone')).not.toHaveClass(/phone-nonstandard/);
+    const phone = row(page, t.customer_name).locator('.cust-phone');
+    await expect(phone).not.toHaveClass(/phone-nonstandard/);
+    await expect(phone).toHaveCSS('background-color', 'rgba(0, 0, 0, 0)');
   }
   for (const t of bad) {
     const phone = row(page, t.customer_name).locator('.cust-phone');
     await expect(phone).toHaveClass(/phone-nonstandard/);
-    await expect(phone).toHaveCSS('color', 'rgb(220, 38, 38)');
+    await expect(phone).toHaveCSS('background-color', 'rgb(254, 226, 226)');
+    await expect(phone).toHaveCSS('color', 'rgb(107, 101, 92)'); // text keeps its usual grey
     await expect(phone).toHaveAttribute('title', /0XXXXXXXXX/);
   }
 });
 
-test('the phone field turns red while typing a nonstandard number, and saving still works', async ({ page }) => {
+test('the phone field gets a light red background while typing a nonstandard number, and saving still works', async ({ page }) => {
   const name = uniqueName();
   await page.click('#newTicketBtn');
   const phone = page.locator('#f_phone');
@@ -432,6 +435,8 @@ test('the phone field turns red while typing a nonstandard number, and saving st
 
   await phone.fill('0888 12');
   await expect(phone).toHaveClass(/phone-nonstandard/);
+  // Also while focused, where the field normally turns white.
+  await expect(phone).toHaveCSS('background-color', 'rgb(254, 226, 226)');
   await phone.fill('0888 123 456');
   await expect(phone).not.toHaveClass(/phone-nonstandard/);
   await phone.fill('12345');

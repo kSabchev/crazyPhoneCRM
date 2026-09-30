@@ -20,6 +20,8 @@
   --pravim-circle:#9A948A;
   --pravim-tick:#16A34A;
   --pravim-cross:#DC2626;
+  --phone-warning-bg:#FEE2E2;
+  --phone-warning-border:#FCA5A5;
 }
 *{box-sizing:border-box;}
 body{
@@ -158,14 +160,18 @@ tbody tr:hover{background:#FBF7EF;}
   font-size:14px;font-family:inherit;color:var(--ink);background:var(--paper);
 }
 .field textarea{resize:vertical;min-height:70px;}
-/* Phone numbers not in 0XXXXXXXXX / +359XXXXXXXXX form: a warning, not an error. */
-.phone-nonstandard{color:#DC2626 !important;}
-.field input.phone-nonstandard{border-color:#DC2626;}
 .password-cell{white-space:nowrap;}
 .password-value{font-family:Consolas,"Courier New",monospace;font-size:12.5px;}
 .field input:focus, .field select:focus, .field textarea:focus{
   outline:2px solid var(--copper);outline-offset:-1px;background:var(--panel);
 }
+/* Phone numbers not in 0XXXXXXXXX / +359XXXXXXXXX form: a warning, not an
+   error — a light red background, text stays in its normal colour. */
+.cust-phone.phone-nonstandard{
+  display:inline-block;background:var(--phone-warning-bg);border-radius:3px;padding:1px 5px;margin-left:-5px;
+}
+.field input.phone-nonstandard,
+.field input.phone-nonstandard:focus{background:var(--phone-warning-bg);border-color:var(--phone-warning-border);}
 .row2{display:grid;grid-template-columns:1fr 1fr;gap:14px;}
 
 .editing-banner{

@@ -394,7 +394,7 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
   converted on upgrade: a model name became "да", with the text kept in the
   order's comment.
 - **Phone numbers** that aren't in the usual form (0 or +359 followed by
-  9 digits; spaces and dashes are fine) are shown in red in the table and
+  9 digits; spaces and dashes are fine) get a light red background in the table and
   the form, as a warning. They can still be saved.
 - Click a **status** in the table to change it straight from a dropdown,
   without opening the ticket. Changing it to "издаден" (here or in the
