@@ -425,6 +425,12 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
 - **Phone numbers** that aren't in the usual form (0 or +359 followed by
   9 digits; spaces and dashes are fine) get a light red background in the table and
   the form, as a warning. They can still be saved.
+- Click a **comment** in the table to edit just the comment in a small
+  window, without opening the whole order (Ctrl+Enter saves, Esc closes).
+- Besides "издаден", two more statuses close an order: **отказан** (repair
+  refused) and **забравен** (phone never collected). Closed orders are left out
+  of the "В процес" filter and the open-orders figures in reports. Only
+  "издаден" fills in the return date automatically.
 - Click a **status** in the table to change it straight from a dropdown,
   without opening the ticket. Changing it to "издаден" (here or in the
   ticket form) fills in today as the return date, unless one is already set.

@@ -93,9 +93,9 @@ function renderKpis(r){
   const tiles = [
     ['Приходи', fmtMoney(t.revenue), `${t.priced} поръчки с цена`],
     ['Печалба', fmtMoney(t.profit), `разходи ${fmtMoney(t.cost)}`],
-    ['Върнати поръчки', t.returned, 'в избрания период'],
+    ['Издадени поръчки', t.returned, 'в избрания период'],
     ['Средна поръчка', t.averageTicket === null ? '—' : fmtMoney(t.averageTicket), 'продажна цена'],
-    ['Срок за ремонт', fmtDays(r.turnaround.medianDays), r.turnaround.count ? `медиана · средно ${fmtDays(r.turnaround.averageDays)}` : 'няма върнати'],
+    ['Срок за ремонт', fmtDays(r.turnaround.medianDays), r.turnaround.count ? `медиана · средно ${fmtDays(r.turnaround.averageDays)}` : 'няма издадени'],
     ['Капаро в момента', fmtMoney(r.workload.depositsHeld.amount), `по ${r.workload.depositsHeld.tickets} отворени поръчки`]
   ];
   document.getElementById('kpis').innerHTML = tiles.map(([label, value, sub])=>`
@@ -144,7 +144,7 @@ function renderRevenueChart(months){
   const el = document.getElementById('revenueChart');
   const hasData = months.some(m => m.returned > 0);
   if(!hasData){
-    el.innerHTML = '<div class="empty-state">Няма върнати поръчки в избрания период.</div>';
+    el.innerHTML = '<div class="empty-state">Няма издадени поръчки в избрания период.</div>';
     return;
   }
 
@@ -192,7 +192,7 @@ function renderRevenueChart(months){
         <div class="tip-title">${escapeHtml(fmtMonthLong(m.month))}</div>
         <div><span class="legend-swatch" style="background:var(--series-1)"></span>Приходи <b>${escapeHtml(fmtMoney(m.revenue))}</b></div>
         <div><span class="legend-swatch" style="background:var(--series-2)"></span>Печалба <b>${escapeHtml(fmtMoney(m.profit))}</b></div>
-        <div class="tip-sub">${m.returned} върнати · ${m.priced} с цена</div>`;
+        <div class="tip-sub">${m.returned} издадени · ${m.priced} с цена</div>`;
       tip.classList.add('show');
     });
     g.addEventListener('mousemove', e=>{
@@ -260,8 +260,8 @@ function renderWorkload(w){
 }
 
 const QUALITY_LABELS = {
-  returnedWithoutPrice: 'Върнати без продажна цена (не влизат в приходите)',
-  returnedWithoutCost: 'Върнати с продажна, но без изкупна цена (печалбата е завишена)',
+  returnedWithoutPrice: 'Издадени без продажна цена (не влизат в приходите)',
+  returnedWithoutCost: 'Издадени с продажна, но без изкупна цена (печалбата е завишена)',
   issuedWithoutReturnDate: 'Със статус „издаден“, но без дата на връщане (не влизат в никой месец)',
   unreadableKaparo: 'Капаро, което не е число (не влиза в „Капаро в момента“)'
 };

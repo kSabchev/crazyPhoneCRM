@@ -6,9 +6,11 @@
 // - Revenue for a month = customer_price of tickets RETURNED that month
 //   (date_returned), i.e. when the money actually comes in.
 // - Cost = service_price of those same tickets; profit = revenue − cost.
-// - A ticket is "open" until its status is the completed status.
+// - A ticket is "open" until it reaches a closed status: handed back
+//   (издаден), refused (отказан) or never collected (забравен).
 
 const COMPLETED_STATUS = 'издаден';
+const CLOSED_STATUSES = [COMPLETED_STATUS, 'отказан', 'забравен'];
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Money is summed in whole cents so totals don't pick up float noise.
@@ -196,7 +198,7 @@ function dataQualityReport(all, returned) {
 function buildReport(db, { from, to, today }) {
   const all = db.prepare('SELECT * FROM tickets ORDER BY ticket_no').all();
   const returned = all.filter(t => t.date_returned && t.date_returned >= from && t.date_returned <= to);
-  const open = all.filter(t => t.status !== COMPLETED_STATUS);
+  const open = all.filter(t => !CLOSED_STATUSES.includes(t.status));
 
   return {
     range: { from, to },
@@ -208,4 +210,4 @@ function buildReport(db, { from, to, today }) {
   };
 }
 
-module.exports = { buildReport, parseKaparo, monthsBetween, COMPLETED_STATUS };
+module.exports = { buildReport, parseKaparo, monthsBetween, COMPLETED_STATUS, CLOSED_STATUSES };

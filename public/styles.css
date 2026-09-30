@@ -16,6 +16,8 @@
   --status-inservice:#FFFFFF;     --status-inservice-bg:#DC2626;    --status-inservice-text:#DC2626;
   --status-waiting:#3F2E00;       --status-waiting-bg:#FBBF24;      --status-waiting-text:#B45309;
   --status-issued:#FFFFFF;        --status-issued-bg:#16A34A;       --status-issued-text:#15803D;
+  --status-refused:#FFFFFF;      --status-refused-bg:#475569;
+  --status-forgotten:#FFFFFF;    --status-forgotten-bg:#9A3412;
   --status-neutral:#FFFFFF;       --status-neutral-bg:#6B7280;
   --pravim-circle:#9A948A;
   --pravim-tick:#16A34A;
@@ -128,6 +130,8 @@ tbody tr:hover{background:#FBF7EF;}
 .price{font-variant-numeric:tabular-nums;white-space:nowrap;}
 .badge{display:inline-block;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;}
 .status-cell{cursor:pointer;}
+.comment-cell{cursor:text;}
+.comment-cell:hover{background:var(--copper-soft);}
 .status-cell .badge:hover{box-shadow:0 0 0 2px var(--copper-soft);}
 .status-select{padding:4px 6px;border:1px solid var(--copper);border-radius:3px;font-size:12.5px;background:var(--panel);color:var(--ink);cursor:pointer;}
 .pravim-cell{text-align:center;cursor:pointer;}
@@ -434,3 +438,8 @@ tbody tr:hover{background:#FBF7EF;}
   background:#FEF3C7;color:#78350F;border-bottom:1px solid #FCD34D;
   padding:8px 16px;font-size:13px;text-align:center;font-weight:600;
 }
+
+/* ---- Comment-only editor ---- */
+.modal.modal-small{max-width:520px;}
+.modal-small textarea{min-height:120px;}
+.hint-text{font-size:12px;color:var(--ink-soft);}

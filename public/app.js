@@ -8,7 +8,9 @@ const statusStyles = {
   'за сервиз': ['var(--status-forservice)','var(--status-forservice-bg)'],
   'в сервиз': ['var(--status-inservice)','var(--status-inservice-bg)'],
   'чака клиент': ['var(--status-waiting)','var(--status-waiting-bg)'],
-  'издаден': ['var(--status-issued)','var(--status-issued-bg)']
+  'издаден': ['var(--status-issued)','var(--status-issued-bg)'],
+  'отказан': ['var(--status-refused)','var(--status-refused-bg)'],
+  'забравен': ['var(--status-forgotten)','var(--status-forgotten-bg)']
 };
 const FALLBACK_STATUS_STYLE = ['var(--status-neutral)','var(--status-neutral-bg)'];
 
@@ -117,6 +119,9 @@ document.getElementById('settingsBtn').addEventListener('click', ()=>{
 // The status considered "completed" for the purposes of the "in progress"
 // filter and the top stats. Matches the default Bulgarian status set.
 const COMPLETED_STATUS = 'издаден';
+// Finished orders: handed back, refused, or never collected. Everything else
+// counts as "В процес".
+const CLOSED_STATUSES = [COMPLETED_STATUS, 'отказан', 'забравен'];
 
 // ---------- Settings ----------
 async function loadSettings(){
@@ -191,7 +196,7 @@ function render(){
   let filtered = tickets.filter(t=>{
     const matchesQ = !q || [t.customer_name, t.phone_contact, t.phone_model, t.description, ('#'+t.ticket_no)]
       .join(' ').toLowerCase().includes(q);
-    const matchesStatus = !statusF || (statusF === '__active__' ? t.status !== COMPLETED_STATUS : t.status === statusF);
+    const matchesStatus = !statusF || (statusF === '__active__' ? !CLOSED_STATUSES.includes(t.status) : t.status === statusF);
     return matchesQ && matchesStatus;
   });
 
@@ -233,7 +238,7 @@ function render(){
         <td${dv('model')}>${escapeHtml(t.phone_model)}</td>
         <td class="desc-cell"${dv('issue')} title="${escapeHtml(t.description)}">${escapeHtml(t.description) || '—'}</td>
         <td class="password-cell"${dv('password')}>${t.phone_password ? `<span class="password-value">${escapeHtml(t.phone_password)}</span>` : '—'}</td>
-        <td class="desc-cell"${dv('comment')} title="${escapeHtml(t.comment)}">${escapeHtml(t.comment) || '—'}</td>
+        <td class="desc-cell comment-cell"${dv('comment')} onclick="openCommentEditor(event, ${t.id})" title="${escapeHtml(t.comment) || 'Щракнете, за да добавите коментар'}">${escapeHtml(t.comment) || '—'}</td>
         <td class="desc-cell"${dv('repairPerformed')} title="${escapeHtml(t.repair_performed)}">${escapeHtml(t.repair_performed) || '—'}</td>
         <td${dv('loanerPhone')}>${escapeHtml(t.loaner_phone)}</td>
         <td${dv('pravim')} class="pravim-cell" onclick="togglePravim(event, ${t.id})"><span class="pravim-toggle pravim-${t.pravim||'circle'}">${PRAVIM_SYMBOLS[t.pravim||'circle']}</span></td>
@@ -627,6 +632,57 @@ document.getElementById('activityLogBtn').addEventListener('click', async ()=>{
 document.getElementById('closeActivityBtn').addEventListener('click', ()=>{
   document.getElementById('activityOverlay').classList.remove('open');
 });
+// ---------- Comment-only editor ----------
+// Clicking a Коментар cell edits just that field in a small window,
+// without opening the whole order. Saves only { comment }, so it can't
+// overwrite anything else a colleague changed meanwhile.
+let commentTicketId = null;
+
+function openCommentEditor(e, id){
+  e.stopPropagation();
+  const t = tickets.find(x=>x.id===id);
+  if(!t) return;
+  commentTicketId = id;
+  document.getElementById('commentSub').textContent = `Поръчка #${t.ticket_no} — ${t.customer_name}, ${t.phone_model}`;
+  const input = document.getElementById('commentInput');
+  input.value = t.comment || '';
+  document.getElementById('commentOverlay').classList.add('open');
+  input.focus();
+  input.setSelectionRange(input.value.length, input.value.length);
+}
+
+function closeCommentEditor(){
+  document.getElementById('commentOverlay').classList.remove('open');
+  commentTicketId = null;
+}
+
+async function saveComment(){
+  if(commentTicketId === null) return;
+  const res = await fetch(`/api/tickets/${commentTicketId}`, {
+    method: 'PUT',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ comment: document.getElementById('commentInput').value.trim() })
+  });
+  if(res.status === 401){ closeCommentEditor(); showLogin(); return; }
+  if(!res.ok){
+    const data = await res.json().catch(()=>({}));
+    alert(data.error || 'Коментарът не можа да бъде запазен.');
+    return;
+  }
+  closeCommentEditor();
+  loadTickets();
+}
+
+document.getElementById('commentSaveBtn').addEventListener('click', saveComment);
+document.getElementById('commentCancelBtn').addEventListener('click', closeCommentEditor);
+document.getElementById('commentOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'commentOverlay') closeCommentEditor();
+});
+document.getElementById('commentInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') closeCommentEditor();
+  if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); saveComment(); }
+});
+
 document.getElementById('activityOverlay').addEventListener('click', (e)=>{
   if(e.target.id === 'activityOverlay') document.getElementById('activityOverlay').classList.remove('open');
 });

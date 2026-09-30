@@ -4,7 +4,7 @@
 const DEFAULT_SETTINGS = {
   shopName: 'CrazyPhone',
   shopTagline: 'аксесоари и сервиз',
-  statuses: ['за сервиз', 'в сервиз', 'чака клиент', 'издаден'],
+  statuses: ['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен'],
   columns: ['customer', 'callBtn', 'model', 'issue', 'password', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
   printCustomer: {
     header: 'СЕРВИЗНА КАРТА',

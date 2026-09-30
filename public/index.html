@@ -213,6 +213,24 @@
   </div>
 </div>
 
+<!-- COMMENT-ONLY EDITOR (opened by clicking a Коментар cell in the table) -->
+<div class="overlay" id="commentOverlay">
+  <div class="modal modal-small" role="dialog" aria-labelledby="commentTitle">
+    <h2 id="commentTitle">Коментар</h2>
+    <div class="sub" id="commentSub"></div>
+    <div class="field">
+      <textarea id="commentInput" aria-labelledby="commentTitle" placeholder="Допълнителни бележки..."></textarea>
+    </div>
+    <div class="modal-actions">
+      <div class="left"><span class="hint-text">Ctrl+Enter запазва, Esc затваря</span></div>
+      <div class="right">
+        <button class="btn secondary" id="commentCancelBtn">Отказ</button>
+        <button class="btn" id="commentSaveBtn">Запази коментара</button>
+      </div>
+    </div>
+  </div>
+</div>
+
 <!-- ACTIVITY LOG MODAL -->
 <div class="overlay" id="activityOverlay">
   <div class="modal">

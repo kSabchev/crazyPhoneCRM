@@ -152,4 +152,18 @@ if (!existingSettings) {
   }
 }
 
+// One-time addition of the closed statuses "отказан" (repair refused) and
+// "забравен" (never collected) to shops set up before they existed. Marked
+// as done so a shop that later removes them in Settings keeps them removed.
+{
+  const saved = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
+  if (!saved.addedClosedStatuses) {
+    for (const status of ['отказан', 'забравен']) {
+      if (!saved.statuses.includes(status)) saved.statuses.push(status);
+    }
+    saved.addedClosedStatuses = true;
+    db.prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify(saved));
+  }
+}
+
 module.exports = db;
