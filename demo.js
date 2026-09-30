@@ -96,19 +96,27 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
       if (returned > now) status = addDays(received, daysIn + daysRepair) > now
         ? (addDays(received, daysIn) > now ? 'за сервиз' : 'в сервиз')
         : 'чака клиент';
+      // A few finished orders were refused (handed back unrepaired) or never
+      // collected.
+      if (status === 'издаден') {
+        const r = rnd();
+        if (r < 0.05) status = 'отказан';
+        else if (r < 0.09) status = 'забравен';
+      }
       const done = status === 'издаден';
-      const deposit = !done && rnd() < 0.4 ? 20 : 'Не';
+      const closed = done || status === 'отказан' || status === 'забравен';
+      const deposit = !closed && rnd() < 0.4 ? 20 : 'Не';
 
       const by = rnd() < 0.5 ? 'demo' : 'demo2';
       const id = insert.run(
-        no, name, phone, isoDate(received), done ? isoDate(returned) : null, pick(MODELS),
+        no, name, phone, isoDate(received), done || status === 'отказан' ? isoDate(returned) : null, pick(MODELS),
         status, issue, pick(COMMENTS),
-        status === 'за сервиз' ? '' : repair,
+        status === 'за сервиз' || status === 'отказан' ? '' : repair,
         rnd() < 0.15 ? 'да' : 'не',
         pick(PASSWORDS),
-        done ? 'tick' : pick(['circle', 'circle', 'tick']),
+        closed ? 'tick' : pick(['circle', 'circle', 'tick']),
         deposit,
-        status === 'за сервиз' ? null : cost + Math.round(rnd() * 10),
+        status === 'за сервиз' || status === 'отказан' ? null : cost + Math.round(rnd() * 10),
         done && rnd() > 0.05 ? price + Math.round(rnd() * 20) : null
       ).lastInsertRowid;
 
@@ -117,7 +125,7 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
       const steps = [
         ['за сервиз', 'в сервиз', addDays(received, daysIn)],
         ['в сервиз', 'чака клиент', addDays(received, daysIn + daysRepair)],
-        ['чака клиент', 'издаден', returned]
+        ['чака клиент', closed ? status : 'издаден', returned]
       ];
       for (const [from, to, at] of steps) {
         if (at > now) break;

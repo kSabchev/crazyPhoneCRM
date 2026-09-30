@@ -42,7 +42,7 @@ test('revenue, profit and turnaround reflect returned tickets', async ({ page })
 
   await expect(kpi(page, 'Приходи').locator('.kpi-value')).toHaveText(/200,00\s€/);
   await expect(kpi(page, 'Печалба').locator('.kpi-value')).toHaveText(/154,50\s€/);
-  await expect(kpi(page, 'Върнати поръчки').locator('.kpi-value')).toHaveText('2');
+  await expect(kpi(page, 'Издадени поръчки').locator('.kpi-value')).toHaveText('2');
   await expect(kpi(page, 'Срок за ремонт').locator('.kpi-value')).toHaveText('6 дни');
 
   // One month group per month in the period, with a bar per series.
@@ -73,7 +73,7 @@ test('a period with no returns shows an empty state instead of a chart', async (
   await page.goto('/reports.html');
   const y = freshYear();
   await showPeriod(page, `${y}-01-01`, `${y}-02-28`);
-  await expect(page.locator('#revenueChart')).toContainText('Няма върнати поръчки');
+  await expect(page.locator('#revenueChart')).toContainText('Няма издадени поръчки');
   await expect(page.locator('#revenueChart svg')).toHaveCount(0);
 });
 

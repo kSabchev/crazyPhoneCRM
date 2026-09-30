@@ -151,7 +151,7 @@ test('clicking a status opens a dropdown that saves without opening the ticket',
   const select = r.locator('.status-select');
   await expect(select).toBeVisible();
   await expect(select).toHaveValue('за сервиз');
-  await expect(select.locator('option')).toHaveText(['за сервиз', 'в сервиз', 'чака клиент', 'издаден']);
+  await expect(select.locator('option')).toHaveText(['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен']);
 
   await select.selectOption('чака клиент');
   await expect(r.locator('.status-select')).toHaveCount(0);
@@ -455,4 +455,95 @@ test('the phone field gets a light red background while typing a nonstandard num
   await page.click('#cancelBtn');
   await page.click('#newTicketBtn');
   await expect(phone).not.toHaveClass(/phone-nonstandard/);
+});
+
+test('"отказан" and "забравен" are finished: hidden by the "в процес" filter, with their own badges', async ({ page }) => {
+  const tag = uniqueName('Затворени');
+  const open = await createTicketViaApi(page, { customerName: `${tag} отворена`, status: 'в сервиз' });
+  const refused = await createTicketViaApi(page, { customerName: `${tag} отказана`, status: 'отказан' });
+  const forgotten = await createTicketViaApi(page, { customerName: `${tag} забравена`, status: 'забравен' });
+  await page.reload();
+
+  await expect(row(page, refused.customer_name).locator('.badge')).toHaveCSS('background-color', 'rgb(71, 85, 105)');
+  await expect(row(page, forgotten.customer_name).locator('.badge')).toHaveCSS('background-color', 'rgb(154, 52, 18)');
+
+  await page.fill('#searchInput', tag);
+  await expect(page.locator('#tableBody tr')).toHaveCount(3);
+  await page.selectOption('#statusFilter', '__active__');
+  await expect(page.locator('#tableBody tr')).toHaveCount(1);
+  await expect(row(page, open.customer_name)).toHaveCount(1);
+
+  await page.selectOption('#statusFilter', 'забравен');
+  await expect(row(page, forgotten.customer_name)).toHaveCount(1);
+  await expect(page.locator('#tableBody tr')).toHaveCount(1);
+});
+
+test('clicking a comment edits only the comment, without opening the order', async ({ page }) => {
+  const t = await createTicketViaApi(page, { comment: 'стар коментар' });
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await r.locator('.comment-cell').click();
+  await expect(page.locator('#commentOverlay')).toHaveClass(/\bopen\b/);
+  await expectModalClosed(page);
+  await expect(page.locator('#commentSub')).toContainText(`#${t.ticket_no}`);
+  const input = page.locator('#commentInput');
+  await expect(input).toBeFocused();
+  await expect(input).toHaveValue('стар коментар');
+
+  await input.fill('клиентът ще дойде утре');
+  await page.click('#commentSaveBtn');
+  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+  await expect(r.locator('.comment-cell')).toHaveText('клиентът ще дойде утре');
+
+  // Recorded in the order's history like any other edit.
+  await r.locator('.ticket-no').click();
+  await page.click('#historyToggle');
+  await expect(page.locator('#historyList')).toContainText('Коментар: стар коментар → клиентът ще дойде утре');
+});
+
+test('a comment can be added to an order that has none, and saved with Ctrl+Enter', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  const cell = row(page, t.customer_name).locator('.comment-cell');
+  await expect(cell).toHaveText('—');
+
+  await cell.click();
+  await page.locator('#commentInput').fill('нов коментар');
+  await page.locator('#commentInput').press('Control+Enter');
+  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+  await expect(cell).toHaveText('нов коментар');
+});
+
+test('cancelling or pressing Escape in the comment editor changes nothing', async ({ page }) => {
+  const t = await createTicketViaApi(page, { comment: 'не пипай' });
+  await page.reload();
+  const cell = row(page, t.customer_name).locator('.comment-cell');
+
+  await cell.click();
+  await page.locator('#commentInput').fill('промяна');
+  await page.click('#commentCancelBtn');
+  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+
+  await cell.click();
+  await page.locator('#commentInput').fill('друга промяна');
+  await page.locator('#commentInput').press('Escape');
+  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+
+  await page.reload();
+  await expect(row(page, t.customer_name).locator('.comment-cell')).toHaveText('не пипай');
+});
+
+test('saving a comment keeps a colleague\'s other changes made meanwhile', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.comment-cell').click();
+
+  // Someone else changes the status while the comment editor is open.
+  await page.request.put(`/api/tickets/${t.id}`, { data: { status: 'чака клиент' } });
+  await page.locator('#commentInput').fill('обадих се');
+  await page.click('#commentSaveBtn');
+
+  await expect(row(page, t.customer_name).locator('.comment-cell')).toHaveText('обадих се');
+  await expect(row(page, t.customer_name).locator('.badge')).toHaveText('чака клиент');
 });

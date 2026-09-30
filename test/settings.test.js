@@ -13,7 +13,7 @@ test.before(async () => {
 test('default settings are seeded on first run', async () => {
   const s = (await agent.get('/api/settings').expect(200)).body;
   assert.equal(s.shopName, 'CrazyPhone');
-  assert.deepEqual(s.statuses, ['за сервиз', 'в сервиз', 'чака клиент', 'издаден']);
+  assert.deepEqual(s.statuses, ['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен']);
   assert.ok(s.columns.includes('callBtn'));
   assert.ok(s.printCustomer.header);
   assert.ok(s.devices.length > 0);
