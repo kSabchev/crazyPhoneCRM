@@ -3,6 +3,9 @@
   "version": "1.0.0",
   "description": "Self-hosted repair ticket CRM for a phone repair shop",
   "main": "server.js",
+  "engines": {
+    "node": ">=22"
+  },
   "scripts": {
     "start": "node server.js",
     "test": "node --test --test-force-exit \"test/**/*.test.js\"",
