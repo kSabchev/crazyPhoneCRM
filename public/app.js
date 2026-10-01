@@ -193,9 +193,32 @@ function fmtDate(d){
   return `${day}.${m}.${y}`;
 }
 
+// Money is shown the same way everywhere (table, history, print, reports):
+// "25,00 €" — Bulgarian format, comma decimals, euro sign after.
+const EUR = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
+
 function fmtPrice(v){
   if(v === null || v === undefined || v === '') return '—';
-  return Number(v).toFixed(2);
+  const n = Number(v);
+  return Number.isFinite(n) ? EUR.format(n) : String(v);
+}
+
+// Капаро holds an amount, "Не" (no deposit) or free text from older
+// orders: amounts are formatted as money, anything else shown as entered.
+function fmtKaparo(v){
+  if(v === null || v === undefined || v === '') return '—';
+  const s = String(v).trim();
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*(€|eur|евро)?$/i);
+  return m ? EUR.format(Number(m[1].replace(',', '.'))) : s;
+}
+
+// A value in the change history, formatted the way the table shows it.
+function fmtHistoryValue(field, v){
+  if(field === 'pravim') return PRAVIM_SYMBOLS[v] || '—';
+  if(v === null || v === undefined || v === '') return '—';
+  if(field === 'service_price' || field === 'customer_price') return escapeHtml(fmtPrice(v));
+  if(field === 'kaparo') return escapeHtml(fmtKaparo(v));
+  return escapeHtml(String(v));
 }
 
 function escapeHtml(str){
@@ -310,7 +333,7 @@ function render(){
         </td>
         <td${dv('model')}>${escapeHtml(t.phone_model)}</td>
         <td class="desc-cell"${dv('issue')} title="${escapeHtml(t.description)}">${escapeHtml(t.description) || '—'}</td>
-        <td class="password-cell"${dv('password')}>${t.phone_password ? `<span class="password-value">${escapeHtml(t.phone_password)}</span>` : '—'}</td>
+        <td class="password-cell quick-edit-cell"${dv('password')} onclick="openQuickEdit(event, ${t.id}, 'phonePassword')" title="Щракнете, за да промените паролата">${t.phone_password ? `<span class="password-value">${escapeHtml(t.phone_password)}</span>` : '—'}</td>
         <td class="desc-cell quick-edit-cell comment-cell"${dv('comment')} onclick="openQuickEdit(event, ${t.id}, 'comment')" title="${escapeHtml(t.comment) || 'Щракнете, за да добавите коментар'}">${escapeHtml(t.comment) || '—'}</td>
         <td class="desc-cell quick-edit-cell repair-cell"${dv('repairPerformed')} onclick="openQuickEdit(event, ${t.id}, 'repairPerformed')" title="${escapeHtml(t.repair_performed) || 'Щракнете, за да добавите извършен ремонт'}">${escapeHtml(t.repair_performed) || '—'}</td>
         <td${dv('loanerPhone')}>${escapeHtml(t.loaner_phone)}</td>
@@ -320,9 +343,9 @@ function render(){
             ? statusSelectHtml(t)
             : `<span class="badge" style="color:${fg};background:${bg};" title="Щракнете за смяна на статуса">${escapeHtml(t.status)}</span>`
         }</td>
-        <td${dv('kaparo')}>${escapeHtml(t.kaparo)}</td>
-        <td class="price"${dv('servicePrice')}>${fmtPrice(t.service_price)}</td>
-        <td class="price"${dv('customerPrice')}>${fmtPrice(t.customer_price)}</td>
+        <td class="price"${dv('kaparo')}>${escapeHtml(fmtKaparo(t.kaparo))}</td>
+        <td class="price quick-edit-cell service-price-cell"${dv('servicePrice')} onclick="openQuickEdit(event, ${t.id}, 'servicePrice')" title="Щракнете, за да промените изкупната цена">${fmtPrice(t.service_price)}</td>
+        <td class="price quick-edit-cell customer-price-cell"${dv('customerPrice')} onclick="openQuickEdit(event, ${t.id}, 'customerPrice')" title="Щракнете, за да промените продажната цена">${fmtPrice(t.customer_price)}</td>
         <td${dv('dateIn')}>${fmtDate(t.date_received)}</td>
         <td${dv('dateReturned')}>${fmtDate(t.date_returned)}</td>
       </tr>`;
@@ -680,8 +703,8 @@ function describeEntry(entry, includeTicketRef){
       // The unlock code itself is never stored in the history.
       if(field === 'phone_password') return '<div class="change-line">Паролата е променена.</div>';
       const label = FIELD_LABELS[field] || field;
-      const fromV = field === 'pravim' ? (PRAVIM_SYMBOLS[from] || '—') : ((from === null || from === '') ? '—' : escapeHtml(String(from)));
-      const toV = field === 'pravim' ? (PRAVIM_SYMBOLS[to] || '—') : ((to === null || to === '') ? '—' : escapeHtml(String(to)));
+      const fromV = fmtHistoryValue(field, from);
+      const toV = fmtHistoryValue(field, to);
       return `<div class="change-line">${label}: ${fromV} → ${toV}</div>`;
     });
     body = lines.join('');
@@ -909,15 +932,23 @@ document.getElementById('smsSkipBtn').addEventListener('click', closeSmsPrompt);
 document.getElementById('smsText').addEventListener('input', updateSmsCounter);
 document.getElementById('smsOverlay').addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeSmsPrompt(); });
 
-// ---------- Quick text editor (Коментар, Извършен ремонт) ----------
+// ---------- Quick editor (Парола, Коментар, Извършен ремонт, prices) ----------
 // Clicking one of these cells edits just that field in a small window,
 // without opening the whole order. Saves only that field, so it can't
 // overwrite anything else a colleague changed meanwhile.
+//   kind 'text'  — multi-line (Ctrl+Enter saves)
+//   kind 'line'  — single line (Enter saves)
+//   kind 'price' — amount in €, empty = no price (Enter saves)
 const QUICK_EDIT_FIELDS = {
-  comment: { title: 'Коментар', column: 'comment', placeholder: 'Допълнителни бележки...', error: 'Коментарът не можа да бъде запазен.' },
-  repairPerformed: { title: 'Извършен ремонт', column: 'repair_performed', placeholder: 'Какво беше извършено при ремонта...', error: 'Извършеният ремонт не можа да бъде запазен.' }
+  comment: { kind: 'text', title: 'Коментар', column: 'comment', placeholder: 'Допълнителни бележки...', error: 'Коментарът не можа да бъде запазен.' },
+  repairPerformed: { kind: 'text', title: 'Извършен ремонт', column: 'repair_performed', placeholder: 'Какво беше извършено при ремонта...', error: 'Извършеният ремонт не можа да бъде запазен.' },
+  phonePassword: { kind: 'line', title: 'Парола', column: 'phone_password', placeholder: 'напр. 1234 или Г-образен шаблон', error: 'Паролата не можа да бъде запазена.' },
+  servicePrice: { kind: 'price', title: 'Изкупна цена (€)', column: 'service_price', placeholder: '0.00 — празно = без цена', error: 'Изкупната цена не можа да бъде запазена.' },
+  customerPrice: { kind: 'price', title: 'Продажна цена (€)', column: 'customer_price', placeholder: '0.00 — празно = без цена', error: 'Продажната цена не можа да бъде запазена.' }
 };
 let quickEdit = null; // { id, field }
+
+const quickEditInputFor = cfg => document.getElementById(cfg.kind === 'text' ? 'quickEditInput' : 'quickEditLine');
 
 function openQuickEdit(e, id, field){
   e.stopPropagation();
@@ -927,12 +958,26 @@ function openQuickEdit(e, id, field){
   quickEdit = { id, field };
   document.getElementById('quickEditTitle').textContent = cfg.title;
   document.getElementById('quickEditSub').textContent = `Поръчка #${t.ticket_no} — ${t.customer_name}, ${t.phone_model}`;
-  const input = document.getElementById('quickEditInput');
+  document.getElementById('quickEditHint').textContent = cfg.kind === 'text'
+    ? 'Ctrl+Enter запазва, Esc затваря' : 'Enter запазва, Esc затваря';
+
+  const area = document.getElementById('quickEditInput');
+  const line = document.getElementById('quickEditLine');
+  area.style.display = cfg.kind === 'text' ? '' : 'none';
+  line.style.display = cfg.kind === 'text' ? 'none' : '';
+  const input = quickEditInputFor(cfg);
+  if(cfg.kind === 'price'){
+    line.type = 'number'; line.step = '0.01'; line.min = '0'; line.inputMode = 'decimal';
+  } else {
+    line.type = 'text'; line.removeAttribute('step'); line.removeAttribute('min'); line.inputMode = 'text';
+  }
   input.placeholder = cfg.placeholder;
-  input.value = t[cfg.column] || '';
+  const current = t[cfg.column];
+  input.value = current === null || current === undefined ? '' : current;
   document.getElementById('quickEditOverlay').classList.add('open');
   input.focus();
-  input.setSelectionRange(input.value.length, input.value.length);
+  if(input.type !== 'number') input.setSelectionRange(input.value.length, input.value.length);
+  else input.select();
 }
 
 function closeQuickEdit(){
@@ -943,10 +988,18 @@ function closeQuickEdit(){
 async function saveQuickEdit(){
   if(!quickEdit) return;
   const { id, field } = quickEdit;
+  const cfg = QUICK_EDIT_FIELDS[field];
+  const input = quickEditInputFor(cfg);
+  // A number field reports bad input (e.g. "12,5,0") as an empty value;
+  // don't silently turn that into "no price".
+  if(cfg.kind === 'price' && input.validity && input.validity.badInput){
+    alert('Невалидна сума — въведете число, напр. 25.50, или оставете празно.');
+    return;
+  }
   const res = await fetch(`/api/tickets/${id}`, {
     method: 'PUT',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ [field]: document.getElementById('quickEditInput').value.trim() })
+    body: JSON.stringify({ [field]: input.value.trim() })
   });
   if(res.status === 401){ closeQuickEdit(); showLogin(); return; }
   if(!res.ok){
@@ -966,6 +1019,10 @@ document.getElementById('quickEditOverlay').addEventListener('click', (e)=>{
 document.getElementById('quickEditInput').addEventListener('keydown', (e)=>{
   if(e.key === 'Escape') closeQuickEdit();
   if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); saveQuickEdit(); }
+});
+document.getElementById('quickEditLine').addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') closeQuickEdit();
+  if(e.key === 'Enter'){ e.preventDefault(); saveQuickEdit(); }
 });
 
 document.getElementById('activityOverlay').addEventListener('click', (e)=>{
@@ -1003,7 +1060,7 @@ function buildCustomerPrintDoc(t){
 
   const bottomRows = [
     ['Оборотен телефон', escapeHtml(t.loaner_phone)],
-    ['Капаро', escapeHtml(t.kaparo)],
+    ['Капаро', escapeHtml(fmtKaparo(t.kaparo))],
     ['Дата на приемане', fmtDate(t.date_received)]
   ].map(([label, value]) => `
     <div class="card-row">
