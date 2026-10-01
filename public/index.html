@@ -245,16 +245,18 @@
   </div>
 </div>
 
-<!-- QUICK TEXT EDITOR (opened by clicking a Коментар or Извършен ремонт cell in the table) -->
+<!-- QUICK EDITOR (opened by clicking a Парола, Коментар, Извършен ремонт or price cell in the table).
+     Long texts use the textarea, short values the single-line input. -->
 <div class="overlay" id="quickEditOverlay">
   <div class="modal modal-small" role="dialog" aria-labelledby="quickEditTitle">
     <h2 id="quickEditTitle">Коментар</h2>
     <div class="sub" id="quickEditSub"></div>
     <div class="field">
       <textarea id="quickEditInput" aria-labelledby="quickEditTitle"></textarea>
+      <input type="text" id="quickEditLine" aria-labelledby="quickEditTitle" autocomplete="off" spellcheck="false" style="display:none;">
     </div>
     <div class="modal-actions">
-      <div class="left"><span class="hint-text">Ctrl+Enter запазва, Esc затваря</span></div>
+      <div class="left"><span class="hint-text" id="quickEditHint">Ctrl+Enter запазва, Esc затваря</span></div>
       <div class="right">
         <button class="btn secondary" id="quickEditCancelBtn">Отказ</button>
         <button class="btn" id="quickEditSaveBtn">Запази</button>
