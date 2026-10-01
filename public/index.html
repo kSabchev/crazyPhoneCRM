@@ -62,7 +62,7 @@
     <table>
       <thead>
         <tr>
-          <th>№</th>
+          <th class="sortable" data-sort="number" tabindex="0" aria-sort="none" title="Подреди по тази колона">№<span class="sort-arrow" aria-hidden="true"></span></th>
           <th data-col="customer">Клиент</th>
           <th data-col="callBtn">Обаждане</th>
           <th data-col="model">Модел</th>
@@ -72,12 +72,12 @@
           <th data-col="repairPerformed">Извършен ремонт</th>
           <th data-col="loanerPhone" title="Оборотен телефон">Об. тел</th>
           <th data-col="pravim">Правим</th>
-          <th data-col="status">Статус</th>
+          <th data-col="status" class="sortable" data-sort="status" tabindex="0" aria-sort="none" title="Подреди по тази колона">Статус<span class="sort-arrow" aria-hidden="true"></span></th>
           <th data-col="kaparo">Капаро</th>
           <th data-col="servicePrice">Изкупна цена</th>
           <th data-col="customerPrice">Продажна цена</th>
-          <th data-col="dateIn">Дата на приемане</th>
-          <th data-col="dateReturned">Дата на връщане</th>
+          <th data-col="dateIn" class="sortable" data-sort="dateIn" tabindex="0" aria-sort="none" title="Подреди по тази колона">Дата на приемане<span class="sort-arrow" aria-hidden="true"></span></th>
+          <th data-col="dateReturned" class="sortable" data-sort="dateReturned" tabindex="0" aria-sort="none" title="Подреди по тази колона">Дата на връщане<span class="sort-arrow" aria-hidden="true"></span></th>
         </tr>
       </thead>
       <tbody id="tableBody"></tbody>
@@ -213,19 +213,19 @@
   </div>
 </div>
 
-<!-- COMMENT-ONLY EDITOR (opened by clicking a Коментар cell in the table) -->
-<div class="overlay" id="commentOverlay">
-  <div class="modal modal-small" role="dialog" aria-labelledby="commentTitle">
-    <h2 id="commentTitle">Коментар</h2>
-    <div class="sub" id="commentSub"></div>
+<!-- QUICK TEXT EDITOR (opened by clicking a Коментар or Извършен ремонт cell in the table) -->
+<div class="overlay" id="quickEditOverlay">
+  <div class="modal modal-small" role="dialog" aria-labelledby="quickEditTitle">
+    <h2 id="quickEditTitle">Коментар</h2>
+    <div class="sub" id="quickEditSub"></div>
     <div class="field">
-      <textarea id="commentInput" aria-labelledby="commentTitle" placeholder="Допълнителни бележки..."></textarea>
+      <textarea id="quickEditInput" aria-labelledby="quickEditTitle"></textarea>
     </div>
     <div class="modal-actions">
       <div class="left"><span class="hint-text">Ctrl+Enter запазва, Esc затваря</span></div>
       <div class="right">
-        <button class="btn secondary" id="commentCancelBtn">Отказ</button>
-        <button class="btn" id="commentSaveBtn">Запази коментара</button>
+        <button class="btn secondary" id="quickEditCancelBtn">Отказ</button>
+        <button class="btn" id="quickEditSaveBtn">Запази</button>
       </div>
     </div>
   </div>

@@ -14,6 +14,20 @@ const statusStyles = {
 };
 const FALLBACK_STATUS_STYLE = ['var(--status-neutral)','var(--status-neutral-bg)'];
 
+// Badge colours: the status's colour from Settings, with white or dark text,
+// whichever reads better on it. Before settings load, the built-in styles.
+function readableTextOn(hex){
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  const luminance = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+  return luminance > 0.4 ? '#211E1A' : '#FFFFFF';
+}
+function statusBadgeColors(status){
+  const bg = settings && settings.statusColors && settings.statusColors[status];
+  if(bg) return [readableTextOn(bg), bg];
+  return statusStyles[status] || FALLBACK_STATUS_STYLE;
+}
+
 const COLUMN_KEYS = ['customer','callBtn','model','issue','password','comment','repairPerformed','loanerPhone','pravim','status','kaparo','servicePrice','customerPrice','dateIn','dateReturned'];
 
 const PRAVIM_SYMBOLS = { circle: '○', tick: '✓', cross: '✗' };
@@ -188,6 +202,69 @@ function escapeHtml(str){
   return div.innerHTML;
 }
 
+// ---------- Sorting ----------
+// Click a sortable header (№, Статус, dates) to sort by it; click again to
+// reverse. Default: by number, newest first. Remembered per browser.
+const SORT_DEFAULT = { key: 'number', dir: 'desc' };
+// Direction used the first time a column is picked.
+const SORT_FIRST_DIR = { number: 'desc', status: 'asc', dateIn: 'desc', dateReturned: 'desc' };
+let sortState = loadSortState();
+
+function loadSortState(){
+  try {
+    const saved = JSON.parse(localStorage.getItem('ticketSort'));
+    if(saved && SORT_FIRST_DIR[saved.key] && (saved.dir === 'asc' || saved.dir === 'desc')) return saved;
+  } catch(_) { /* storage unavailable or corrupt: use the default */ }
+  return { ...SORT_DEFAULT };
+}
+
+function setSort(key){
+  sortState = sortState.key === key
+    ? { key, dir: sortState.dir === 'asc' ? 'desc' : 'asc' }
+    : { key, dir: SORT_FIRST_DIR[key] };
+  try { localStorage.setItem('ticketSort', JSON.stringify(sortState)); } catch(_) {}
+  render();
+}
+
+function sortTickets(list){
+  const { key, dir } = sortState;
+  const sign = dir === 'asc' ? 1 : -1;
+  // Statuses sort in the order they're listed in Settings, not alphabetically.
+  const statusOrder = settings ? settings.statuses : [];
+  const statusRank = s => { const i = statusOrder.indexOf(s); return i === -1 ? statusOrder.length : i; };
+  const value = {
+    number: t => t.ticket_no,
+    status: t => statusRank(t.status),
+    dateIn: t => t.date_received || '',
+    dateReturned: t => t.date_returned || ''
+  }[key];
+
+  return list.slice().sort((a, b) => {
+    const va = value(a), vb = value(b);
+    // Orders without a date always go last, whichever direction.
+    if(key === 'dateReturned' && (va === '') !== (vb === '')) return va === '' ? 1 : -1;
+    if(va < vb) return -sign;
+    if(va > vb) return sign;
+    return b.ticket_no - a.ticket_no; // ties: newest order first
+  });
+}
+
+function updateSortHeaders(){
+  document.querySelectorAll('th.sortable').forEach(th=>{
+    const active = th.dataset.sort === sortState.key;
+    th.classList.toggle('sorted', active);
+    th.setAttribute('aria-sort', active ? (sortState.dir === 'asc' ? 'ascending' : 'descending') : 'none');
+    th.querySelector('.sort-arrow').textContent = active ? (sortState.dir === 'asc' ? '▲' : '▼') : '';
+  });
+}
+
+document.querySelectorAll('th.sortable').forEach(th=>{
+  th.addEventListener('click', ()=>setSort(th.dataset.sort));
+  th.addEventListener('keydown', (e)=>{
+    if(e.key === 'Enter' || e.key === ' '){ e.preventDefault(); setSort(th.dataset.sort); }
+  });
+});
+
 function render(){
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const statusF = document.getElementById('statusFilter').value;
@@ -200,14 +277,8 @@ function render(){
     return matchesQ && matchesStatus;
   });
 
-  if(statusF === '__active__'){
-    const priority = { 'за сервиз': 0, 'в сервиз': 1, 'чака клиент': 2 };
-    filtered = filtered.slice().sort((a, b) => {
-      const pa = priority[a.status] ?? 99;
-      const pb = priority[b.status] ?? 99;
-      return pa - pb;
-    });
-  }
+  filtered = sortTickets(filtered);
+  updateSortHeaders();
 
   const body = document.getElementById('tableBody');
   const empty = document.getElementById('emptyState');
@@ -223,7 +294,7 @@ function render(){
     empty.style.display = 'none';
     const dv = (key) => visible.includes(key) ? '' : ' style="display:none;"';
     body.innerHTML = filtered.map(t=>{
-      const [fg,bg] = statusStyles[t.status] || FALLBACK_STATUS_STYLE;
+      const [fg,bg] = statusBadgeColors(t.status);
       const editingBadge = (t.editing_by && t.editing_by !== currentUsername)
         ? `<div class="editing-badge">👁 ${escapeHtml(t.editing_by)}</div>` : '';
       return `<tr onclick="openEdit(${t.id})">
@@ -238,8 +309,8 @@ function render(){
         <td${dv('model')}>${escapeHtml(t.phone_model)}</td>
         <td class="desc-cell"${dv('issue')} title="${escapeHtml(t.description)}">${escapeHtml(t.description) || '—'}</td>
         <td class="password-cell"${dv('password')}>${t.phone_password ? `<span class="password-value">${escapeHtml(t.phone_password)}</span>` : '—'}</td>
-        <td class="desc-cell comment-cell"${dv('comment')} onclick="openCommentEditor(event, ${t.id})" title="${escapeHtml(t.comment) || 'Щракнете, за да добавите коментар'}">${escapeHtml(t.comment) || '—'}</td>
-        <td class="desc-cell"${dv('repairPerformed')} title="${escapeHtml(t.repair_performed)}">${escapeHtml(t.repair_performed) || '—'}</td>
+        <td class="desc-cell quick-edit-cell comment-cell"${dv('comment')} onclick="openQuickEdit(event, ${t.id}, 'comment')" title="${escapeHtml(t.comment) || 'Щракнете, за да добавите коментар'}">${escapeHtml(t.comment) || '—'}</td>
+        <td class="desc-cell quick-edit-cell repair-cell"${dv('repairPerformed')} onclick="openQuickEdit(event, ${t.id}, 'repairPerformed')" title="${escapeHtml(t.repair_performed) || 'Щракнете, за да добавите извършен ремонт'}">${escapeHtml(t.repair_performed) || '—'}</td>
         <td${dv('loanerPhone')}>${escapeHtml(t.loaner_phone)}</td>
         <td${dv('pravim')} class="pravim-cell" onclick="togglePravim(event, ${t.id})"><span class="pravim-toggle pravim-${t.pravim||'circle'}">${PRAVIM_SYMBOLS[t.pravim||'circle']}</span></td>
         <td${dv('status')} class="status-cell" onclick="startStatusEdit(event, ${t.id})">${
@@ -636,55 +707,63 @@ document.getElementById('activityLogBtn').addEventListener('click', async ()=>{
 document.getElementById('closeActivityBtn').addEventListener('click', ()=>{
   document.getElementById('activityOverlay').classList.remove('open');
 });
-// ---------- Comment-only editor ----------
-// Clicking a Коментар cell edits just that field in a small window,
-// without opening the whole order. Saves only { comment }, so it can't
+// ---------- Quick text editor (Коментар, Извършен ремонт) ----------
+// Clicking one of these cells edits just that field in a small window,
+// without opening the whole order. Saves only that field, so it can't
 // overwrite anything else a colleague changed meanwhile.
-let commentTicketId = null;
+const QUICK_EDIT_FIELDS = {
+  comment: { title: 'Коментар', column: 'comment', placeholder: 'Допълнителни бележки...', error: 'Коментарът не можа да бъде запазен.' },
+  repairPerformed: { title: 'Извършен ремонт', column: 'repair_performed', placeholder: 'Какво беше извършено при ремонта...', error: 'Извършеният ремонт не можа да бъде запазен.' }
+};
+let quickEdit = null; // { id, field }
 
-function openCommentEditor(e, id){
+function openQuickEdit(e, id, field){
   e.stopPropagation();
   const t = tickets.find(x=>x.id===id);
-  if(!t) return;
-  commentTicketId = id;
-  document.getElementById('commentSub').textContent = `Поръчка #${t.ticket_no} — ${t.customer_name}, ${t.phone_model}`;
-  const input = document.getElementById('commentInput');
-  input.value = t.comment || '';
-  document.getElementById('commentOverlay').classList.add('open');
+  const cfg = QUICK_EDIT_FIELDS[field];
+  if(!t || !cfg) return;
+  quickEdit = { id, field };
+  document.getElementById('quickEditTitle').textContent = cfg.title;
+  document.getElementById('quickEditSub').textContent = `Поръчка #${t.ticket_no} — ${t.customer_name}, ${t.phone_model}`;
+  const input = document.getElementById('quickEditInput');
+  input.placeholder = cfg.placeholder;
+  input.value = t[cfg.column] || '';
+  document.getElementById('quickEditOverlay').classList.add('open');
   input.focus();
   input.setSelectionRange(input.value.length, input.value.length);
 }
 
-function closeCommentEditor(){
-  document.getElementById('commentOverlay').classList.remove('open');
-  commentTicketId = null;
+function closeQuickEdit(){
+  document.getElementById('quickEditOverlay').classList.remove('open');
+  quickEdit = null;
 }
 
-async function saveComment(){
-  if(commentTicketId === null) return;
-  const res = await fetch(`/api/tickets/${commentTicketId}`, {
+async function saveQuickEdit(){
+  if(!quickEdit) return;
+  const { id, field } = quickEdit;
+  const res = await fetch(`/api/tickets/${id}`, {
     method: 'PUT',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ comment: document.getElementById('commentInput').value.trim() })
+    body: JSON.stringify({ [field]: document.getElementById('quickEditInput').value.trim() })
   });
-  if(res.status === 401){ closeCommentEditor(); showLogin(); return; }
+  if(res.status === 401){ closeQuickEdit(); showLogin(); return; }
   if(!res.ok){
     const data = await res.json().catch(()=>({}));
-    alert(data.error || 'Коментарът не можа да бъде запазен.');
+    alert(data.error || QUICK_EDIT_FIELDS[field].error);
     return;
   }
-  closeCommentEditor();
+  closeQuickEdit();
   loadTickets();
 }
 
-document.getElementById('commentSaveBtn').addEventListener('click', saveComment);
-document.getElementById('commentCancelBtn').addEventListener('click', closeCommentEditor);
-document.getElementById('commentOverlay').addEventListener('click', (e)=>{
-  if(e.target.id === 'commentOverlay') closeCommentEditor();
+document.getElementById('quickEditSaveBtn').addEventListener('click', saveQuickEdit);
+document.getElementById('quickEditCancelBtn').addEventListener('click', closeQuickEdit);
+document.getElementById('quickEditOverlay').addEventListener('click', (e)=>{
+  if(e.target.id === 'quickEditOverlay') closeQuickEdit();
 });
-document.getElementById('commentInput').addEventListener('keydown', (e)=>{
-  if(e.key === 'Escape') closeCommentEditor();
-  if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); saveComment(); }
+document.getElementById('quickEditInput').addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') closeQuickEdit();
+  if(e.key === 'Enter' && (e.ctrlKey || e.metaKey)){ e.preventDefault(); saveQuickEdit(); }
 });
 
 document.getElementById('activityOverlay').addEventListener('click', (e)=>{

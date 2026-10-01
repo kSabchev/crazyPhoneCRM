@@ -102,7 +102,7 @@ test('editing a ticket updates the table and records history', async ({ page }) 
   await expect(r.locator('.badge')).toHaveText('в сервиз');
   await expect(r).toContainText('Сменен дисплей');
 
-  await r.click();
+  await r.locator('.ticket-no').click();
   await expect(page.locator('#historyCount')).toHaveText('(2)');
   await page.click('#historyToggle');
   await expect(page.locator('#historyList')).toContainText('alice');
@@ -484,16 +484,16 @@ test('clicking a comment edits only the comment, without opening the order', asy
   const r = row(page, t.customer_name);
 
   await r.locator('.comment-cell').click();
-  await expect(page.locator('#commentOverlay')).toHaveClass(/\bopen\b/);
+  await expect(page.locator('#quickEditOverlay')).toHaveClass(/\bopen\b/);
   await expectModalClosed(page);
-  await expect(page.locator('#commentSub')).toContainText(`#${t.ticket_no}`);
-  const input = page.locator('#commentInput');
+  await expect(page.locator('#quickEditSub')).toContainText(`#${t.ticket_no}`);
+  const input = page.locator('#quickEditInput');
   await expect(input).toBeFocused();
   await expect(input).toHaveValue('стар коментар');
 
   await input.fill('клиентът ще дойде утре');
-  await page.click('#commentSaveBtn');
-  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+  await page.click('#quickEditSaveBtn');
+  await expect(page.locator('#quickEditOverlay')).not.toHaveClass(/\bopen\b/);
   await expect(r.locator('.comment-cell')).toHaveText('клиентът ще дойде утре');
 
   // Recorded in the order's history like any other edit.
@@ -509,9 +509,9 @@ test('a comment can be added to an order that has none, and saved with Ctrl+Ente
   await expect(cell).toHaveText('—');
 
   await cell.click();
-  await page.locator('#commentInput').fill('нов коментар');
-  await page.locator('#commentInput').press('Control+Enter');
-  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+  await page.locator('#quickEditInput').fill('нов коментар');
+  await page.locator('#quickEditInput').press('Control+Enter');
+  await expect(page.locator('#quickEditOverlay')).not.toHaveClass(/\bopen\b/);
   await expect(cell).toHaveText('нов коментар');
 });
 
@@ -521,14 +521,14 @@ test('cancelling or pressing Escape in the comment editor changes nothing', asyn
   const cell = row(page, t.customer_name).locator('.comment-cell');
 
   await cell.click();
-  await page.locator('#commentInput').fill('промяна');
-  await page.click('#commentCancelBtn');
-  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+  await page.locator('#quickEditInput').fill('промяна');
+  await page.click('#quickEditCancelBtn');
+  await expect(page.locator('#quickEditOverlay')).not.toHaveClass(/\bopen\b/);
 
   await cell.click();
-  await page.locator('#commentInput').fill('друга промяна');
-  await page.locator('#commentInput').press('Escape');
-  await expect(page.locator('#commentOverlay')).not.toHaveClass(/\bopen\b/);
+  await page.locator('#quickEditInput').fill('друга промяна');
+  await page.locator('#quickEditInput').press('Escape');
+  await expect(page.locator('#quickEditOverlay')).not.toHaveClass(/\bopen\b/);
 
   await page.reload();
   await expect(row(page, t.customer_name).locator('.comment-cell')).toHaveText('не пипай');
@@ -541,8 +541,8 @@ test('saving a comment keeps a colleague\'s other changes made meanwhile', async
 
   // Someone else changes the status while the comment editor is open.
   await page.request.put(`/api/tickets/${t.id}`, { data: { status: 'чака клиент' } });
-  await page.locator('#commentInput').fill('обадих се');
-  await page.click('#commentSaveBtn');
+  await page.locator('#quickEditInput').fill('обадих се');
+  await page.click('#quickEditSaveBtn');
 
   await expect(row(page, t.customer_name).locator('.comment-cell')).toHaveText('обадих се');
   await expect(row(page, t.customer_name).locator('.badge')).toHaveText('чака клиент');
@@ -570,4 +570,32 @@ test('the header counts "отказани" and "забравени", and the for
   await row(page, t.customer_name).locator('.status-select').selectOption('забравен');
   await expect(stat('забравени')).toHaveText(String(forgottenBefore + 1));
   await expect(stat('отказани')).toHaveText(String(refusedBefore));
+});
+
+test('clicking "Извършен ремонт" edits only that field, without opening the order', async ({ page }) => {
+  const t = await createTicketViaApi(page, { comment: 'не пипай' });
+  await page.reload();
+  const r = row(page, t.customer_name);
+  const cell = r.locator('.repair-cell');
+  await expect(cell).toHaveText('—');
+
+  await cell.click();
+  await expect(page.locator('#quickEditOverlay')).toHaveClass(/\bopen\b/);
+  await expectModalClosed(page);
+  await expect(page.locator('#quickEditTitle')).toHaveText('Извършен ремонт');
+  await expect(page.locator('#quickEditInput')).toBeFocused();
+  await page.locator('#quickEditInput').fill('Сменен дисплей и батерия');
+  await page.locator('#quickEditInput').press('Control+Enter');
+
+  await expect(page.locator('#quickEditOverlay')).not.toHaveClass(/\bopen\b/);
+  await expect(cell).toHaveText('Сменен дисплей и батерия');
+  await expect(r.locator('.comment-cell')).toHaveText('не пипай');
+
+  // Reopening shows the saved text; the comment editor still shows the comment.
+  await cell.click();
+  await expect(page.locator('#quickEditInput')).toHaveValue('Сменен дисплей и батерия');
+  await page.locator('#quickEditInput').press('Escape');
+  await r.locator('.comment-cell').click();
+  await expect(page.locator('#quickEditTitle')).toHaveText('Коментар');
+  await expect(page.locator('#quickEditInput')).toHaveValue('не пипай');
 });

@@ -425,8 +425,12 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
 - **Phone numbers** that aren't in the usual form (0 or +359 followed by
   9 digits; spaces and dashes are fine) get a light red background in the table and
   the form, as a warning. They can still be saved.
-- Click a **comment** in the table to edit just the comment in a small
-  window, without opening the whole order (Ctrl+Enter saves, Esc closes).
+- Click a **comment** or **Извършен ремонт** in the table to edit just that
+  field in a small window, without opening the whole order (Ctrl+Enter saves,
+  Esc closes).
+- Click the **№, Статус, Дата на приемане or Дата на връщане** header to sort
+  by it (click again to reverse; an arrow shows the current sort). Default: by
+  number, newest first. Each browser remembers its last choice.
 - Besides "издаден", two more statuses close an order: **отказан** (repair
   refused) and **забравен** (phone never collected). Closed orders are left out
   of the "В процес" filter and the open-orders figures in reports. Only
