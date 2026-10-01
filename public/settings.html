@@ -73,6 +73,19 @@
   </div>
 
   <div class="settings-section">
+    <h2>SMS до клиента</h2>
+    <div class="section-sub">
+      Текстът, предложен за изпращане, когато поръчка стане „чака клиент“ (винаги се пита преди изпращане и текстът може да се промени).
+      Може да използвате: <code>{номер}</code> номер на поръчката, <code>{клиент}</code> име на клиента, <code>{модел}</code> модел на телефона, <code>{магазин}</code> име на сервиза.
+    </div>
+    <div class="field">
+      <label for="smsTemplateInput">Текст на SMS</label>
+      <textarea id="smsTemplateInput"></textarea>
+      <div class="sms-counter" id="smsTemplateCounter"></div>
+    </div>
+  </div>
+
+  <div class="settings-section">
     <h2>Разпечатка за сервиза</h2>
     <div class="section-sub">
       Отпечатва се като малък стикер (5×3 см за баркод принтер), който се залепя на

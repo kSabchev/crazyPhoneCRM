@@ -8,6 +8,7 @@ const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { buildReport, COMPLETED_STATUS } = require('./reports');
 const { forgetStaleWaiting } = require('./auto-status');
+const sms = require('./sms');
 
 const app = express();
 
@@ -211,7 +212,10 @@ function withStatusColors(settings) {
 
 function getSettings() {
   const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();
-  return withStatusColors(JSON.parse(row.data));
+  const saved = JSON.parse(row.data);
+  // Shops set up before SMS existed get the default text.
+  if (typeof saved.smsTemplate !== 'string') saved.smsTemplate = require('./default-settings').smsTemplate;
+  return withStatusColors(saved);
 }
 
 app.get('/api/settings', requireAuth, (req, res) => {
@@ -254,6 +258,16 @@ app.put('/api/settings', requireAuth, (req, res) => {
     }
     next.statusColors = { ...current.statusColors, ...incoming };
   }
+  if (body.smsTemplate !== undefined) {
+    if (typeof body.smsTemplate !== 'string' || !body.smsTemplate.trim()) {
+      return res.status(400).json({ error: 'Текстът на SMS не може да бъде празен' });
+    }
+    if (body.smsTemplate.length > 600) {
+      return res.status(400).json({ error: 'Текстът на SMS е твърде дълъг (най-много 600 знака)' });
+    }
+    next.smsTemplate = body.smsTemplate.trim();
+  }
+
   // Keep colours only for statuses that still exist (fills in defaults for new ones).
   const saved = withStatusColors(next);
   next.statusColors = saved.statusColors;
@@ -576,14 +590,14 @@ app.get('/api/tickets/:id/history', requireAuth, (req, res) => {
   const existing = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
   const rows = db
-    .prepare('SELECT * FROM audit_log WHERE ticket_id = ? ORDER BY performed_at DESC')
+    .prepare('SELECT * FROM audit_log WHERE ticket_id = ? ORDER BY performed_at DESC, id DESC')
     .all(req.params.id);
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
 
 app.get('/api/audit', requireAuth, (req, res) => {
   const rows = db
-    .prepare('SELECT * FROM audit_log ORDER BY performed_at DESC LIMIT 200')
+    .prepare('SELECT * FROM audit_log ORDER BY performed_at DESC, id DESC LIMIT 200')
     .all();
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
@@ -614,6 +628,108 @@ app.get('/api/reports', requireAuth, (req, res) => {
 function daysBetweenDates(from, to) {
   return (Date.parse(to + 'T00:00:00Z') - Date.parse(from + 'T00:00:00Z')) / (24 * 60 * 60 * 1000);
 }
+
+// ---- SMS notifications ----
+// Sent only when staff confirm it in the app (it asks when an order moves
+// to "чака клиент"), through the shop phone — see sms.js.
+const MAX_SMS_LENGTH = 600;
+const RESEND_GUARD_SECONDS = 30;
+
+app.get('/api/sms/config', requireAuth, (req, res) => {
+  res.json({ enabled: sms.isConfigured() });
+});
+
+function smsForTicket(ticketId) {
+  return db.prepare('SELECT * FROM sms_messages WHERE ticket_id = ? ORDER BY id DESC').all(ticketId);
+}
+
+app.get('/api/tickets/:id/sms', requireAuth, (req, res) => {
+  const ticket = db.prepare('SELECT id FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
+  res.json(smsForTicket(ticket.id));
+});
+
+// What would be sent: the number in international form and the text from
+// the template, for the confirmation window.
+app.get('/api/tickets/:id/sms/preview', requireAuth, (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
+  const settings = getSettings();
+  res.json({
+    enabled: sms.isConfigured(),
+    phone: sms.toInternationalBg(ticket.phone_contact),
+    phoneAsEntered: ticket.phone_contact,
+    text: sms.renderTemplate(settings.smsTemplate, ticket, settings.shopName)
+  });
+});
+
+// Express 4 doesn't catch errors in async routes, and an unhandled rejection
+// would stop the server (see server.js) — pass them to the error handler.
+const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
+app.post('/api/tickets/:id/sms', requireAuth, asyncRoute(async (req, res) => {
+  if (!sms.isConfigured()) return res.status(503).json({ error: 'SMS известията не са настроени' });
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
+
+  const phone = sms.toInternationalBg(ticket.phone_contact);
+  if (!phone) {
+    return res.status(400).json({ error: `Номерът „${ticket.phone_contact}“ не е валиден български мобилен номер` });
+  }
+  const body = req.body || {};
+  const settings = getSettings();
+  const text = (typeof body.text === 'string' ? body.text : sms.renderTemplate(settings.smsTemplate, ticket, settings.shopName)).trim();
+  if (!text) return res.status(400).json({ error: 'Текстът на SMS е празен' });
+  if (text.length > MAX_SMS_LENGTH) return res.status(400).json({ error: `Текстът на SMS е твърде дълъг (най-много ${MAX_SMS_LENGTH} знака)` });
+
+  // Guards against a double click or two colleagues sending at once.
+  const recent = db.prepare(
+    `SELECT id FROM sms_messages WHERE ticket_id = ? AND created_at > datetime('now', ?)`
+  ).get(ticket.id, `-${RESEND_GUARD_SECONDS} seconds`);
+  if (recent) return res.status(409).json({ error: 'За тази поръчка току-що беше изпратен SMS' });
+
+  const { lastInsertRowid } = db.prepare(
+    `INSERT INTO sms_messages (ticket_id, ticket_no, phone, text, state, sent_by) VALUES (?, ?, ?, ?, 'Sending', ?)`
+  ).run(ticket.id, ticket.ticket_no, phone, text, req.session.username);
+
+  let failure = null;
+  try {
+    const { gatewayId, state } = await sms.sendSms(phone, text);
+    db.prepare(`UPDATE sms_messages SET state = ?, gateway_id = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(state, gatewayId, lastInsertRowid);
+  } catch (err) {
+    failure = err.message;
+    db.prepare(`UPDATE sms_messages SET state = 'Failed', error = ?, updated_at = datetime('now') WHERE id = ?`)
+      .run(failure, lastInsertRowid);
+  }
+
+  logAudit(ticket.id, ticket.ticket_no, 'sms', { phone, ok: !failure }, req.session.username);
+  broadcastChange('tickets');
+  const saved = db.prepare('SELECT * FROM sms_messages WHERE id = ?').get(lastInsertRowid);
+  if (failure) return res.status(502).json({ error: failure, sms: saved });
+  res.status(201).json(saved);
+}));
+
+// Asks the phone how recent messages are doing (Sent / Delivered / Failed).
+// Called every minute by server.js; only looks at the last 24 hours.
+app.pollSmsStates = async () => {
+  if (!sms.isConfigured()) return 0;
+  const open = db.prepare(`
+    SELECT * FROM sms_messages
+    WHERE gateway_id IS NOT NULL AND state IN (${sms.POLL_STATES.map(() => '?').join(',')})
+      AND created_at > datetime('now', '-1 day')`).all(...sms.POLL_STATES);
+  let changed = 0;
+  for (const m of open) {
+    const now = await sms.getSmsState(m.gateway_id).catch(() => null);
+    if (now && now.state && now.state !== m.state) {
+      db.prepare(`UPDATE sms_messages SET state = ?, error = ?, updated_at = datetime('now') WHERE id = ?`)
+        .run(now.state, now.error, m.id);
+      changed++;
+    }
+  }
+  if (changed) broadcastChange('tickets');
+  return changed;
+};
 
 // ---- Scheduled maintenance ----
 // Called by server.js on start and hourly: orders waiting for the customer

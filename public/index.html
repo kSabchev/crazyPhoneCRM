@@ -194,6 +194,14 @@
       <button type="button" class="pravim-toggle pravim-circle" id="f_pravim" data-value="circle">○</button>
     </div>
 
+    <div class="sms-section" id="smsSection" style="display:none;">
+      <div class="sms-section-head">
+        <span class="sms-section-title">SMS до клиента</span>
+        <button type="button" class="btn secondary sms-send-btn" id="smsSendBtn">Изпрати SMS</button>
+      </div>
+      <div class="sms-list" id="smsList"></div>
+    </div>
+
     <div class="history-section" id="historySection" style="display:none;">
       <div class="history-toggle" id="historyToggle">История <span id="historyCount"></span> ▾</div>
       <div class="history-list" id="historyList"></div>
@@ -208,6 +216,28 @@
         <button class="btn print-btn secondary" id="printServiceBtn" data-action="print-service" style="display:none;">Разпечатай за сервиза</button>
         <button class="btn secondary" id="cancelBtn" data-action="cancel">Отказ</button>
         <button class="btn" id="saveBtn" data-action="save">Запази поръчката</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- SMS CONFIRMATION (asked when an order moves to "чака клиент", or from the order's "Изпрати SMS") -->
+<div class="overlay" id="smsOverlay">
+  <div class="modal modal-small" role="dialog" aria-labelledby="smsTitle">
+    <h2 id="smsTitle">Изпращане на SMS до клиента</h2>
+    <div class="sub" id="smsSub"></div>
+    <div class="sms-to" id="smsTo"></div>
+    <div class="field">
+      <label for="smsText">Текст на съобщението</label>
+      <textarea id="smsText"></textarea>
+      <div class="sms-counter" id="smsCounter"></div>
+    </div>
+    <div class="sms-error" id="smsError" role="alert"></div>
+    <div class="modal-actions">
+      <div class="left"><span class="hint-text">Изпраща се от телефона на сервиза</span></div>
+      <div class="right">
+        <button class="btn secondary" id="smsSkipBtn">Не изпращай</button>
+        <button class="btn" id="smsConfirmBtn">Изпрати SMS</button>
       </div>
     </div>
   </div>

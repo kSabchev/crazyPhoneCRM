@@ -450,3 +450,20 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
 .modal.modal-small{max-width:520px;}
 .modal-small textarea{min-height:120px;}
 .hint-text{font-size:12px;color:var(--ink-soft);}
+
+/* ---- SMS to the customer ---- */
+.sms-section{margin-top:8px;margin-bottom:6px;border-top:1px solid var(--line);padding-top:14px;}
+.sms-section-head{display:flex;justify-content:space-between;align-items:center;margin-bottom:8px;}
+.sms-section-title{font-size:12px;font-weight:600;color:var(--ink-soft);}
+.sms-send-btn{padding:6px 12px;font-size:13px;}
+.sms-entry{font-size:12.5px;padding:8px 10px;border:1px solid var(--line);border-radius:3px;margin-bottom:6px;background:var(--paper);}
+.sms-entry .sms-state{font-weight:600;margin:2px 0;}
+.sms-entry .sms-text{color:var(--ink-soft);white-space:pre-wrap;}
+.sms-entry.sms-delivered .sms-state, .sms-entry.sms-sent .sms-state{color:var(--status-ready);}
+.sms-entry.sms-failed{border-color:var(--phone-warning-border);background:var(--phone-warning-bg);}
+.sms-entry.sms-failed .sms-state{color:var(--status-parts);}
+.sms-entry.sms-none{color:var(--ink-soft);}
+.sms-to{font-size:14px;margin:-6px 0 14px;}
+.sms-counter{font-size:12px;color:var(--ink-soft);margin-top:4px;text-align:right;}
+.sms-counter.multi{color:#B45309;}
+.sms-error{color:var(--status-parts);font-size:13px;min-height:4px;}

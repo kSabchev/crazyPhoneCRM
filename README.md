@@ -104,6 +104,51 @@ Node 22 and 24; browser tests on Linux) for every pull request and every
 push to `main` — see
 `.github/workflows/test.yml`.
 
+## SMS to customers
+
+When an order moves to **"чака клиент"** (from the order form or the status
+dropdown in the table), the app asks whether to send the customer an SMS,
+showing the number and the text, which can be edited before sending.
+Nothing is sent without confirming. Each order also has an **"Изпрати SMS"**
+button, and lists the SMS sent for it with their status (чака телефона →
+изпратено → доставено ✓, or неуспешно with the reason).
+
+The SMS is sent **from the shop's Android phone**, using its own SIM and SMS
+plan, through the free app [SMS Gateway for Android](https://sms-gate.app/).
+The default text is in Settings → "SMS до клиента" (placeholders `{номер}`,
+`{клиент}`, `{модел}`, `{магазин}`). Cyrillic fits 70 characters per SMS; the
+counter shows how many SMS a text uses.
+
+### Setting up the phone (local server mode)
+
+1. Install **SMS Gateway for Android** on the shop phone (Google Play, or the
+   APK from the project's GitHub releases) and allow it to send SMS.
+2. Connect the phone to the **same Wi-Fi as the shop PC**.
+3. In Android settings, turn **battery optimisation off** for the app, so
+   Android doesn't stop it. Keeping the phone on its charger (e.g. the USB
+   cable to the PC) is recommended.
+4. In the app, switch on **Local Server** and tap **Offline** to make it
+   **Online**. Note the **address** (e.g. `192.168.1.50:8080`), **username**
+   and **password** it shows.
+5. In the Wi-Fi router, give the phone a **fixed IP address** (DHCP
+   reservation), so the address doesn't change after a restart.
+6. Add to the app's `.env` and restart the service (`nssm restart RepairLog`):
+   ```
+   SMS_GATEWAY_URL=http://192.168.1.50:8080
+   SMS_GATEWAY_USER=<username from the app>
+   SMS_GATEWAY_PASSWORD=<password from the app>
+   ```
+7. Test it: create an order with **your own number**, move it to
+   "чака клиент", and confirm the SMS.
+
+If the phone can't be on the same network, the app's **Cloud Server** mode
+works over the internet instead: use
+`SMS_GATEWAY_URL=https://api.sms-gate.app/3rdparty/v1` with the cloud
+credentials shown in the app. Messages then pass through that service.
+
+Without `SMS_GATEWAY_URL` (and always in demo mode) SMS is switched off: the
+app never offers to send.
+
 ## Public demo on Render
 
 A **demo** copy (fake data only, never the shop's real app) can run on
