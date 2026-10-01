@@ -113,12 +113,12 @@ Nothing is sent without confirming. Each order also has an **"Изпрати SMS
 button, and lists the SMS sent for it with their status (чака телефона →
 изпратено → доставено ✓, or неуспешно with the reason).
 
-A pill in the header shows whether the phone is ready: **SMS: готов**,
-**SMS: внимание** (e.g. low battery), or **SMS: няма връзка**. Hover it for
-battery, charging, network and failed messages; click it to check again. The
-SMS window shows the same before sending. **Справки → SMS съобщения** lists the
-SMS sent in the chosen period with their status, and how many SMS parts they
-used from the phone plan.
+A pill in the header shows whether the phone is ready (see
+[Troubleshooting](#troubleshooting-sms) for what each state means). Hover it
+for battery, charging, network and failed messages; click it to check again.
+The SMS window checks the phone again before sending. **Справки → SMS
+съобщения** lists the SMS sent in the chosen period with their status, and how
+many SMS parts they used from the phone plan.
 
 The SMS is sent **from the shop's Android phone**, using its own SIM and SMS
 plan, through the free app [SMS Gateway for Android](https://sms-gate.app/).
@@ -130,23 +130,34 @@ counter shows how many SMS a text uses.
 
 1. Install **SMS Gateway for Android** on the shop phone (Google Play, or the
    APK from the project's GitHub releases) and allow it to send SMS.
-2. Connect the phone to the **same Wi-Fi as the shop PC**.
+2. Connect the phone to the **same Wi-Fi as the shop PC**, and not a guest
+   network: guest Wi-Fi usually blocks devices from reaching each other. The
+   USB cable to the PC only keeps the phone charged; the app talks to the
+   phone over Wi-Fi.
 3. In Android settings, turn **battery optimisation off** for the app, so
-   Android doesn't stop it. Keeping the phone on its charger (e.g. the USB
-   cable to the PC) is recommended.
+   Android doesn't stop it. Keeping the phone on its charger is recommended.
 4. In the app, switch on **Local Server** and tap **Offline** to make it
    **Online**. Note the **address** (e.g. `192.168.1.50:8080`), **username**
    and **password** it shows.
 5. In the Wi-Fi router, give the phone a **fixed IP address** (DHCP
    reservation), so the address doesn't change after a restart.
-6. Add to the app's `.env` and restart the service (`nssm restart RepairLog`):
+6. Check the connection from the shop PC: open
+   `http://192.168.1.50:8080/health` (with the phone's address) in a browser;
+   if it asks for a login, use the username and password from step 4. A page
+   of text containing `"status":"pass"` means the PC can reach the phone. If the
+   page doesn't load, see [Troubleshooting](#troubleshooting-sms) before going
+   on.
+7. Add to the app's `.env` and restart the service (`nssm restart RepairLog`):
    ```
    SMS_GATEWAY_URL=http://192.168.1.50:8080
    SMS_GATEWAY_USER=<username from the app>
    SMS_GATEWAY_PASSWORD=<password from the app>
    ```
-7. Test it: create an order with **your own number**, move it to
-   "чака клиент", and confirm the SMS.
+8. Open the app: the header should show **📱 SMS: готов** within a minute.
+9. Test it: create an order with **your own number**, move it to
+   "чака клиент", confirm the SMS, and check it arrives. The order's "SMS до
+   клиента" section should then show **изпратено**, or **доставено ✓** once
+   the delivery report comes back. Delete the test order afterwards.
 
 If the phone can't be on the same network, the app's **Cloud Server** mode
 works over the internet instead: use
@@ -154,7 +165,27 @@ works over the internet instead: use
 credentials shown in the app. Messages then pass through that service.
 
 Without `SMS_GATEWAY_URL` (and always in demo mode) SMS is switched off: the
-app never offers to send.
+app never offers to send, and the header pill isn't shown.
+
+### Troubleshooting SMS
+
+| Header pill | Meaning | What to do |
+|---|---|---|
+| **📱 SMS: готов** | The phone answers and reports no problems | Nothing |
+| **📱 SMS: внимание** | The phone answers but reports a problem: low battery, no internet, or SMS that failed in the last hour (hover for which) | Charge the phone; check the failed SMS in Справки → SMS съобщения |
+| **📱 SMS: няма връзка** | The phone doesn't answer | Check the phone is on, on the **same (non-guest) Wi-Fi**, and the app shows **Online**. Check its address hasn't changed (step 5). Open `http://<phone-address>:8080/health` from the shop PC (step 6) |
+| **📱 SMS: грешни данни** | The phone rejects the username/password | Copy them again from the app into `.env`, then `nssm restart RepairLog` |
+| **📱 SMS: облак** | Cloud mode: the phone's state can't be checked from the PC | Normal in cloud mode; the SMS status in the order still updates |
+
+| SMS status in an order | Meaning |
+|---|---|
+| **чака телефона** | The app accepted it; the phone hasn't sent it yet. It normally moves on within a minute. If it stays here, the phone app may be stopped by Android (check battery optimisation, step 3) |
+| **изпратено** | The phone sent it to the mobile network |
+| **доставено ✓** | The customer's phone confirmed receipt |
+| **неуспешно** | It failed; the reason is shown next to it (e.g. phone unreachable, invalid number, no SMS left on the plan). It can be sent again with **Изпрати SMS** |
+
+The server checks with the phone every minute for status updates on SMS sent
+in the last 24 hours.
 
 ## Public demo on Render
 
@@ -544,8 +575,13 @@ signed-in account can view, create, edit, delete, and print any ticket.
 repair-log/
   server.js          Entry point — starts the app on PORT
   app.js             Express app: auth routes + ticket API + settings API
-  db.js              SQLite schema/setup
+  db.js              SQLite schema/setup and upgrades of older databases
+  default-settings.js  Default statuses, colours, columns, print and SMS texts
   reports.js         Calculations behind the reports page
+  sms.js             SMS to customers via the shop's Android phone
+  auto-status.js     Marks orders waiting 30+ days as "забравен" (hourly)
+  demo.js            Fake demo data for DEMO_MODE (public demo only)
+  render.yaml        Render Blueprint for the public demo
   create-admin.js     CLI to create/reset a login account
   backup.sh           Database backup script for Linux (local + NAS)
   backup.js            Database backup script for Windows (local + NAS)
@@ -562,7 +598,9 @@ repair-log/
     reports.js          Reports page frontend logic (incl. the chart)
     assets/logo.png     Shop logo, used on the customer print
     vendor/              html2canvas + jsPDF (self-hosted, no CDN)
-  test/                API + backup/restore tests (npm test)
+    demo-banner.js      DEMO banner + pre-filled login (demo mode only)
+  test/                API + backup/restore tests (npm test), incl. a fake
+                         SMS phone so tests never send real SMS
   e2e/                 Browser tests (npm run test:e2e)
   data/                repair-log.db lives here (created on first run)
 ```
