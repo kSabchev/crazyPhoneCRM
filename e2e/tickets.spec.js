@@ -637,7 +637,9 @@ test('clicking a price edits it as an amount; empty removes the price', async ({
   await expectModalClosed(page);
   await expect(page.locator('#quickEditTitle')).toHaveText('Продажна цена (€)');
   const line = page.locator('#quickEditLine');
-  await expect(line).toHaveAttribute('type', 'number');
+  // A text field with a numeric keyboard: no up/down arrows.
+  await expect(line).toHaveAttribute('type', 'text');
+  await expect(line).toHaveAttribute('inputmode', 'decimal');
   await expect(line).toHaveValue('80');
   await line.fill('95.5');
   await line.press('Enter');
@@ -707,4 +709,103 @@ test('money is shown as "25,00 €" in the table, history and customer print', a
   // The printed customer card shows the deposit as money too.
   await page.click('#printCustomerBtn');
   await expect(page.locator('#printCustomerTemplate')).toContainText(/Капаро:\s*20,00\s€/);
+});
+
+test('prices can be typed with a decimal comma, in the quick editor and the order form', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await r.locator('.customer-price-cell').click();
+  await page.locator('#quickEditLine').fill('25,50');
+  await page.locator('#quickEditLine').press('Enter');
+  await expect(r.locator('.customer-price-cell')).toHaveText(/^25,50\s€$/);
+
+  // Reopening shows the amount with a comma, ready to edit.
+  await r.locator('.customer-price-cell').click();
+  await expect(page.locator('#quickEditLine')).toHaveValue('25,5');
+  await page.locator('#quickEditLine').press('Escape');
+
+  // The order form: text fields with a numeric keyboard, no arrows.
+  await r.locator('.ticket-no').click();
+  for (const id of ['#f_service_price', '#f_customer_price']) {
+    await expect(page.locator(id)).toHaveAttribute('type', 'text');
+    await expect(page.locator(id)).toHaveAttribute('inputmode', 'decimal');
+  }
+  await expect(page.locator('#f_customer_price')).toHaveValue('25,5');
+  await page.fill('#f_service_price', '12,3');
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+  await expect(r.locator('.service-price-cell')).toHaveText(/^12,30\s€$/);
+});
+
+test('an invalid amount in the order form is refused with the field named', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.fill('#f_customer_price', '12,5,0');
+  let message = null;
+  page.once('dialog', d => { message = d.message(); d.accept(); });
+  await page.click('#saveBtn');
+  await expect.poll(() => message).toContain('Продажна цена: невалидна сума');
+  await expectModalOpen(page);
+});
+
+test('the header counters filter the table, and clicking again shows all', async ({ page }) => {
+  const tag = uniqueName('Брояч');
+  const waiting = await createTicketViaApi(page, { customerName: `${tag} чака`, status: 'чака клиент' });
+  const other = await createTicketViaApi(page, { customerName: `${tag} в сервиз`, status: 'в сервиз' });
+  await page.reload();
+
+  const counter = label => page.locator('#stats .stat', { hasText: label });
+  const filter = page.locator('#statusFilter');
+
+  await counter('чакат клиент').click();
+  await expect(filter).toHaveValue('чака клиент');
+  await expect(counter('чакат клиент')).toHaveClass(/\bactive\b/);
+  await expect(counter('чакат клиент')).toHaveAttribute('aria-pressed', 'true');
+  await expect(row(page, waiting.customer_name)).toHaveCount(1);
+  await expect(row(page, other.customer_name)).toHaveCount(0);
+  // Every row shown is in that status, and the count matches.
+  const shown = await page.locator('#tableBody tr .badge').allInnerTexts();
+  expect(new Set(shown)).toEqual(new Set(['чака клиент']));
+  expect(String(shown.length)).toBe(await counter('чакат клиент').locator('.num').textContent());
+
+  // Clicking the active counter again clears the filter.
+  await counter('чакат клиент').click();
+  await expect(filter).toHaveValue('');
+  await expect(counter('чакат клиент')).not.toHaveClass(/\bactive\b/);
+  await expect(row(page, other.customer_name)).toHaveCount(1);
+
+  // "общо поръчки" always shows everything.
+  await counter('в сервиза').click();
+  await expect(row(page, waiting.customer_name)).toHaveCount(0);
+  await counter('общо поръчки').click();
+  await expect(filter).toHaveValue('');
+  await expect(row(page, waiting.customer_name)).toHaveCount(1);
+});
+
+test('choosing a status in the dropdown highlights its counter', async ({ page }) => {
+  await page.selectOption('#statusFilter', 'издаден');
+  await expect(page.locator('#stats .stat.active')).toHaveCount(1);
+  await expect(page.locator('#stats .stat.active')).toContainText('издадени');
+  await page.selectOption('#statusFilter', '__active__');
+  await expect(page.locator('#stats .stat.active')).toHaveCount(0);
+});
+
+test('the chosen filter survives a live-update reconnect and settings reload', async ({ page }) => {
+  await page.locator('#stats .stat', { hasText: 'чакат клиент' }).click();
+  await expect(page.locator('#statusFilter')).toHaveValue('чака клиент');
+
+  // A reconnect reloads settings (and rebuilds the dropdown).
+  await page.evaluate(() => { disconnectLiveUpdates(); connectLiveUpdates(); });
+  await page.evaluate(() => loadSettings());
+  await expect(page.locator('#statusFilter')).toHaveValue('чака клиент');
+  await expect(page.locator('#stats .stat.active')).toContainText('чакат клиент');
+});
+
+test('the counters work from the keyboard', async ({ page }) => {
+  await page.locator('#stats .stat', { hasText: 'забравени' }).focus();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#statusFilter')).toHaveValue('забравен');
 });

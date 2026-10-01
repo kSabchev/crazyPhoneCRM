@@ -527,6 +527,9 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
 - Click a **status** in the table to change it straight from a dropdown,
   without opening the ticket. Changing it to "издаден" (here or in the
   ticket form) fills in today as the return date, unless one is already set.
+- The **counters at the top** are shortcuts: click one (e.g. "чакат клиент") to
+  show only those orders; click it again, or "общо поръчки", to show all.
+- **Prices** can be typed with a comma or a point ("25,50" or "25.50").
 - **Search** filters across customer name, phone number, model, ticket
   number, and description as you type. The status dropdown narrows further.
 - **Live updates**: when anyone creates, edits, or deletes a ticket (or an

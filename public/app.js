@@ -147,9 +147,13 @@ async function loadSettings(){
 
   // Status filter dropdown: All, then "in progress" (everything not completed), then each status individually.
   const filterSel = document.getElementById('statusFilter');
+  // Rebuilding the options resets the selection, and this runs again on every
+  // live-update (re)connect and settings change: keep what the user chose.
+  const chosen = filterSel.value;
   filterSel.innerHTML = '<option value="">Всички статуси</option>' +
     '<option value="__active__">В процес (без завършени)</option>' +
     settings.statuses.map(s=>`<option value="${escapeHtml(s)}">${escapeHtml(s)}</option>`).join('');
+  if([...filterSel.options].some(o => o.value === chosen)) filterSel.value = chosen;
 
   // Ticket modal status dropdown
   const modalSel = document.getElementById('f_status');
@@ -202,6 +206,13 @@ function fmtPrice(v){
   const n = Number(v);
   return Number.isFinite(n) ? EUR.format(n) : String(v);
 }
+
+// A price for an input field, with a decimal comma as staff type it
+// ("25,5"); empty when there's no price. The server accepts comma or point.
+function priceForInput(v){
+  return v === null || v === undefined || v === '' ? '' : String(v).replace('.', ',');
+}
+const PRICE_INPUT = /^\s*(\d+(?:[.,]\d{1,2})?)?\s*$/;
 
 // Капаро holds an amount, "Не" (no deposit) or free text from older
 // orders: amounts are formatted as money, anything else shown as entered.
@@ -420,24 +431,44 @@ document.addEventListener('click', (e)=>{
   if(quickStatusId !== null && !e.target.closest('.status-select')) cancelStatusEdit();
 });
 
+// Header counters, each a shortcut: clicking one filters the table to that
+// status ("общо поръчки" shows all); clicking the active one again clears it.
+const STAT_COUNTERS = [
+  { filter: '',             label: 'общо поръчки', color: null },
+  { filter: 'за сервиз',    label: 'за сервиз',    color: 'var(--status-forservice-text)' },
+  { filter: 'в сервиз',     label: 'в сервиза',    color: 'var(--status-inservice-text)' },
+  { filter: 'чака клиент',  label: 'чакат клиент', color: 'var(--status-waiting-text)' },
+  { filter: COMPLETED_STATUS, label: 'издадени',     color: 'var(--status-issued-text)' },
+  { filter: 'отказан',      label: 'отказани',     color: 'var(--status-refused-bg)' },
+  { filter: 'забравен',     label: 'забравени',    color: 'var(--status-forgotten-bg)' }
+];
+
 function renderStats(){
-  const total = tickets.length;
-  const forService = tickets.filter(t=> t.status === 'за сервиз').length;
-  const inService = tickets.filter(t=> t.status === 'в сервиз').length;
-  const waiting = tickets.filter(t=> t.status === 'чака клиент').length;
-  const issued = tickets.filter(t=> t.status === COMPLETED_STATUS).length;
-  const refused = tickets.filter(t=> t.status === 'отказан').length;
-  const forgotten = tickets.filter(t=> t.status === 'забравен').length;
-  document.getElementById('stats').innerHTML = `
-    <div class="stat"><div class="num">${total}</div><div class="lbl">общо поръчки</div></div>
-    <div class="stat"><div class="num" style="color:var(--status-forservice-text)">${forService}</div><div class="lbl">за сервиз</div></div>
-    <div class="stat"><div class="num" style="color:var(--status-inservice-text)">${inService}</div><div class="lbl">в сервиза</div></div>
-    <div class="stat"><div class="num" style="color:var(--status-waiting-text)">${waiting}</div><div class="lbl">чакат клиент</div></div>
-    <div class="stat"><div class="num" style="color:var(--status-issued-text)">${issued}</div><div class="lbl">издадени</div></div>
-    <div class="stat"><div class="num" style="color:var(--status-refused-bg)">${refused}</div><div class="lbl">отказани</div></div>
-    <div class="stat"><div class="num" style="color:var(--status-forgotten-bg)">${forgotten}</div><div class="lbl">забравени</div></div>
-  `;
+  const current = document.getElementById('statusFilter').value;
+  document.getElementById('stats').innerHTML = STAT_COUNTERS.map(c=>{
+    const count = c.filter === '' ? tickets.length : tickets.filter(t=> t.status === c.filter).length;
+    const active = c.filter !== '' && current === c.filter;
+    const title = c.filter === '' ? 'Покажи всички поръчки' : `Покажи само „${c.filter}“`;
+    return `<button type="button" class="stat${active ? ' active' : ''}" data-filter="${escapeHtml(c.filter)}" aria-pressed="${active}" title="${escapeHtml(title)}">
+      <span class="num"${c.color ? ` style="color:${c.color}"` : ''}>${count}</span><span class="lbl">${c.label}</span>
+    </button>`;
+  }).join('');
 }
+
+function filterByCounter(status){
+  const select = document.getElementById('statusFilter');
+  // Toggle: the active counter clears the filter. A status removed from
+  // Settings has no option in the dropdown, so it can't be filtered on.
+  const next = select.value === status ? '' : status;
+  if(next && ![...select.options].some(o => o.value === next)) return;
+  select.value = next;
+  render();
+}
+
+document.getElementById('stats').addEventListener('click', (e)=>{
+  const btn = e.target.closest('.stat');
+  if(btn) filterByCounter(btn.dataset.filter);
+});
 
 // Click a "Правим" marker in the table to cycle it and save immediately,
 // without opening the ticket for editing.
@@ -511,8 +542,8 @@ function openEdit(id){
   document.getElementById('f_date_returned').value = t.date_returned || '';
   document.getElementById('f_model').value = t.phone_model;
   document.getElementById('f_status').value = t.status;
-  document.getElementById('f_service_price').value = t.service_price ?? '';
-  document.getElementById('f_customer_price').value = t.customer_price ?? '';
+  document.getElementById('f_service_price').value = priceForInput(t.service_price);
+  document.getElementById('f_customer_price').value = priceForInput(t.customer_price);
   document.getElementById('f_kaparo').value = t.kaparo || 'Не';
   document.getElementById('f_desc').value = t.description || '';
   document.getElementById('f_comment').value = t.comment || '';
@@ -943,8 +974,8 @@ const QUICK_EDIT_FIELDS = {
   comment: { kind: 'text', title: 'Коментар', column: 'comment', placeholder: 'Допълнителни бележки...', error: 'Коментарът не можа да бъде запазен.' },
   repairPerformed: { kind: 'text', title: 'Извършен ремонт', column: 'repair_performed', placeholder: 'Какво беше извършено при ремонта...', error: 'Извършеният ремонт не можа да бъде запазен.' },
   phonePassword: { kind: 'line', title: 'Парола', column: 'phone_password', placeholder: 'напр. 1234 или Г-образен шаблон', error: 'Паролата не можа да бъде запазена.' },
-  servicePrice: { kind: 'price', title: 'Изкупна цена (€)', column: 'service_price', placeholder: '0.00 — празно = без цена', error: 'Изкупната цена не можа да бъде запазена.' },
-  customerPrice: { kind: 'price', title: 'Продажна цена (€)', column: 'customer_price', placeholder: '0.00 — празно = без цена', error: 'Продажната цена не можа да бъде запазена.' }
+  servicePrice: { kind: 'price', title: 'Изкупна цена (€)', column: 'service_price', placeholder: '0,00 — празно = без цена', error: 'Изкупната цена не можа да бъде запазена.' },
+  customerPrice: { kind: 'price', title: 'Продажна цена (€)', column: 'customer_price', placeholder: '0,00 — празно = без цена', error: 'Продажната цена не можа да бъде запазена.' }
 };
 let quickEdit = null; // { id, field }
 
@@ -966,18 +997,17 @@ function openQuickEdit(e, id, field){
   area.style.display = cfg.kind === 'text' ? '' : 'none';
   line.style.display = cfg.kind === 'text' ? 'none' : '';
   const input = quickEditInputFor(cfg);
-  if(cfg.kind === 'price'){
-    line.type = 'number'; line.step = '0.01'; line.min = '0'; line.inputMode = 'decimal';
-  } else {
-    line.type = 'text'; line.removeAttribute('step'); line.removeAttribute('min'); line.inputMode = 'text';
-  }
+  // Prices: a plain text field with a numeric keyboard on phones — no
+  // up/down arrows, no mouse-wheel changes, and "25,50" works as typed.
+  line.inputMode = cfg.kind === 'price' ? 'decimal' : 'text';
+  line.classList.toggle('price-input', cfg.kind === 'price');
   input.placeholder = cfg.placeholder;
   const current = t[cfg.column];
-  input.value = current === null || current === undefined ? '' : current;
+  input.value = cfg.kind === 'price' ? priceForInput(current) : (current === null || current === undefined ? '' : current);
   document.getElementById('quickEditOverlay').classList.add('open');
   input.focus();
-  if(input.type !== 'number') input.setSelectionRange(input.value.length, input.value.length);
-  else input.select();
+  if(cfg.kind === 'price') input.select();
+  else input.setSelectionRange(input.value.length, input.value.length);
 }
 
 function closeQuickEdit(){
@@ -990,10 +1020,8 @@ async function saveQuickEdit(){
   const { id, field } = quickEdit;
   const cfg = QUICK_EDIT_FIELDS[field];
   const input = quickEditInputFor(cfg);
-  // A number field reports bad input (e.g. "12,5,0") as an empty value;
-  // don't silently turn that into "no price".
-  if(cfg.kind === 'price' && input.validity && input.validity.badInput){
-    alert('Невалидна сума — въведете число, напр. 25.50, или оставете празно.');
+  if(cfg.kind === 'price' && !PRICE_INPUT.test(input.value)){
+    alert(`${cfg.title.replace(' (€)', '')}: невалидна сума — въведете число, напр. 25,50, или оставете празно.`);
     return;
   }
   const res = await fetch(`/api/tickets/${id}`, {
