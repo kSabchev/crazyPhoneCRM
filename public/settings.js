@@ -40,8 +40,58 @@ async function init(){
   renderAll();
 }
 
-document.getElementById('backBtn').addEventListener('click', ()=>{ window.location.href = '/'; });
+// ---------- Unsaved changes ----------
+// The settings as they'd be saved right now: the edited lists plus the text
+// fields, which are only copied into `settings` when saving.
+function currentDraft(){
+  return {
+    ...settings,
+    shopName: document.getElementById('shopNameInput').value.trim() || settings.shopName,
+    shopTagline: document.getElementById('shopTaglineInput').value.trim(),
+    printCustomer: {
+      header: document.getElementById('custHeader').value,
+      footer: document.getElementById('custFooter').value
+    }
+  };
+}
+
+// JSON with object keys sorted, so the same settings always compare equal
+// regardless of the order things were added in.
+function stableJson(value){
+  if(Array.isArray(value)) return `[${value.map(stableJson).join(',')}]`;
+  if(value && typeof value === 'object'){
+    return `{${Object.keys(value).sort().map(k => `${JSON.stringify(k)}:${stableJson(value[k])}`).join(',')}}`;
+  }
+  return JSON.stringify(value);
+}
+
+function hasUnsavedChanges(){
+  if(!settings || !originalSettings) return false;
+  return stableJson(currentDraft()) !== stableJson({ ...originalSettings, shopTagline: originalSettings.shopTagline || '' });
+}
+
+const UNSAVED_MESSAGE = 'Имате незапазени промени в настройките. Да се напусне ли страницата без запазване?';
+let leaveConfirmed = false;
+
+// In-app links: our own confirmation. Closing the tab / reloading: the
+// browser's built-in "leave site?" dialog (its text can't be customised).
+function confirmLeave(){
+  if(!hasUnsavedChanges()) return true;
+  leaveConfirmed = confirm(UNSAVED_MESSAGE);
+  return leaveConfirmed;
+}
+window.addEventListener('beforeunload', (e)=>{
+  if(leaveConfirmed || !hasUnsavedChanges()) return;
+  e.preventDefault();
+  e.returnValue = '';
+});
+
+document.getElementById('backBtn').addEventListener('click', ()=>{
+  if(!confirmLeave()) return;
+  window.location.href = '/';
+});
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
+  if(!confirmLeave()) return;
   await fetch('/api/auth/logout', { method:'POST' });
   window.location.href = '/';
 });
@@ -58,11 +108,27 @@ function renderAll(){
   document.getElementById('saveStatus').textContent = '';
 }
 
+const NEW_STATUS_DEFAULT_COLOR = '#6B7280';
+
+// White or dark text, whichever reads better on the badge colour (same rule
+// as the order table).
+function readableTextOn(hex){
+  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
+    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
+  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#211E1A' : '#FFFFFF';
+}
+
+function statusColor(s){
+  return (settings.statusColors && settings.statusColors[s]) || NEW_STATUS_DEFAULT_COLOR;
+}
+
 function renderStatusList(){
   const el = document.getElementById('statusList');
+  settings.statusColors = settings.statusColors || {};
   el.innerHTML = settings.statuses.map((s, i)=>`
     <div class="editable-row">
-      <span class="item-text">${escapeHtml(s)}</span>
+      <span class="item-text"><span class="badge status-preview" style="background:${statusColor(s)};color:${readableTextOn(statusColor(s))}">${escapeHtml(s)}</span></span>
+      <input type="color" class="status-color" data-index="${i}" value="${statusColor(s)}" title="Цвят на „${escapeHtml(s)}“" aria-label="Цвят на ${escapeHtml(s)}">
       <button class="row-btn" data-action="up" data-index="${i}" ${i===0?'disabled':''}>↑</button>
       <button class="row-btn" data-action="down" data-index="${i}" ${i===settings.statuses.length-1?'disabled':''}>↓</button>
       <button class="row-btn remove" data-action="remove" data-index="${i}">Премахни</button>
@@ -75,7 +141,8 @@ function renderStatusList(){
       const action = btn.getAttribute('data-action');
       if(action === 'remove'){
         if(settings.statuses.length <= 1){ alert('Трябва да има поне един статус.'); return; }
-        settings.statuses.splice(i, 1);
+        const [removed] = settings.statuses.splice(i, 1);
+        delete settings.statusColors[removed];
       } else if(action === 'up' && i > 0){
         [settings.statuses[i-1], settings.statuses[i]] = [settings.statuses[i], settings.statuses[i-1]];
       } else if(action === 'down' && i < settings.statuses.length - 1){
@@ -84,10 +151,22 @@ function renderStatusList(){
       renderStatusList();
     });
   });
+
+  // Recolour live: update the stored colour and the preview badge.
+  el.querySelectorAll('input.status-color').forEach(picker=>{
+    picker.addEventListener('input', ()=>{
+      const status = settings.statuses[Number(picker.dataset.index)];
+      settings.statusColors[status] = picker.value;
+      const preview = picker.parentElement.querySelector('.status-preview');
+      preview.style.background = picker.value;
+      preview.style.color = readableTextOn(picker.value);
+    });
+  });
 }
 
 document.getElementById('addStatusBtn').addEventListener('click', ()=>{
   const input = document.getElementById('newStatusInput');
+  const colorInput = document.getElementById('newStatusColor');
   const val = input.value.trim();
   if(!val) return;
   if(settings.statuses.some(s=>s.toLowerCase() === val.toLowerCase())){
@@ -95,7 +174,9 @@ document.getElementById('addStatusBtn').addEventListener('click', ()=>{
     return;
   }
   settings.statuses.push(val);
+  settings.statusColors[val] = colorInput.value;
   input.value = '';
+  colorInput.value = NEW_STATUS_DEFAULT_COLOR;
   renderStatusList();
 });
 

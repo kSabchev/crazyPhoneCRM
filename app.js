@@ -194,9 +194,24 @@ app.get('/api/auth/me', (req, res) => {
 // ---- Settings routes ----
 const COLUMN_KEYS = ['customer', 'callBtn', 'model', 'issue', 'password', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'dateIn', 'dateReturned', 'servicePrice', 'customerPrice'];
 
+// Badge colour per status, as #rrggbb. Statuses without a saved colour use
+// the built-in one for that name, or neutral grey for custom statuses.
+const DEFAULT_STATUS_COLORS = require('./default-settings').statusColors;
+const FALLBACK_STATUS_COLOR = '#6B7280';
+const HEX_COLOR = /^#[0-9a-f]{6}$/i;
+
+function withStatusColors(settings) {
+  const saved = settings.statusColors || {};
+  const statusColors = {};
+  for (const s of settings.statuses) {
+    statusColors[s] = saved[s] || DEFAULT_STATUS_COLORS[s] || FALLBACK_STATUS_COLOR;
+  }
+  return { ...settings, statusColors };
+}
+
 function getSettings() {
   const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();
-  return JSON.parse(row.data);
+  return withStatusColors(JSON.parse(row.data));
 }
 
 app.get('/api/settings', requireAuth, (req, res) => {
@@ -226,6 +241,22 @@ app.put('/api/settings', requireAuth, (req, res) => {
     }
     next.statuses = [...new Set(statuses)];
   }
+
+  if (body.statusColors !== undefined) {
+    const incoming = body.statusColors;
+    if (!incoming || typeof incoming !== 'object' || Array.isArray(incoming)) {
+      return res.status(400).json({ error: 'Невалидни цветове на статусите' });
+    }
+    for (const [status, color] of Object.entries(incoming)) {
+      if (typeof color !== 'string' || !HEX_COLOR.test(color)) {
+        return res.status(400).json({ error: `Невалиден цвят за статус „${status}“` });
+      }
+    }
+    next.statusColors = { ...current.statusColors, ...incoming };
+  }
+  // Keep colours only for statuses that still exist (fills in defaults for new ones).
+  const saved = withStatusColors(next);
+  next.statusColors = saved.statusColors;
 
   if (body.columns !== undefined) {
     const columns = (body.columns || []).filter(c => COLUMN_KEYS.includes(c));
