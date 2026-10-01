@@ -641,15 +641,15 @@ test('clicking a price edits it as an amount; empty removes the price', async ({
   await expect(line).toHaveValue('80');
   await line.fill('95.5');
   await line.press('Enter');
-  await expect(r.locator('.customer-price-cell')).toHaveText('95.50');
-  await expect(r.locator('.service-price-cell')).toHaveText('30.00');
+  await expect(r.locator('.customer-price-cell')).toHaveText(/^95,50\s€$/);
+  await expect(r.locator('.service-price-cell')).toHaveText(/^30,00\s€$/);
 
   await r.locator('.service-price-cell').click();
   await expect(page.locator('#quickEditTitle')).toHaveText('Изкупна цена (€)');
   await line.fill('');
   await page.click('#quickEditSaveBtn');
   await expect(r.locator('.service-price-cell')).toHaveText('—');
-  await expect(r.locator('.customer-price-cell')).toHaveText('95.50');
+  await expect(r.locator('.customer-price-cell')).toHaveText(/^95,50\s€$/);
 });
 
 test('a negative price is rejected with a message and nothing changes', async ({ page }) => {
@@ -665,7 +665,7 @@ test('a negative price is rejected with a message and nothing changes', async ({
   await expect.poll(() => message).toContain('невалидна сума');
   await expect(page.locator('#quickEditOverlay')).toHaveClass(/\bopen\b/);
   await page.locator('#quickEditLine').press('Escape');
-  await expect(r.locator('.customer-price-cell')).toHaveText('80.00');
+  await expect(r.locator('.customer-price-cell')).toHaveText(/^80,00\s€$/);
 });
 
 test('after a price edit, the comment editor is multi-line again', async ({ page }) => {
@@ -679,4 +679,32 @@ test('after a price edit, the comment editor is multi-line again', async ({ page
   await expect(page.locator('#quickEditLine')).toBeHidden();
   await expect(page.locator('#quickEditInput')).toHaveValue('ред 1');
   await expect(page.locator('#quickEditHint')).toHaveText('Ctrl+Enter запазва, Esc затваря');
+});
+
+test('money is shown as "25,00 €" in the table, history and customer print', async ({ page }) => {
+  await page.addInitScript(() => { window.open = () => null; });
+  await page.reload();
+  const t = await createTicketViaApi(page, { servicePrice: '30', customerPrice: '1234.5', kaparo: '20' });
+  const noDeposit = await createTicketViaApi(page);
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await expect(r.locator('.service-price-cell')).toHaveText(/^30,00\s€$/);
+  await expect(r.locator('.customer-price-cell')).toHaveText(/^1234,50\s€$/);
+  await expect(r.locator('td').filter({ hasText: /^20,00\s€$/ })).toHaveCount(1);
+  // "Не" (no deposit) and empty prices are shown as before.
+  await expect(row(page, noDeposit.customer_name).locator('.customer-price-cell')).toHaveText('—');
+  await expect(row(page, noDeposit.customer_name)).toContainText('Не');
+
+  // History: old and new amounts in the same format.
+  await r.locator('.customer-price-cell').click();
+  await page.locator('#quickEditLine').fill('99.9');
+  await page.locator('#quickEditLine').press('Enter');
+  await r.locator('.ticket-no').click();
+  await page.click('#historyToggle');
+  await expect(page.locator('#historyList')).toContainText(/Продажна цена: 1234,50\s€ → 99,90\s€/);
+
+  // The printed customer card shows the deposit as money too.
+  await page.click('#printCustomerBtn');
+  await expect(page.locator('#printCustomerTemplate')).toContainText(/Капаро:\s*20,00\s€/);
 });

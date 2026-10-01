@@ -193,9 +193,32 @@ function fmtDate(d){
   return `${day}.${m}.${y}`;
 }
 
+// Money is shown the same way everywhere (table, history, print, reports):
+// "25,00 €" — Bulgarian format, comma decimals, euro sign after.
+const EUR = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
+
 function fmtPrice(v){
   if(v === null || v === undefined || v === '') return '—';
-  return Number(v).toFixed(2);
+  const n = Number(v);
+  return Number.isFinite(n) ? EUR.format(n) : String(v);
+}
+
+// Капаро holds an amount, "Не" (no deposit) or free text from older
+// orders: amounts are formatted as money, anything else shown as entered.
+function fmtKaparo(v){
+  if(v === null || v === undefined || v === '') return '—';
+  const s = String(v).trim();
+  const m = s.match(/^(\d+(?:[.,]\d+)?)\s*(€|eur|евро)?$/i);
+  return m ? EUR.format(Number(m[1].replace(',', '.'))) : s;
+}
+
+// A value in the change history, formatted the way the table shows it.
+function fmtHistoryValue(field, v){
+  if(field === 'pravim') return PRAVIM_SYMBOLS[v] || '—';
+  if(v === null || v === undefined || v === '') return '—';
+  if(field === 'service_price' || field === 'customer_price') return escapeHtml(fmtPrice(v));
+  if(field === 'kaparo') return escapeHtml(fmtKaparo(v));
+  return escapeHtml(String(v));
 }
 
 function escapeHtml(str){
@@ -320,7 +343,7 @@ function render(){
             ? statusSelectHtml(t)
             : `<span class="badge" style="color:${fg};background:${bg};" title="Щракнете за смяна на статуса">${escapeHtml(t.status)}</span>`
         }</td>
-        <td${dv('kaparo')}>${escapeHtml(t.kaparo)}</td>
+        <td class="price"${dv('kaparo')}>${escapeHtml(fmtKaparo(t.kaparo))}</td>
         <td class="price quick-edit-cell service-price-cell"${dv('servicePrice')} onclick="openQuickEdit(event, ${t.id}, 'servicePrice')" title="Щракнете, за да промените изкупната цена">${fmtPrice(t.service_price)}</td>
         <td class="price quick-edit-cell customer-price-cell"${dv('customerPrice')} onclick="openQuickEdit(event, ${t.id}, 'customerPrice')" title="Щракнете, за да промените продажната цена">${fmtPrice(t.customer_price)}</td>
         <td${dv('dateIn')}>${fmtDate(t.date_received)}</td>
@@ -680,8 +703,8 @@ function describeEntry(entry, includeTicketRef){
       // The unlock code itself is never stored in the history.
       if(field === 'phone_password') return '<div class="change-line">Паролата е променена.</div>';
       const label = FIELD_LABELS[field] || field;
-      const fromV = field === 'pravim' ? (PRAVIM_SYMBOLS[from] || '—') : ((from === null || from === '') ? '—' : escapeHtml(String(from)));
-      const toV = field === 'pravim' ? (PRAVIM_SYMBOLS[to] || '—') : ((to === null || to === '') ? '—' : escapeHtml(String(to)));
+      const fromV = fmtHistoryValue(field, from);
+      const toV = fmtHistoryValue(field, to);
       return `<div class="change-line">${label}: ${fromV} → ${toV}</div>`;
     });
     body = lines.join('');
@@ -1037,7 +1060,7 @@ function buildCustomerPrintDoc(t){
 
   const bottomRows = [
     ['Оборотен телефон', escapeHtml(t.loaner_phone)],
-    ['Капаро', escapeHtml(t.kaparo)],
+    ['Капаро', escapeHtml(fmtKaparo(t.kaparo))],
     ['Дата на приемане', fmtDate(t.date_received)]
   ].map(([label, value]) => `
     <div class="card-row">
