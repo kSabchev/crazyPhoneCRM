@@ -113,6 +113,13 @@ Nothing is sent without confirming. Each order also has an **"Изпрати SMS
 button, and lists the SMS sent for it with their status (чака телефона →
 изпратено → доставено ✓, or неуспешно with the reason).
 
+A pill in the header shows whether the phone is ready: **SMS: готов**,
+**SMS: внимание** (e.g. low battery), or **SMS: няма връзка**. Hover it for
+battery, charging, network and failed messages; click it to check again. The
+SMS window shows the same before sending. **Справки → SMS съобщения** lists the
+SMS sent in the chosen period with their status, and how many SMS parts they
+used from the phone plan.
+
 The SMS is sent **from the shop's Android phone**, using its own SIM and SMS
 plan, through the free app [SMS Gateway for Android](https://sms-gate.app/).
 The default text is in Settings → "SMS до клиента" (placeholders `{номер}`,

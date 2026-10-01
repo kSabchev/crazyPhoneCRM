@@ -467,3 +467,26 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
 .sms-counter{font-size:12px;color:var(--ink-soft);margin-top:4px;text-align:right;}
 .sms-counter.multi{color:#B45309;}
 .sms-error{color:var(--status-parts);font-size:13px;min-height:4px;}
+
+/* ---- SMS phone status ---- */
+.sms-pill{border:1px solid var(--line);background:var(--panel);border-radius:20px;padding:2px 10px;font-size:12px;cursor:pointer;color:var(--ink);white-space:nowrap;}
+.sms-pill-ok{border-color:#86EFAC;background:#F0FDF4;color:#166534;}
+.sms-pill-warn{border-color:#FCD34D;background:#FFFBEB;color:#92400E;}
+.sms-pill-bad{border-color:var(--phone-warning-border);background:var(--phone-warning-bg);color:#991B1B;}
+.sms-pill-neutral{color:var(--ink-soft);}
+.sms-phone-status{font-size:12.5px;margin:-8px 0 14px;color:var(--ink-soft);}
+.sms-phone-status.sms-phone-ok{color:#166534;}
+.sms-phone-status.sms-phone-warn{color:#92400E;}
+.sms-phone-status.sms-phone-bad{color:#991B1B;font-weight:600;}
+
+/* ---- SMS in reports ---- */
+.sms-summary{font-size:13.5px;margin-bottom:12px;display:flex;flex-wrap:wrap;gap:8px;align-items:center;}
+.sms-count{display:inline-block;padding:2px 9px;border-radius:12px;font-size:12px;font-weight:600;background:var(--paper);border:1px solid var(--line);}
+.sms-count-ok{color:#166534;border-color:#86EFAC;background:#F0FDF4;}
+.sms-count-pending{color:#92400E;border-color:#FCD34D;background:#FFFBEB;}
+.sms-count-bad{color:#991B1B;border-color:var(--phone-warning-border);background:var(--phone-warning-bg);}
+.report-table .sms-text-cell{max-width:320px;color:var(--ink-soft);white-space:normal;}
+.report-table .nowrap{white-space:nowrap;}
+.report-table .muted, .muted{color:var(--ink-soft);font-size:12px;}
+.report-table .sms-row-failed td{background:var(--phone-warning-bg);}
+.sms-truncated{margin:8px 0 0;}

@@ -191,7 +191,117 @@ test('the SMS text is a setting with a default, and can be changed', async () =>
   await agent.put('/api/settings').send({ smsTemplate: 'я'.repeat(601) }).expect(400);
 });
 
+// ---- Phone status ----
+const setHealth = h => { gw.health = { mode: 'ok', status: 200, body: gw.health.body, ...h }; };
+const status = async () => (await agent.get('/api/sms/status?fresh=1').expect(200)).body;
+
+test('a healthy phone shows as ready, with battery, charging and network', async () => {
+  const s = await status();
+  assert.equal(s.state, 'ready');
+  assert.equal(s.details.battery, 87);
+  assert.equal(s.details.charging, 2);
+  assert.equal(s.details.network, 'WiFi');
+  assert.equal(s.details.failedLastHour, 0);
+  assert.deepEqual(s.details.problems, []);
+  assert.ok(s.checkedAt);
+});
+
+test('a phone reporting low battery is shown as a warning with the reason', async () => {
+  const body = JSON.parse(JSON.stringify(gw.health.body));
+  body.status = 'fail';
+  body.checks['battery:level'] = { observedValue: 8, status: 'fail' };
+  setHealth({ status: 503, body });
+  try {
+    const s = await status();
+    assert.equal(s.state, 'warning');
+    assert.deepEqual(s.details.problems, ['ниска батерия']);
+    assert.equal(s.details.battery, 8);
+  } finally {
+    body.status = 'pass';
+    body.checks['battery:level'] = { observedValue: 87, status: 'pass' };
+    setHealth({ status: 200, body });
+  }
+});
+
+test('an unreachable phone shows as offline; wrong credentials as auth', async () => {
+  setHealth({ mode: 'down' });
+  try {
+    assert.equal((await status()).state, 'offline');
+  } finally {
+    setHealth({ mode: 'ok' });
+  }
+  process.env.SMS_GATEWAY_PASSWORD = 'wrong';
+  try {
+    assert.equal((await status()).state, 'auth');
+  } finally {
+    process.env.SMS_GATEWAY_PASSWORD = 'secret';
+  }
+  assert.equal((await status()).state, 'ready');
+});
+
+test('the status is cached for 30 seconds unless a fresh check is asked for', async () => {
+  assert.equal((await status()).state, 'ready');
+  setHealth({ mode: 'down' });
+  try {
+    assert.equal((await agent.get('/api/sms/status').expect(200)).body.state, 'ready'); // cached
+    assert.equal((await status()).state, 'offline'); // fresh
+  } finally {
+    setHealth({ mode: 'ok' });
+    await status();
+  }
+});
+
+test('cloud mode and an unconfigured gateway are reported, not guessed', async () => {
+  const saved = process.env.SMS_GATEWAY_URL;
+  try {
+    process.env.SMS_GATEWAY_URL = 'https://api.sms-gate.app/3rdparty/v1';
+    assert.equal((await status()).state, 'cloud');
+    delete process.env.SMS_GATEWAY_URL;
+    assert.equal((await status()).state, 'off');
+  } finally {
+    process.env.SMS_GATEWAY_URL = saved;
+  }
+});
+
+// ---- SMS in reports ----
+test('reports list the period\'s SMS with counts and SMS parts used', async () => {
+  db.exec('DELETE FROM sms_messages');
+  const t = await create({ customerName: 'Отчет Клиент' });
+  const add = db.prepare(`INSERT INTO sms_messages (ticket_id, ticket_no, phone, text, state, error, sent_by, created_at)
+    VALUES (?, ?, '+359888123456', ?, ?, ?, 'tester', ?)`);
+  add.run(t.id, t.ticket_no, 'кратко', 'Delivered', null, '2031-03-10 10:00:00');
+  add.run(t.id, t.ticket_no, 'я'.repeat(100), 'Sent', null, '2031-03-11 10:00:00');       // 2 parts
+  add.run(t.id, t.ticket_no, 'неуспешно', 'Failed', 'Invalid number', '2031-03-12 10:00:00'); // uses none
+  add.run(9999, 42, 'към изтрита поръчка', 'Delivered', null, '2031-03-13 10:00:00');
+  add.run(t.id, t.ticket_no, 'извън периода', 'Delivered', null, '2031-05-01 10:00:00');
+
+  const r = (await agent.get('/api/reports?from=2031-03-01&to=2031-03-31').expect(200)).body.sms;
+  assert.equal(r.total, 4);
+  assert.equal(r.parts, 1 + 2 + 1);
+  assert.deepEqual(r.byState, { Delivered: 2, Sent: 1, Failed: 1 });
+  assert.equal(r.truncated, false);
+  assert.deepEqual(r.messages.map(m => m.text), ['към изтрита поръчка', 'неуспешно', 'я'.repeat(100), 'кратко']);
+  assert.equal(r.messages[0].customerName, null);
+  assert.equal(r.messages[1].error, 'Invalid number');
+  assert.equal(r.messages[3].customerName, 'Отчет Клиент');
+  assert.equal(r.messages[2].parts, 2);
+});
+
+test('the SMS list in reports is capped at the newest 200', async () => {
+  db.exec('DELETE FROM sms_messages');
+  const add = db.prepare(`INSERT INTO sms_messages (ticket_id, ticket_no, phone, text, state, sent_by, created_at)
+    VALUES (1, 1, '+359888123456', ?, 'Delivered', 'tester', '2032-01-15 10:00:00')`);
+  for (let i = 1; i <= 205; i++) add.run(`съобщение ${i}`);
+  const r = (await agent.get('/api/reports?from=2032-01-01&to=2032-01-31').expect(200)).body.sms;
+  assert.equal(r.total, 205);
+  assert.equal(r.messages.length, 200);
+  assert.equal(r.truncated, true);
+  assert.equal(r.messages[0].text, 'съобщение 205');
+  db.exec('DELETE FROM sms_messages');
+});
+
 test('SMS routes need a login', async () => {
+  await request(app).get('/api/sms/status').expect(401);
   await request(app).get('/api/sms/config').expect(401);
   await request(app).post('/api/tickets/1/sms').send({}).expect(401);
   await request(app).get('/api/tickets/1/sms').expect(401);

@@ -141,6 +141,83 @@ test('a second send within 30 seconds is refused with a clear message', async ({
   expect(await sentTo(page, intl(phone))).toHaveLength(1);
 });
 
+// ---- Phone status ----
+const setHealth = (page, health) => page.request.post(`${GATEWAY}/__health`, { data: health });
+
+test('the header shows that the phone is connected and ready, with details', async ({ page }) => {
+  const pill = page.locator('#smsPill');
+  await expect(pill).toHaveText('📱 SMS: готов');
+  await expect(pill).toHaveClass(/sms-pill-ok/);
+  await expect(pill).toHaveAttribute('title', /Батерия: 87% \(зарежда се\)/);
+  await expect(pill).toHaveAttribute('title', /Мрежа: WiFi/);
+});
+
+test('an unreachable phone shows "няма връзка" in the header and in the SMS window', async ({ page }) => {
+  await setHealth(page, { mode: 'down' });
+  try {
+    const pill = page.locator('#smsPill');
+    await pill.click(); // re-check now
+    await expect(pill).toHaveText('📱 SMS: няма връзка');
+    await expect(pill).toHaveClass(/sms-pill-bad/);
+
+    const t = await createTicketViaApi(page);
+    await page.reload();
+    await row(page, t.customer_name).locator('.ticket-no').click();
+    await page.click('#smsSendBtn');
+    await expect(page.locator('#smsPhoneStatus')).toContainText('не отговаря');
+    await expect(page.locator('#smsPhoneStatus')).toHaveClass(/sms-phone-bad/);
+    await page.click('#smsSkipBtn');
+    await page.click('#cancelBtn');
+  } finally {
+    await setHealth(page, { mode: 'ok' });
+  }
+  await page.locator('#smsPill').click();
+  await expect(page.locator('#smsPill')).toHaveText('📱 SMS: готов');
+});
+
+test('a phone reporting low battery shows a warning with the reason', async ({ page }) => {
+  await setHealth(page, {
+    status: 503,
+    body: { status: 'fail', checks: { 'battery:level': { observedValue: 7, status: 'fail' } } }
+  });
+  try {
+    const pill = page.locator('#smsPill');
+    await pill.click();
+    await expect(pill).toHaveText('📱 SMS: внимание');
+    await expect(pill).toHaveAttribute('title', /ниска батерия/);
+    await expect(pill).toHaveAttribute('title', /Батерия: 7%/);
+  } finally {
+    await setHealth(page, { mode: 'ok' });
+  }
+});
+
+test('the SMS window confirms the phone is ready before sending', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.click('#smsSendBtn');
+  await expect(page.locator('#smsPhoneStatus')).toContainText('свързан и готов');
+  await page.click('#smsSkipBtn');
+});
+
+test('Справки lists the SMS sent in the period', async ({ page }) => {
+  const phone = uniquePhone();
+  const t = await createTicketViaApi(page, { phoneContact: phone });
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.click('#smsSendBtn');
+  await page.click('#smsConfirmBtn');
+  await expect(smsWindow(page)).not.toHaveClass(/\bopen\b/);
+
+  await page.goto('/reports.html');
+  const smsRow = page.locator('#smsTable tr', { hasText: intl(phone) });
+  await expect(smsRow).toHaveCount(1);
+  await expect(smsRow).toContainText(`#${t.ticket_no}`);
+  await expect(smsRow).toContainText(t.customer_name);
+  await expect(smsRow).toContainText('alice');
+  await expect(page.locator('#smsSummary')).toContainText('SMS части от плана');
+});
+
 test('the SMS text can be changed in Настройки, with a part counter', async ({ page }) => {
   const original = await (await page.request.get('/api/settings')).json();
   try {

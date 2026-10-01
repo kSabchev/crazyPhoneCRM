@@ -735,7 +735,58 @@ async function loadSmsConfig(){
     const res = await fetch('/api/sms/config');
     smsEnabled = res.ok && (await res.json()).enabled === true;
   } catch(_) { smsEnabled = false; }
+  document.getElementById('smsPill').style.display = smsEnabled ? '' : 'none';
+  if(smsEnabled){
+    refreshPhoneStatus();
+    if(!phoneStatusTimer) phoneStatusTimer = setInterval(refreshPhoneStatus, 60 * 1000);
+  }
 }
+
+// ---------- Is the SMS phone connected? ----------
+// A pill in the header shows whether the shop phone answers and is ready,
+// re-checked every minute (click it to check now). Details on hover.
+let phoneStatusTimer = null;
+const PHONE_STATES = {
+  ready:   { cls: 'ok',      label: 'SMS: готов',           text: 'Телефонът е свързан и готов за изпращане на SMS.' },
+  warning: { cls: 'warn',    label: 'SMS: внимание',        text: 'Телефонът е свързан, но съобщава за проблем' },
+  offline: { cls: 'bad',     label: 'SMS: няма връзка',     text: 'Телефонът за SMS не отговаря — проверете дали е включен, в същата Wi-Fi мрежа и приложението е „Online“. SMS няма да бъде изпратен.' },
+  auth:    { cls: 'bad',     label: 'SMS: грешни данни',    text: 'Телефонът отказва достъп — проверете потребителското име и паролата в .env.' },
+  cloud:   { cls: 'neutral', label: 'SMS: облак',           text: 'SMS през облачната услуга — състоянието на телефона не може да се провери оттук.' }
+};
+
+function describePhoneStatus(s){
+  const info = PHONE_STATES[s.state];
+  if(!info) return null;
+  const lines = [info.text + (s.state === 'warning' && s.details.problems && s.details.problems.length ? `: ${s.details.problems.join(', ')}.` : '')];
+  const d = s.details || {};
+  if(d.battery !== null && d.battery !== undefined) lines.push(`Батерия: ${d.battery}%${d.charging ? ' (зарежда се)' : ''}`);
+  if(d.network) lines.push(`Мрежа: ${d.network}`);
+  if(d.failedLastHour !== null && d.failedLastHour !== undefined) lines.push(`Неуспешни SMS за последния час: ${d.failedLastHour}`);
+  lines.push(`Проверено: ${new Date(s.checkedAt).toLocaleTimeString('bg-BG', { hour: '2-digit', minute: '2-digit' })}`);
+  return { ...info, lines };
+}
+
+async function fetchPhoneStatus(fresh){
+  try {
+    const res = await fetch(`/api/sms/status${fresh ? '?fresh=1' : ''}`);
+    return res.ok ? await res.json() : null;
+  } catch(_) { return null; }
+}
+
+async function refreshPhoneStatus(fresh){
+  const s = await fetchPhoneStatus(fresh);
+  const pill = document.getElementById('smsPill');
+  const info = s && describePhoneStatus(s);
+  if(!info){ pill.style.display = 'none'; return; }
+  pill.style.display = '';
+  pill.className = `sms-pill sms-pill-${info.cls}`;
+  pill.dataset.state = s.state;
+  pill.textContent = `📱 ${info.label}`;
+  pill.title = info.lines.join('\n') + '\n\nЩракнете за нова проверка.';
+  return s;
+}
+
+document.getElementById('smsPill').addEventListener('click', ()=>refreshPhoneStatus(true));
 
 function offerSmsIfNowWaiting(saved, previousStatus){
   if(smsEnabled && saved && saved.status === WAITING_STATUS && previousStatus !== WAITING_STATUS){
@@ -781,8 +832,18 @@ async function openSmsPrompt(ticketId){
   }
   confirmBtn.textContent = 'Изпрати SMS';
   updateSmsCounter();
+  const phoneLine = document.getElementById('smsPhoneStatus');
+  phoneLine.textContent = 'Проверка на телефона…';
+  phoneLine.className = 'sms-phone-status';
   document.getElementById('smsOverlay').classList.add('open');
   (p.phone ? confirmBtn : document.getElementById('smsSkipBtn')).focus();
+
+  // Fresh check of the phone, so it's clear before sending whether it can work.
+  const s = await refreshPhoneStatus(true);
+  const info = s && describePhoneStatus(s);
+  if(smsTicketId !== ticketId) return; // window closed meanwhile
+  phoneLine.textContent = info ? `📱 ${info.lines[0]}` : '';
+  phoneLine.className = `sms-phone-status${info ? ' sms-phone-' + info.cls : ''}`;
 }
 
 function closeSmsPrompt(){

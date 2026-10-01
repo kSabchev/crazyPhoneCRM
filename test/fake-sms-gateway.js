@@ -4,11 +4,28 @@
 // browser-test server (e2e/server.js).
 const http = require('http');
 
+// A healthy phone, in the app's health-check format.
+function healthyBody() {
+  return {
+    status: 'pass',
+    version: '1.0-fake',
+    checks: {
+      'battery:level': { observedValue: 87, observedUnit: 'percent', status: 'pass' },
+      'battery:charging': { observedValue: 2, status: 'pass' },
+      'connection:status': { observedValue: 1, status: 'pass' },
+      'connection:transport': { observedValue: 'WiFi', status: 'pass' },
+      'messages:failed': { observedValue: 0, status: 'pass' }
+    }
+  };
+}
+
 function startFakeGateway({ user = 'sms', password = 'secret', port = 0 } = {}) {
   const gw = {
     sent: [],              // { id, text, phoneNumbers, withDeliveryReport }
     mode: 'ok',            // 'ok' | 'error' (HTTP 500)
     states: new Map(),     // id -> { state, error }
+    // What /health answers; mode 'down' drops the connection like an unreachable phone.
+    health: { mode: 'ok', status: 200, body: healthyBody() },
     url: null,
     close: null
   };
@@ -21,9 +38,23 @@ function startFakeGateway({ user = 'sms', password = 'secret', port = 0 } = {}) 
     };
     // Test-only helpers (no auth): inspect and reset what was "sent".
     if (req.url === '/__sent') return send(200, gw.sent);
-    if (req.url === '/__reset' && req.method === 'POST') { gw.sent = []; gw.states.clear(); return send(200, {}); }
+    if (req.url === '/__reset' && req.method === 'POST') {
+      gw.sent = []; gw.states.clear(); gw.health = { mode: 'ok', status: 200, body: healthyBody() };
+      return send(200, {});
+    }
+    if (req.url === '/__health' && req.method === 'POST') {
+      let raw = '';
+      req.on('data', c => { raw += c; });
+      req.on('end', () => { gw.health = { mode: 'ok', status: 200, body: healthyBody(), ...JSON.parse(raw) }; send(200, {}); });
+      return;
+    }
 
     if (req.headers.authorization !== expectedAuth) return send(401, { message: 'Unauthorized' });
+
+    if (req.method === 'GET' && req.url === '/health') {
+      if (gw.health.mode === 'down') return req.socket.destroy();
+      return send(gw.health.status, gw.health.body);
+    }
 
     const match = req.url.match(/^\/messages?\/([\w-]+)$/);
     if (req.method === 'GET' && match) {

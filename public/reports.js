@@ -85,6 +85,55 @@ function render(r){
   renderStatusTime(r.statusTime);
   renderWorkload(r.workload);
   renderDataQuality(r.dataQuality);
+  renderSms(r.sms);
+}
+
+// ---------- SMS sent to customers ----------
+const SMS_STATES = [
+  ['Delivered', 'доставени', 'ok'],
+  ['Sent', 'изпратени', 'ok'],
+  ['Pending', 'чакат телефона', 'pending'],
+  ['Processed', 'изпращат се', 'pending'],
+  ['Sending', 'изпращат се', 'pending'],
+  ['Failed', 'неуспешни', 'bad']
+];
+const SMS_STATE_LABEL = {
+  Delivered: 'доставено ✓', Sent: 'изпратено', Pending: 'чака телефона',
+  Processed: 'изпраща се', Sending: 'изпраща се', Failed: 'неуспешно'
+};
+
+// SQLite datetime('now') is UTC: "YYYY-MM-DD HH:MM:SS" -> local "dd.mm.yyyy hh:mm".
+function fmtUtcTime(s){
+  const d = new Date(s.replace(' ', 'T') + 'Z');
+  if(isNaN(d)) return s;
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
+function renderSms(s){
+  if(!s) return;
+  const counts = SMS_STATES
+    .filter(([state]) => s.byState[state])
+    .map(([state, label, cls]) => `<span class="sms-count sms-count-${cls}">${s.byState[state]} ${label}</span>`);
+  document.getElementById('smsSummary').innerHTML = s.total
+    ? `<strong>${s.total}</strong> SMS · <strong>${s.parts}</strong> SMS части от плана · ${counts.join(' ')}`
+    : '';
+  document.getElementById('smsTable').innerHTML = s.messages.length
+    ? s.messages.map(m=>`
+      <tr class="sms-row sms-row-${escapeHtml(m.state.toLowerCase())}">
+        <td class="nowrap">${escapeHtml(fmtUtcTime(m.createdAt))}</td>
+        <td class="ticket-no">#${m.ticketNo}</td>
+        <td>${m.customerName ? escapeHtml(m.customerName) : '<span class="muted">(изтрита поръчка)</span>'}</td>
+        <td class="nowrap">${escapeHtml(m.phone)}</td>
+        <td class="sms-text-cell">${escapeHtml(m.text)}</td>
+        <td class="num">${m.parts}</td>
+        <td>${escapeHtml(SMS_STATE_LABEL[m.state] || m.state)}${m.error ? `<div class="muted">${escapeHtml(m.error)}</div>` : ''}</td>
+        <td>${escapeHtml(m.sentBy)}</td>
+      </tr>`).join('')
+    : emptyRow(8, 'Няма изпратени SMS в избрания период.');
+  document.getElementById('smsTruncated').textContent = s.truncated
+    ? `Показани са последните ${s.messages.length} от ${s.total} SMS. Изберете по-кратък период, за да видите всички.`
+    : '';
 }
 
 // ---------- KPI tiles ----------

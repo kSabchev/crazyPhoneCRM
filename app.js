@@ -635,9 +635,19 @@ function daysBetweenDates(from, to) {
 const MAX_SMS_LENGTH = 600;
 const RESEND_GUARD_SECONDS = 30;
 
+// Express 4 doesn't catch errors in async routes, and an unhandled rejection
+// would stop the server (see server.js) — pass them to the error handler.
+const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
+
 app.get('/api/sms/config', requireAuth, (req, res) => {
   res.json({ enabled: sms.isConfigured() });
 });
+
+// Whether the shop phone is reachable and ready (see sms.getPhoneStatus).
+// ?fresh=1 skips the 30-second cache, e.g. when opening the send window.
+app.get('/api/sms/status', requireAuth, asyncRoute(async (req, res) => {
+  res.json(await sms.getPhoneStatus({ fresh: req.query.fresh === '1' }));
+}));
 
 function smsForTicket(ticketId) {
   return db.prepare('SELECT * FROM sms_messages WHERE ticket_id = ? ORDER BY id DESC').all(ticketId);
@@ -662,10 +672,6 @@ app.get('/api/tickets/:id/sms/preview', requireAuth, (req, res) => {
     text: sms.renderTemplate(settings.smsTemplate, ticket, settings.shopName)
   });
 });
-
-// Express 4 doesn't catch errors in async routes, and an unhandled rejection
-// would stop the server (see server.js) — pass them to the error handler.
-const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 app.post('/api/tickets/:id/sms', requireAuth, asyncRoute(async (req, res) => {
   if (!sms.isConfigured()) return res.status(503).json({ error: 'SMS известията не са настроени' });
@@ -699,6 +705,7 @@ app.post('/api/tickets/:id/sms', requireAuth, asyncRoute(async (req, res) => {
       .run(state, gatewayId, lastInsertRowid);
   } catch (err) {
     failure = err.message;
+    sms.resetPhoneStatusCache(); // so the phone indicator re-checks now
     db.prepare(`UPDATE sms_messages SET state = 'Failed', error = ?, updated_at = datetime('now') WHERE id = ?`)
       .run(failure, lastInsertRowid);
   }

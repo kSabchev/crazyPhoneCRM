@@ -100,11 +100,84 @@ async function getSmsState(gatewayId) {
   };
 }
 
+// ---- Is the phone reachable and ready? ----
+// Local server mode: the app's /health endpoint reports an overall status
+// (pass / warn / fail) plus checks such as battery level, charging, network
+// and failed messages. In cloud mode the phone can't be asked directly, so
+// the state is reported as "cloud" rather than guessed.
+const HEALTH_TIMEOUT_MS = 5000;
+const STATUS_CACHE_MS = 30 * 1000;
+let cachedStatus = null; // { at, value }
+
+function checkValue(checks, key) {
+  const c = checks && checks[key];
+  if (!c) return null;
+  return c.observedValue !== undefined ? c.observedValue : null;
+}
+
+function checkFailing(checks, key) {
+  const c = checks && checks[key];
+  return c && (c.status === 'warn' || c.status === 'fail');
+}
+
+// Returns { state, details, checkedAt } where state is one of:
+//   off      SMS not configured
+//   cloud    cloud mode: phone status not available here
+//   ready    phone answered and reports no problems
+//   warning  phone answered but reports a problem (e.g. low battery)
+//   offline  phone didn't answer (off, not on the Wi-Fi, app stopped)
+//   auth     phone answered but rejected the username/password
+async function getPhoneStatus({ fresh = false } = {}) {
+  const cfg = gatewayConfig();
+  if (!cfg) return { state: 'off', details: {}, checkedAt: new Date().toISOString() };
+  if (cfg.path === '/messages') return { state: 'cloud', details: {}, checkedAt: new Date().toISOString() };
+  if (!fresh && cachedStatus && Date.now() - cachedStatus.at < STATUS_CACHE_MS) return cachedStatus.value;
+
+  let value;
+  try {
+    const res = await fetch(`${cfg.url}/health`, {
+      headers: { Authorization: authHeader(cfg) },
+      signal: AbortSignal.timeout(HEALTH_TIMEOUT_MS)
+    });
+    if (res.status === 401) {
+      value = { state: 'auth', details: {} };
+    } else {
+      // The app answers 503 (with a body) when a check fails; still useful.
+      const body = await res.json().catch(() => ({}));
+      const checks = body.checks || {};
+      const problems = [];
+      if (checkFailing(checks, 'battery:level')) problems.push('ниска батерия');
+      if (checkFailing(checks, 'connection:status')) problems.push('няма интернет връзка');
+      if (checkFailing(checks, 'messages:failed')) problems.push('неуспешни SMS през последния час');
+      const healthy = body.status === 'pass' || (!body.status && res.ok);
+      value = {
+        state: healthy && problems.length === 0 ? 'ready' : 'warning',
+        details: {
+          battery: checkValue(checks, 'battery:level'),
+          charging: checkValue(checks, 'battery:charging'),
+          network: checkValue(checks, 'connection:transport'),
+          failedLastHour: checkValue(checks, 'messages:failed'),
+          version: body.version || null,
+          problems: problems.length ? problems : (healthy ? [] : ['телефонът съобщава за проблем'])
+        }
+      };
+    }
+  } catch (_) {
+    value = { state: 'offline', details: {} };
+  }
+  value.checkedAt = new Date().toISOString();
+  cachedStatus = { at: Date.now(), value };
+  return value;
+}
+
+const resetPhoneStatusCache = () => { cachedStatus = null; };
+
 // Final states: no point asking the phone again.
 const FINAL_STATES = ['Sent', 'Delivered', 'Failed'];
 // 'Sent' can still become 'Delivered', so keep asking for a while.
 const POLL_STATES = ['Pending', 'Processed', 'Sent'];
 
 module.exports = {
-  isConfigured, toInternationalBg, renderTemplate, smsParts, sendSms, getSmsState, FINAL_STATES, POLL_STATES
+  isConfigured, toInternationalBg, renderTemplate, smsParts, sendSms, getSmsState, FINAL_STATES, POLL_STATES,
+  getPhoneStatus, resetPhoneStatusCache
 };
