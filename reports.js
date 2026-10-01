@@ -9,6 +9,8 @@
 // - A ticket is "open" until it reaches a closed status: handed back
 //   (издаден), refused (отказан) or never collected (забравен).
 
+const { smsParts } = require('./sms');
+
 const COMPLETED_STATUS = 'издаден';
 const CLOSED_STATUSES = [COMPLETED_STATUS, 'отказан', 'забравен'];
 const DAY_MS = 24 * 60 * 60 * 1000;
@@ -194,6 +196,44 @@ function dataQualityReport(all, returned) {
   };
 }
 
+// SMS sent to customers in the period (by the shop's local date): counts by
+// state, SMS parts used (to compare with the phone plan's limit), and the
+// newest messages.
+const SMS_LIST_LIMIT = 200;
+function smsReport(db, from, to) {
+  const rows = db.prepare(`
+    SELECT m.*, t.customer_name FROM sms_messages m
+    LEFT JOIN tickets t ON t.id = m.ticket_id
+    WHERE date(m.created_at, 'localtime') BETWEEN ? AND ?
+    ORDER BY m.id DESC`).all(from, to);
+  const byState = {};
+  let parts = 0;
+  for (const m of rows) {
+    byState[m.state] = (byState[m.state] || 0) + 1;
+    // Failed sends never reached the network, so they used no SMS.
+    if (m.state !== 'Failed') parts += smsParts(m.text);
+  }
+  return {
+    total: rows.length,
+    parts,
+    byState,
+    truncated: rows.length > SMS_LIST_LIMIT,
+    messages: rows.slice(0, SMS_LIST_LIMIT).map(m => ({
+      id: m.id,
+      createdAt: m.created_at,
+      ticketId: m.ticket_id,
+      ticketNo: m.ticket_no,
+      customerName: m.customer_name, // null if the order was deleted since
+      phone: m.phone,
+      text: m.text,
+      parts: smsParts(m.text),
+      state: m.state,
+      error: m.error,
+      sentBy: m.sent_by
+    }))
+  };
+}
+
 // from/to are inclusive YYYY-MM-DD dates; today is injectable for tests.
 function buildReport(db, { from, to, today }) {
   const all = db.prepare('SELECT * FROM tickets ORDER BY ticket_no').all();
@@ -206,7 +246,8 @@ function buildReport(db, { from, to, today }) {
     turnaround: turnaroundReport(returned),
     statusTime: statusTimeReport(db, from, to),
     workload: workloadReport(open, today),
-    dataQuality: dataQualityReport(all, returned)
+    dataQuality: dataQualityReport(all, returned),
+    sms: smsReport(db, from, to)
   };
 }
 

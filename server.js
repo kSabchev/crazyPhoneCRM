@@ -41,3 +41,9 @@ function runMaintenance() {
 }
 runMaintenance();
 setInterval(runMaintenance, 60 * 60 * 1000).unref();
+
+// Every minute: ask the SMS phone how recently sent messages are doing.
+setInterval(() => {
+  app.pollSmsStates().catch(err =>
+    console.error(`[${new Date().toISOString()}] SMS status check failed:`, err));
+}, 60 * 1000).unref();

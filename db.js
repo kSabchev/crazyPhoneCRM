@@ -62,6 +62,23 @@ db.exec(`
   -- Single-row table holding the shop's configurable settings as JSON:
   -- statuses, which table columns are shown, the two print templates,
   -- and the base phone-model suggestion list.
+  -- SMS notifications sent to customers through the shop phone (sms.js),
+  -- with the state reported back by the phone.
+  CREATE TABLE IF NOT EXISTS sms_messages (
+    id INTEGER PRIMARY KEY AUTOINCREMENT,
+    ticket_id INTEGER NOT NULL,
+    ticket_no INTEGER NOT NULL,
+    phone TEXT NOT NULL,
+    text TEXT NOT NULL,
+    state TEXT NOT NULL,           -- Sending | Pending | Processed | Sent | Delivered | Failed
+    gateway_id TEXT,
+    error TEXT,
+    sent_by TEXT NOT NULL,
+    created_at TEXT NOT NULL DEFAULT (datetime('now')),
+    updated_at TEXT NOT NULL DEFAULT (datetime('now'))
+  );
+  CREATE INDEX IF NOT EXISTS idx_sms_ticket ON sms_messages (ticket_id);
+
   CREATE TABLE IF NOT EXISTS settings (
     id INTEGER PRIMARY KEY CHECK (id = 1),
     data TEXT NOT NULL,

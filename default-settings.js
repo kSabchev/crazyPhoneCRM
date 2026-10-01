@@ -15,6 +15,9 @@ const DEFAULT_SETTINGS = {
     'забравен': '#9A3412'
   },
   columns: ['customer', 'callBtn', 'model', 'issue', 'password', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
+  // SMS sent when an order is moved to "чака клиент" (after confirming).
+  // Placeholders: {номер} {клиент} {модел} {магазин}.
+  smsTemplate: 'Здравейте! Телефонът Ви по поръчка №{номер} е готов. {магазин}',
   printCustomer: {
     header: 'СЕРВИЗНА КАРТА',
     footer: 'МАГАЗИНЪТ И СЕРВИЗЪТ НЕ НОСЯТ ОТГОВОРНОСТ ЗА:\nИЗГУБЕНА ПРИ РЕМОНТА ИНФОРМАЦИЯ ОТ МОБИЛНИТЕ АПАРАТИ\nАПАРАТИ НЕПОТЪРСЕНИ ДО 1 МЕСЕЦ ОТ ДАТАТА НА ПРИЕМАНЕ'

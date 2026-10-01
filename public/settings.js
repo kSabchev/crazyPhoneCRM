@@ -40,6 +40,25 @@ async function init(){
   renderAll();
 }
 
+// ---------- SMS text ----------
+// Counter for the SMS template, with sample values in place of the
+// placeholders (Cyrillic: 70 characters per SMS, 67 per part when longer).
+function updateSmsTemplateCounter(){
+  const sample = document.getElementById('smsTemplateInput').value.trim()
+    .replace(/\{номер\}/g, '1234')
+    .replace(/\{клиент\}/g, 'Иван Петров')
+    .replace(/\{модел\}/g, 'Samsung Galaxy S24')
+    .replace(/\{магазин\}/g, document.getElementById('shopNameInput').value.trim() || settings.shopName);
+  const len = [...sample].length;
+  const latin = /^[\x20-\x7E\r\n]*$/.test(sample);
+  const [single, multi] = latin ? [160, 153] : [70, 67];
+  const parts = len === 0 ? 0 : (len <= single ? 1 : Math.ceil(len / multi));
+  const counter = document.getElementById('smsTemplateCounter');
+  counter.textContent = `≈ ${len} знака · ${parts} SMS (с примерни данни)`;
+  counter.classList.toggle('multi', parts > 1);
+}
+document.getElementById('smsTemplateInput').addEventListener('input', updateSmsTemplateCounter);
+
 // ---------- Unsaved changes ----------
 // The settings as they'd be saved right now: the edited lists plus the text
 // fields, which are only copied into `settings` when saving.
@@ -51,7 +70,8 @@ function currentDraft(){
     printCustomer: {
       header: document.getElementById('custHeader').value,
       footer: document.getElementById('custFooter').value
-    }
+    },
+    smsTemplate: document.getElementById('smsTemplateInput').value.trim() || settings.smsTemplate
   };
 }
 
@@ -104,6 +124,8 @@ function renderAll(){
   renderColumnGrid();
   document.getElementById('custHeader').value = settings.printCustomer.header;
   document.getElementById('custFooter').value = settings.printCustomer.footer;
+  document.getElementById('smsTemplateInput').value = settings.smsTemplate || '';
+  updateSmsTemplateCounter();
   renderDeviceList();
   document.getElementById('saveStatus').textContent = '';
 }
@@ -244,6 +266,7 @@ document.getElementById('saveBtn').addEventListener('click', async ()=>{
   settings.shopTagline = document.getElementById('shopTaglineInput').value.trim();
   settings.printCustomer.header = document.getElementById('custHeader').value;
   settings.printCustomer.footer = document.getElementById('custFooter').value;
+  settings.smsTemplate = document.getElementById('smsTemplateInput').value.trim() || settings.smsTemplate;
 
   const statusEl = document.getElementById('saveStatus');
   statusEl.textContent = 'Запазване…';
