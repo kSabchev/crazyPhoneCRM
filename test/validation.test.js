@@ -103,3 +103,20 @@ test('a full edit exactly as the ticket form sends it is accepted', async () => 
     pravim: 'tick'
   }).expect(200);
 });
+
+test('prices accept a decimal comma or point, and spaces around them', async () => {
+  const res = await agent.post('/api/tickets')
+    .send(validTicket({ servicePrice: '25,50', customerPrice: ' 80.5 ' }))
+    .expect(201);
+  assert.equal(res.body.service_price, 25.5);
+  assert.equal(res.body.customer_price, 80.5);
+
+  const edited = await agent.put(`/api/tickets/${res.body.id}`).send({ customerPrice: '99,9' }).expect(200);
+  assert.equal(edited.body.customer_price, 99.9);
+});
+
+test('prices with thousands separators, signs or extra text are rejected', async () => {
+  for (const bad of ['1.234,50', '1 234', '+5', '12,5,0', '25 лв', '0x10']) {
+    await expectRejected({ customerPrice: bad }, /Продажна цена: невалидна сума/);
+  }
+});

@@ -395,6 +395,18 @@ const TICKET_PRICE_FIELDS = [
   ['customerPrice', 'Продажна цена']
 ];
 
+// A price as sent by the forms: a number, or text with a decimal comma or
+// point ("25,50" / "25.50"). Empty means no price (null); anything else
+// gives NaN, which validation rejects.
+function toPrice(v) {
+  if (v === undefined || v === null) return null;
+  if (typeof v === 'number') return v;
+  if (typeof v !== 'string') return NaN;
+  const s = v.trim();
+  if (s === '') return null;
+  return /^\d+(?:[.,]\d+)?$/.test(s) ? Number(s.replace(',', '.')) : NaN;
+}
+
 function isValidDate(v) {
   if (!/^\d{4}-\d{2}-\d{2}$/.test(v)) return false;
   const d = new Date(v + 'T00:00:00Z');
@@ -431,7 +443,7 @@ function validateTicketInput(t, { partial }) {
   for (const [key, label] of TICKET_PRICE_FIELDS) {
     const v = t[key];
     if (v === undefined || v === null || v === '') continue;
-    const n = typeof v === 'number' || typeof v === 'string' ? Number(v) : NaN;
+    const n = toPrice(v);
     if (!Number.isFinite(n) || n < 0) return `${label}: невалидна сума`;
   }
   if (t.loanerPhone !== undefined && t.loanerPhone !== null) {
@@ -471,8 +483,8 @@ app.post('/api/tickets', requireAuth, (req, res) => {
       normalizePassword(t.phonePassword),
       normalizePravim(t.pravim, 'circle'),
       t.kaparo && String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не',
-      t.servicePrice === '' || t.servicePrice == null ? null : Number(t.servicePrice),
-      t.customerPrice === '' || t.customerPrice == null ? null : Number(t.customerPrice)
+      toPrice(t.servicePrice),
+      toPrice(t.customerPrice)
     );
 
   const created = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
@@ -524,8 +536,8 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
     kaparo: t.kaparo !== undefined
       ? (String(t.kaparo ?? '').trim() || 'Не')
       : existing.kaparo,
-    service_price: t.servicePrice === '' || t.servicePrice == null ? null : Number(t.servicePrice),
-    customer_price: t.customerPrice === '' || t.customerPrice == null ? null : Number(t.customerPrice)
+    service_price: toPrice(t.servicePrice),
+    customer_price: toPrice(t.customerPrice)
   };
   if (t.servicePrice === undefined) next.service_price = existing.service_price;
   if (t.customerPrice === undefined) next.customer_price = existing.customer_price;

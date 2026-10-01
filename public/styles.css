@@ -76,9 +76,12 @@ header{
 .brand .tag{font-size:13px;color:var(--ink-soft);border-left:1px solid var(--line);padding-left:12px;}
 .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
 .stats{display:flex;gap:22px;flex-wrap:wrap;justify-content:flex-end;}
-.stat{text-align:right;}
-.stat .num{font-size:22px;font-weight:600;line-height:1;font-family:Georgia,serif;}
-.stat .lbl{font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
+.stat{text-align:right;background:none;border:none;border-bottom:2px solid transparent;padding:2px 4px 4px;margin:0;font:inherit;color:inherit;cursor:pointer;border-radius:3px 3px 0 0;}
+.stat:hover{background:rgba(0,0,0,0.04);}
+.stat:focus-visible{outline:2px solid var(--copper);outline-offset:1px;}
+.stat.active{border-bottom-color:var(--ink);background:var(--panel);}
+.stat .num{display:block;font-size:22px;font-weight:600;line-height:1;font-family:Georgia,serif;}
+.stat .lbl{display:block;font-size:11.5px;color:var(--ink-soft);margin-top:3px;}
 .who{font-size:13px;color:var(--ink-soft);display:flex;gap:10px;align-items:center;}
 .link-btn{background:none;border:none;color:var(--copper);cursor:pointer;font-size:13px;padding:0;text-decoration:underline;}
 
@@ -490,3 +493,6 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
 .report-table .muted, .muted{color:var(--ink-soft);font-size:12px;}
 .report-table .sms-row-failed td{background:var(--phone-warning-bg);}
 .sms-truncated{margin:8px 0 0;}
+
+/* Price fields: even-width digits, like the table. */
+.field input.price-input{font-variant-numeric:tabular-nums;}
