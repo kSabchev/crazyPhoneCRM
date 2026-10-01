@@ -1,5 +1,7 @@
 # Repair Log
 
+See demo on https://crazyphone-demo.onrender.com/
+
 A self-hosted repair-ticket register for a phone repair shop: register phones
 brought in for repair, search and filter tickets, edit them, and print a
 customer copy or a service copy of any ticket. Login-protected.
@@ -8,7 +10,7 @@ customer copy or a service copy of any ticket. Login-protected.
 This README and the code comments stay in English, for whoever
 administers/develops the app rather than for shop staff. The
 `create-admin.js` CLI and `backup.sh` script also stay in English for the
-same reason — say the word if you'd like those translated too.
+same reason.
 
 **If you already have a `data/repair-log.db` from testing an earlier
 version:** the new Bulgarian default statuses only apply to a *fresh*
