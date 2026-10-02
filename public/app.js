@@ -1123,23 +1123,7 @@ function buildCustomerPrintDoc(t){
   `;
 }
 
-// The service copy is a tiny fixed label meant to be printed on a small
-// barcode/label printer and stuck directly onto the phone: just enough to
-// identify which order it belongs to and what needs to be fixed.
-function buildServiceLabelDoc(t){
-  return `
-    <div class="label-header">
-      <div class="label-shop">${escapeHtml(settings.shopName)}</div>
-      <div class="label-order">№ ${t.ticket_no}</div>
-      ${t.phone_password ? `<div class="label-password">Парола: ${escapeHtml(t.phone_password)}</div>` : ''}
-    </div>
-    <div class="label-issue-area">
-      <div class="label-issue">${escapeHtml(t.description)}</div>
-    </div>
-  `;
-}
-
-// Both prints are generated as real, exactly-sized PDFs rather than relying
+// The customer copy is generated as a real, exactly-sized PDF rather than relying
 // on the browser's print dialog and CSS @page (which different printers and
 // drivers honor inconsistently, especially at small physical sizes).
 // html2canvas rasterizes our existing HTML/CSS exactly as the browser
@@ -1148,7 +1132,6 @@ function buildServiceLabelDoc(t){
 // dimensions, so the physical output size is guaranteed regardless of the
 // printer or OS print settings.
 const CUSTOMER_CARD_MM = { width: 100, height: 95 };
-const SERVICE_LABEL_MM = { width: 50, height: 30 };
 const CAPTURE_SCALE = 4; // renders at 4x resolution for crisp small-format print output
 
 async function renderElementToPdf(el, sizeMm){
@@ -1174,7 +1157,6 @@ async function renderElementToPdf(el, sizeMm){
 async function printCopy(kind){
   if(!editingTicket || !settings) return;
   const custEl = document.getElementById('printCustomerTemplate');
-  const svcEl = document.getElementById('printServiceTemplate');
 
   if(kind === 'customer'){
     custEl.innerHTML = buildCustomerPrintDoc(editingTicket);
@@ -1184,8 +1166,15 @@ async function printCopy(kind){
     }
     await renderElementToPdf(custEl, CUSTOMER_CARD_MM);
   } else {
-    svcEl.innerHTML = buildServiceLabelDoc(editingTicket);
-    await renderElementToPdf(svcEl, SERVICE_LABEL_MM);
+    // The service label goes to the Brother QL-600 label printer as a
+    // P-touch Editor file (built by the server from the shop's template):
+    // it downloads, and opening it in P-touch Editor prints it.
+    const a = document.createElement('a');
+    a.href = `/api/tickets/${editingTicket.id}/service-label.lbx`;
+    a.download = `poruchka-${editingTicket.ticket_no}.lbx`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
   }
 }
 
