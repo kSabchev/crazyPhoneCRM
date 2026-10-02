@@ -55,8 +55,10 @@ test('the service label is the template filled with the ticket', async () => {
 
 test('without an unlock code the password text box is left out', async () => {
   const t = (await agent.post('/api/tickets').send(validTicket()).expect(201)).body;
+  const withCode = (await agent.post('/api/tickets').send(validTicket({ phonePassword: '1234' })).expect(201)).body;
   const { xml } = await fetchLabel(t.id);
-  assert.equal(xml.match(/<text:text>/g).length, 3);
+  const textBoxes = (await fetchLabel(withCode.id)).xml.match(/<text:text>/g).length;
+  assert.equal(xml.match(/<text:text>/g).length, textBoxes - 1);
   assert.doesNotMatch(xml, /Парола|pasword/i);
   assertRunLengthsMatch(xml);
 });

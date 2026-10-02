@@ -15,7 +15,7 @@ test('default settings are seeded on first run', async () => {
   assert.equal(s.shopName, 'CrazyPhone');
   assert.deepEqual(s.statuses, ['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен']);
   assert.ok(s.columns.includes('callBtn'));
-  assert.ok(s.printCustomer.header);
+  assert.match(s.printCustomer.footer, /3 МЕСЕЦА ГАРАНЦИЯ/);
   assert.ok(s.devices.length > 0);
 });
 
@@ -46,11 +46,25 @@ test('fields not sent are left unchanged', async () => {
   assert.deepEqual(after.statuses, before.statuses);
 });
 
-test('only header and footer of the customer print template are editable', async () => {
+test('only the footer of the customer print template is editable', async () => {
   const s = (await agent.put('/api/settings')
     .send({ printCustomer: { header: 'КАРТА', footer: 'текст', extra: 'x' } })
     .expect(200)).body;
-  assert.deepEqual(s.printCustomer, { header: 'КАРТА', footer: 'текст' });
+  assert.deepEqual(s.printCustomer, { footer: 'текст' });
+});
+
+test('the shop phone comes from SHOP_PHONE and is never saved', async () => {
+  process.env.SHOP_PHONE = ' 0888 123 456 ';
+  try {
+    const s = (await agent.get('/api/settings')).body;
+    assert.equal(s.shopPhone, '0888 123 456');
+    // Sending it back (the settings page saves the whole object) doesn't store it.
+    await agent.put('/api/settings').send({ ...s, shopPhone: 'hacked' }).expect(200);
+    delete process.env.SHOP_PHONE;
+    assert.equal((await agent.get('/api/settings')).body.shopPhone, '');
+  } finally {
+    delete process.env.SHOP_PHONE;
+  }
 });
 
 test('an empty shop name or empty status list is rejected', async () => {

@@ -135,6 +135,7 @@ tbody tr:hover{background:#FBF7EF;}
 .cust-phone{color:var(--ink-soft);font-size:12.5px;margin-top:2px;}
 .desc-cell{max-width:150px;color:var(--ink-soft);font-size:12.5px;white-space:normal;word-break:break-word;}
 .price{font-variant-numeric:tabular-nums;white-space:nowrap;}
+.kaparo-paid{background:#DCFCE7;color:#14532D;font-weight:600;}
 .badge{display:inline-block;padding:4px 11px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;}
 .status-cell{cursor:pointer;}
 .quick-edit-cell{cursor:text;}
@@ -301,7 +302,6 @@ tbody tr:hover{background:#FBF7EF;}
   font-size:2.3mm;line-height:1.35;color:#333;text-align:center;
 }
 .card-warning strong{display:block;margin-bottom:0.7mm;font-size:2.5mm;}
-.card-sign{margin-top:3mm;font-size:2.7mm;color:#333;}
 
 /* ---- Settings page ---- */
 .settings-section{

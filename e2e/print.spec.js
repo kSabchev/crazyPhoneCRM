@@ -47,7 +47,9 @@ test('the customer copy is a 100 × 95 mm landscape card', async ({ page }) => {
   const card = page.locator('#printCustomerTemplate');
   await expect(card).toContainText(t.customer_name);
   await expect(card).toContainText(`№ ${t.ticket_no}`);
-  await expect(card).toContainText('СЕРВИЗНА КАРТА');
+  await expect(card).not.toContainText('СЕРВИЗНА КАРТА');
+  await expect(card).not.toContainText('Подпис на клиента');
+  await expect(card).toContainText('ИМАТЕ 3 МЕСЕЦА ГАРАНЦИЯ НА ПРОДУКТА СЛЕД РЕМОНТ');
   await expect(card).toContainText('Счупен дисплей и заден капак');
   await expect(card).toContainText('01.09.2026');
 });
