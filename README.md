@@ -38,7 +38,8 @@ npm install
 cp .env.example .env
 ```
 
-Open `.env` and set `SESSION_SECRET` to a long random string. You can
+Open `.env` and set `SESSION_SECRET` to a long random string, and
+`SHOP_PHONE` to the shop's phone number (printed on the customer card). You can
 generate one with:
 
 ```bash
@@ -460,8 +461,9 @@ Click **Settings** in the header to configure:
   the status options every ticket uses. There must always be at least one.
 - **Table columns** — choose which columns appear in the main ticket table.
   Ticket # always shows, for reference.
-- **Customer print copy** — the document title, which fields appear on it,
-  and a footer note (e.g. a return policy or thank-you line).
+- **Customer print copy** — the footer warning text (liability, the
+  1-month pickup limit, the 3-month warranty). The fields on the card are
+  fixed; the shop phone at the top comes from `SHOP_PHONE` in `.env`.
 - **Service print copy** — same, for the job sheet the repair technician
   gets. Keep customer price off this one if you don't want the technician
   seeing what the customer is charged.

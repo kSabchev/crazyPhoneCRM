@@ -68,7 +68,6 @@ function currentDraft(){
     shopName: document.getElementById('shopNameInput').value.trim() || settings.shopName,
     shopTagline: document.getElementById('shopTaglineInput').value.trim(),
     printCustomer: {
-      header: document.getElementById('custHeader').value,
       footer: document.getElementById('custFooter').value
     },
     smsTemplate: document.getElementById('smsTemplateInput').value.trim() || settings.smsTemplate
@@ -122,7 +121,6 @@ function renderAll(){
   document.getElementById('shopTaglineInput').value = settings.shopTagline || '';
   renderStatusList();
   renderColumnGrid();
-  document.getElementById('custHeader').value = settings.printCustomer.header;
   document.getElementById('custFooter').value = settings.printCustomer.footer;
   document.getElementById('smsTemplateInput').value = settings.smsTemplate || '';
   updateSmsTemplateCounter();
@@ -264,7 +262,6 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
 document.getElementById('saveBtn').addEventListener('click', async ()=>{
   settings.shopName = document.getElementById('shopNameInput').value.trim() || settings.shopName;
   settings.shopTagline = document.getElementById('shopTaglineInput').value.trim();
-  settings.printCustomer.header = document.getElementById('custHeader').value;
   settings.printCustomer.footer = document.getElementById('custFooter').value;
   settings.smsTemplate = document.getElementById('smsTemplateInput').value.trim() || settings.smsTemplate;
 

@@ -223,6 +223,14 @@ function fmtKaparo(v){
   return m ? EUR.format(Number(m[1].replace(',', '.'))) : s;
 }
 
+// True when the deposit equals the selling price — the customer has
+// already paid in full, so the table shows Капаро on a green background.
+function kaparoCoversPrice(t){
+  if(t.customer_price === null || t.customer_price === undefined || t.customer_price === '') return false;
+  const m = String(t.kaparo ?? '').trim().match(/^(\d+(?:[.,]\d+)?)\s*(€|eur|евро)?$/i);
+  return !!m && Math.abs(Number(m[1].replace(',', '.')) - Number(t.customer_price)) < 0.005;
+}
+
 // A value in the change history, formatted the way the table shows it.
 function fmtHistoryValue(field, v){
   if(field === 'pravim') return PRAVIM_SYMBOLS[v] || '—';
@@ -354,7 +362,7 @@ function render(){
             ? statusSelectHtml(t)
             : `<span class="badge" style="color:${fg};background:${bg};" title="Щракнете за смяна на статуса">${escapeHtml(t.status)}</span>`
         }</td>
-        <td class="price"${dv('kaparo')}>${escapeHtml(fmtKaparo(t.kaparo))}</td>
+        <td class="price${kaparoCoversPrice(t) ? ' kaparo-paid' : ''}"${dv('kaparo')}>${escapeHtml(fmtKaparo(t.kaparo))}</td>
         <td class="price quick-edit-cell service-price-cell"${dv('servicePrice')} onclick="openQuickEdit(event, ${t.id}, 'servicePrice')" title="Щракнете, за да промените изкупната цена">${fmtPrice(t.service_price)}</td>
         <td class="price quick-edit-cell customer-price-cell"${dv('customerPrice')} onclick="openQuickEdit(event, ${t.id}, 'customerPrice')" title="Щракнете, за да промените продажната цена">${fmtPrice(t.customer_price)}</td>
         <td${dv('dateIn')}>${fmtDate(t.date_received)}</td>
@@ -1089,6 +1097,7 @@ function buildCustomerPrintDoc(t){
   const bottomRows = [
     ['Оборотен телефон', escapeHtml(t.loaner_phone)],
     ['Капаро', escapeHtml(fmtKaparo(t.kaparo))],
+    ['Цена', fmtPrice(t.customer_price)],
     ['Дата на приемане', fmtDate(t.date_received)]
   ].map(([label, value]) => `
     <div class="card-row">
@@ -1113,13 +1122,12 @@ function buildCustomerPrintDoc(t){
         ${tagline}
       </div>
       <div class="card-order-no">
-        <div class="card-doc-title">${escapeHtml(settings.printCustomer.header)}</div>
+        ${settings.shopPhone ? `<div class="card-doc-title">тел. ${escapeHtml(settings.shopPhone)}</div>` : ''}
         <div>№ ${t.ticket_no}</div>
       </div>
     </div>
     <div class="card-body">${topRows}${descriptionRow}${bottomRows}</div>
     ${warning}
-    <div class="card-sign">Подпис на клиента: ____________________</div>
   `;
 }
 

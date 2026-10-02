@@ -216,11 +216,28 @@ function getSettings() {
   const saved = JSON.parse(row.data);
   // Shops set up before SMS existed get the default text.
   if (typeof saved.smsTemplate !== 'string') saved.smsTemplate = require('./default-settings').smsTemplate;
+  // The customer card's title was replaced by the shop phone (SHOP_PHONE),
+  // and the default warning gained the warranty line — upgrade shops that
+  // never edited the old default text.
+  if (saved.printCustomer) {
+    delete saved.printCustomer.header;
+    if (saved.printCustomer.footer === OLD_DEFAULT_FOOTER) {
+      saved.printCustomer.footer = require('./default-settings').printCustomer.footer;
+    }
+  }
   return withStatusColors(saved);
 }
 
+const OLD_DEFAULT_FOOTER = 'МАГАЗИНЪТ И СЕРВИЗЪТ НЕ НОСЯТ ОТГОВОРНОСТ ЗА:\nИЗГУБЕНА ПРИ РЕМОНТА ИНФОРМАЦИЯ ОТ МОБИЛНИТЕ АПАРАТИ\nАПАРАТИ НЕПОТЪРСЕНИ ДО 1 МЕСЕЦ ОТ ДАТАТА НА ПРИЕМАНЕ';
+
+// The shop's phone number for the customer print comes from the environment
+// (SHOP_PHONE), not the database, so it's added to responses but never saved.
+function withShopPhone(settings) {
+  return { ...settings, shopPhone: (process.env.SHOP_PHONE || '').trim() };
+}
+
 app.get('/api/settings', requireAuth, (req, res) => {
-  res.json(getSettings());
+  res.json(withShopPhone(getSettings()));
 });
 
 app.put('/api/settings', requireAuth, (req, res) => {
@@ -284,11 +301,10 @@ app.put('/api/settings', requireAuth, (req, res) => {
   }
 
   // The customer copy's layout is fixed (matches the shop's paper service
-  // card) — only its header title and footer warning text are editable.
+  // card) — only its footer warning text is editable.
   if (body.printCustomer !== undefined) {
     const incoming = body.printCustomer || {};
     next.printCustomer = {
-      header: typeof incoming.header === 'string' ? incoming.header : current.printCustomer.header,
       footer: typeof incoming.footer === 'string' ? incoming.footer : current.printCustomer.footer
     };
   }
@@ -300,7 +316,7 @@ app.put('/api/settings', requireAuth, (req, res) => {
     .run(JSON.stringify(next));
 
   broadcastChange('settings');
-  res.json(next);
+  res.json(withShopPhone(next));
 });
 
 // Merges the admin-curated device list with phone models actually used on

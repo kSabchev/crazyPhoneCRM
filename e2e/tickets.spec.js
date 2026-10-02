@@ -706,9 +706,21 @@ test('money is shown as "25,00 €" in the table, history and customer print', a
   await page.click('#historyToggle');
   await expect(page.locator('#historyList')).toContainText(/Продажна цена: 1234,50\s€ → 99,90\s€/);
 
-  // The printed customer card shows the deposit as money too.
+  // The printed customer card shows the deposit and the price as money too.
   await page.click('#printCustomerBtn');
   await expect(page.locator('#printCustomerTemplate')).toContainText(/Капаро:\s*20,00\s€/);
+  await expect(page.locator('#printCustomerTemplate')).toContainText(/Цена:\s*99,90\s€/);
+});
+
+test('Капаро is green in the table when it equals the selling price', async ({ page }) => {
+  const paid = await createTicketViaApi(page, { customerPrice: '25.5', kaparo: '25,50' });
+  const partial = await createTicketViaApi(page, { customerPrice: '25.5', kaparo: '10' });
+  const noPrice = await createTicketViaApi(page, { kaparo: '10' });
+  await page.reload();
+
+  await expect(row(page, paid.customer_name).locator('td.kaparo-paid')).toHaveText(/^25,50\s€$/);
+  await expect(row(page, partial.customer_name).locator('td.kaparo-paid')).toHaveCount(0);
+  await expect(row(page, noPrice.customer_name).locator('td.kaparo-paid')).toHaveCount(0);
 });
 
 test('prices can be typed with a decimal comma, in the quick editor and the order form', async ({ page }) => {
