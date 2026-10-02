@@ -52,52 +52,37 @@ test('the customer copy is a 100 × 95 mm landscape card', async ({ page }) => {
   await expect(card).toContainText('01.09.2026');
 });
 
-test('the service label is a 50 × 30 mm sticker', async ({ page }) => {
+// The service label is a P-touch Editor (.lbx) file for the Brother
+// QL-600, downloaded rather than opened as a PDF.
+async function downloadServiceLabel(page, button) {
+  const [download] = await Promise.all([page.waitForEvent('download'), button.click()]);
+  return download;
+}
+
+test('the service label downloads as a .lbx file', async ({ page }) => {
   const t = await createTicketViaApi(page, { description: 'Смяна на батерия' });
   await page.reload();
   await row(page, t.customer_name).locator('.ticket-no').click();
-  await page.click('#printServiceBtn');
 
-  const { width, height } = await capturePdf(page);
-  expect(width).toBeCloseTo(50, 0);
-  expect(height).toBeCloseTo(30, 0);
-
-  const label = page.locator('#printServiceTemplate');
-  await expect(label).toContainText(`№ ${t.ticket_no}`);
-  await expect(label).toContainText('Смяна на батерия');
+  const download = await downloadServiceLabel(page, page.locator('#printServiceBtn'));
+  expect(download.suggestedFilename()).toBe(`poruchka-${t.ticket_no}.lbx`);
+  expect(download.url()).toContain(`/api/tickets/${t.id}/service-label.lbx`);
 });
 
 test('printing also works from the buttons at the top of the form', async ({ page }) => {
   const t = await createTicketViaApi(page);
   await page.reload();
   await row(page, t.customer_name).locator('.ticket-no').click();
-  await page.locator('#topActions [data-action="print-service"]').click();
 
-  const { width, height } = await capturePdf(page);
-  expect(width).toBeCloseTo(50, 0);
-  expect(height).toBeCloseTo(30, 0);
+  const download = await downloadServiceLabel(page, page.locator('#topActions [data-action="print-service"]'));
+  expect(download.suggestedFilename()).toBe(`poruchka-${t.ticket_no}.lbx`);
 });
 
-test('the service label shows the unlock code; the customer card does not', async ({ page }) => {
+test('the customer card does not show the unlock code', async ({ page }) => {
   const t = await createTicketViaApi(page, { phonePassword: 'Z-шаблон 7' });
   await page.reload();
   await row(page, t.customer_name).locator('.ticket-no').click();
-
-  await page.click('#printServiceBtn');
-  await capturePdf(page);
-  await expect(page.locator('#printServiceTemplate')).toContainText('Парола: Z-шаблон 7');
-
-  await page.evaluate(() => { window.__openedUrls = []; });
   await page.click('#printCustomerBtn');
   await capturePdf(page);
   await expect(page.locator('#printCustomerTemplate')).not.toContainText('Z-шаблон 7');
-});
-
-test('the service label has no password line when none is set', async ({ page }) => {
-  const t = await createTicketViaApi(page);
-  await page.reload();
-  await row(page, t.customer_name).locator('.ticket-no').click();
-  await page.click('#printServiceBtn');
-  await capturePdf(page);
-  await expect(page.locator('#printServiceTemplate .label-password')).toHaveCount(0);
 });

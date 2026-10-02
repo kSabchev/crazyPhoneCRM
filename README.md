@@ -24,11 +24,12 @@ Settings in the app and edit the statuses there — both work equally well.
   database server to install or run
 - **Auth:** Server-side sessions, passwords hashed with bcrypt
 - **Frontend:** Plain HTML/CSS/JS served by the same server
-- **Printing:** `html2canvas` + `jsPDF` (vendored locally in `public/vendor/`,
-  no CDN dependency), generating real PDFs at exact physical sizes — more
-  reliable across printers than the browser's print dialog, especially for
-  the small label size. See "How it works day-to-day" below for what each
-  print produces.
+- **Printing:** the customer copy uses `html2canvas` + `jsPDF` (vendored
+  locally in `public/vendor/`, no CDN dependency), generating a real PDF at
+  an exact physical size — more reliable across printers than the browser's
+  print dialog. The service label is a P-touch Editor `.lbx` file for the
+  Brother QL-600, filled in from a template (`lbx.js`). See "How it works
+  day-to-day" below for what each print produces.
 
 ## First-time setup
 
@@ -553,10 +554,25 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
 - From an open ticket, **Print for customer** generates a small service-card
   PDF (100×95mm) matching the shop's paper card — client, model, damage
   description, loaner phone, deposit, and intake date, with the shop's logo
-  and liability warning. **Print for service** generates a tiny 50×30mm
-  label PDF (shop name, order number, and the problem description only) for
-  a barcode/label printer, meant to be stuck directly on the phone. Both
-  open as a real PDF in a new tab — print from there.
+  and liability warning; it opens as a real PDF in a new tab — print from
+  there. **Print for service** downloads a label for the Brother QL-600
+  label printer (shop name, order number, unlock code if any, and the
+  problem description), meant to be stuck directly on the phone. It is a
+  P-touch Editor file (`poruchka-<number>.lbx`): open it and press Print in
+  P-touch Editor (installed on the shop PC, with the QL-600 driver).
+
+### Changing the service label
+
+The label's layout comes from `print-templates/service-label.lbx`, designed
+in P-touch Editor — the label roll and length, fonts, sizes and positions
+are all whatever is set there. The app only replaces text boxes containing
+exactly these placeholders (curly braces included, any letter case):
+`{shop}`, `{order}`, `{issue}`, `{password}` (a box whose value is empty,
+e.g. no unlock code, is left off). To change the look, open the template in
+P-touch Editor, edit it, keep the placeholder texts, and save it over the
+same file — no restart needed. A long problem description makes a longer
+label on continuous tape; to shrink it into its box instead, set that text
+box's text options in P-touch Editor (e.g. fit text to frame).
 - Every ticket's **History** (inside the ticket) shows who created it and
   who changed what, with a timestamp. The **Activity log** button in the
   header shows the same thing across all tickets, for accountability across
@@ -585,6 +601,9 @@ repair-log/
   default-settings.js  Default statuses, colours, columns, print and SMS texts
   reports.js         Calculations behind the reports page
   sms.js             SMS to customers via the shop's Android phone
+  lbx.js             Service label (.lbx) for the Brother QL-600 from the template
+  print-templates/
+    service-label.lbx  P-touch Editor template for the service label
   auto-status.js     Marks orders waiting 30+ days as "забравен" (hourly)
   demo.js            Fake demo data for DEMO_MODE (public demo only)
   render.yaml        Render Blueprint for the public demo

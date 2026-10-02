@@ -9,6 +9,7 @@ const db = require('./db');
 const { buildReport, COMPLETED_STATUS } = require('./reports');
 const { forgetStaleWaiting } = require('./auto-status');
 const sms = require('./sms');
+const { buildServiceLabel } = require('./lbx');
 
 const app = express();
 
@@ -595,6 +596,18 @@ app.delete('/api/tickets/:id', requireAuth, (req, res) => {
   db.prepare('DELETE FROM tickets WHERE id = ?').run(req.params.id);
   broadcastChange('tickets');
   res.json({ ok: true });
+});
+
+// Service label for the Brother QL-600: a P-touch Editor .lbx file filled
+// in from print-templates/service-label.lbx. Opening it starts P-touch
+// Editor, which prints it.
+app.get('/api/tickets/:id/service-label.lbx', requireAuth, (req, res) => {
+  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
+  const file = buildServiceLabel(ticket, getSettings().shopName);
+  res.set('Content-Type', 'application/octet-stream');
+  res.attachment(`poruchka-${ticket.ticket_no}.lbx`);
+  res.send(file);
 });
 
 // ---- Audit / history routes ----

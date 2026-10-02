@@ -303,27 +303,6 @@ tbody tr:hover{background:#FBF7EF;}
 .card-warning strong{display:block;margin-bottom:0.7mm;font-size:2.5mm;}
 .card-sign{margin-top:3mm;font-size:2.7mm;color:#333;}
 
-/* ---- Service label (fixed layout, 50mm x 30mm — barcode-printer sticker) ----
-   Shop name + order number are compact and pinned to the top ("lifted up"),
-   so the problem description — which tends to run long — gets the rest of
-   the label's height rather than competing for space in a centered stack. */
-.print-card-service{
-  width:50mm;height:30mm;box-sizing:border-box;
-  padding:1.5mm;background:#fff;color:#000;text-align:center;
-  font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Helvetica,Arial,sans-serif;
-  overflow:hidden;
-  display:flex;flex-direction:column;
-}
-.label-header{flex-shrink:0;}
-.label-shop{font-weight:700;font-size:2.3mm;line-height:1.1;margin-bottom:0.4mm;}
-.label-order{font-weight:700;font-size:3mm;line-height:1.1;margin-bottom:0.8mm;}
-.label-issue-area{
-  flex:1;display:flex;align-items:center;justify-content:center;
-  min-height:0;
-}
-.label-issue{font-size:2.6mm;line-height:1.3;word-break:break-word;}
-.label-password{font-weight:700;font-size:2.6mm;line-height:1.2;margin-bottom:0.6mm;word-break:break-all;}
-
 /* ---- Settings page ---- */
 .settings-section{
   background:var(--panel);border:1px solid var(--line);border-radius:4px;
