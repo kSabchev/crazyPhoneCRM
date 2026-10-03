@@ -114,7 +114,7 @@ When an order moves to **"чака клиент"** (from the order form or the s
 dropdown in the table), the app asks whether to send the customer an SMS,
 showing the number and the text, which can be edited before sending.
 Nothing is sent without confirming. Each order also has an **"Изпрати SMS"**
-button, and lists the SMS sent for it with their status (чака телефона →
+button, and lists the SMS sent for it with their status (изчаква изпращане →
 изпратено → доставено ✓, or неуспешно with the reason).
 
 A pill in the header shows whether the phone is ready (see
@@ -124,13 +124,51 @@ The SMS window checks the phone again before sending. **Справки → SMS
 съобщения** lists the SMS sent in the chosen period with their status, and how
 many SMS parts they used from the phone plan.
 
-The SMS is sent **from the shop's Android phone**, using its own SIM and SMS
-plan, through the free app [SMS Gateway for Android](https://sms-gate.app/).
 The default text is in Settings → "SMS до клиента" (placeholders `{номер}`,
 `{клиент}`, `{модел}`, `{магазин}`). Cyrillic fits 70 characters per SMS; the
 counter shows how many SMS a text uses.
 
-### Setting up the phone (local server mode)
+There are two ways to send the SMS; set up **one** of them:
+
+- **Option 1 — SMSAPI.bg** (recommended): a paid SMS service, about €0.04–0.05
+  per SMS. No phone needed.
+- **Option 2 — the shop's Android phone**: free with the phone's SMS plan, but
+  the phone must stay on, charged and on the shop Wi-Fi.
+
+If both are configured, SMSAPI.bg is used.
+
+### Option 1: SMSAPI.bg
+
+1. Create an account at [smsapi.bg](https://www.smsapi.bg/). A test account
+   with free test SMS needs no card.
+2. In the customer portal, open **OAuth tokens**
+   (`https://portal.smsapi.bg/react/oauth/manage`) and create a token with
+   access to sending SMS and to the account profile. Copy it.
+3. Add to the app's `.env` and restart the service (`nssm restart RepairLog`):
+   ```
+   SMSAPI_TOKEN=<the token>
+   SMSAPI_TEST=true
+   ```
+   `SMSAPI_TEST=true` is **test mode**: SMSAPI accepts the messages but doesn't
+   deliver or charge them. The header shows **📱 SMS: внимание (тестов режим)**.
+4. Send a test from the app (create an order, move it to "чака клиент",
+   confirm). It should appear in the order's "SMS до клиента" section.
+5. When it works, **remove `SMSAPI_TEST=true`**, top up credit in the portal,
+   restart, and send a real test SMS to **your own number**.
+6. Optional: register a **sender name** (e.g. `CrazyPhone`, max 11 characters)
+   in the SMSAPI portal. Approval needs company details and can take a few
+   days. Once approved, add `SMSAPI_SENDER=CrazyPhone` to `.env` and restart.
+   Until then, messages use SMSAPI's default sender. Customers **can't reply**
+   to a sender name, so mention the shop's phone in the SMS text if needed.
+
+The header pill shows whether SMSAPI.bg is reachable and your **remaining
+credit** (hover), with a warning when it's low.
+
+> Delivery status is checked with SMSAPI every minute. If SMS in an order
+> stay at "изчаква изпращане" even though customers receive them, the status
+> check doesn't match SMSAPI's answer. Sending is unaffected; please report it.
+
+### Option 2: setting up the phone (local server mode)
 
 1. Install **SMS Gateway for Android** on the shop phone (Google Play, or the
    APK from the project's GitHub releases) and allow it to send SMS.
@@ -168,7 +206,7 @@ works over the internet instead: use
 `SMS_GATEWAY_URL=https://api.sms-gate.app/3rdparty/v1` with the cloud
 credentials shown in the app. Messages then pass through that service.
 
-Without `SMS_GATEWAY_URL` (and always in demo mode) SMS is switched off: the
+Without `SMSAPI_TOKEN` or `SMS_GATEWAY_URL` (and always in demo mode) SMS is switched off: the
 app never offers to send, and the header pill isn't shown.
 
 ### Troubleshooting SMS
@@ -181,9 +219,21 @@ app never offers to send, and the header pill isn't shown.
 | **📱 SMS: грешни данни** | The phone rejects the username/password | Copy them again from the app into `.env`, then `nssm restart RepairLog` |
 | **📱 SMS: облак** | Cloud mode: the phone's state can't be checked from the PC | Normal in cloud mode; the SMS status in the order still updates |
 
+With **SMSAPI.bg**, the same pill means:
+
+| Header pill | Meaning | What to do |
+|---|---|---|
+| **📱 SMS: готов** | SMSAPI.bg answers and the token works | Nothing |
+| **📱 SMS: внимание** | Low credit (under 5), or test mode is on (hover for which) | Top up in the SMSAPI portal; remove `SMSAPI_TEST=true` when done testing |
+| **📱 SMS: няма връзка** | SMSAPI.bg doesn't answer | Check the shop PC's internet connection |
+| **📱 SMS: грешни данни** | SMSAPI.bg rejects the token | Create a new token in the portal, put it in `SMSAPI_TOKEN`, restart |
+
+A failed SMS shows SMSAPI's reason, e.g. no credit left, sender name not
+approved, or an invalid number.
+
 | SMS status in an order | Meaning |
 |---|---|
-| **чака телефона** | The app accepted it; the phone hasn't sent it yet. It normally moves on within a minute. If it stays here, the phone app may be stopped by Android (check battery optimisation, step 3) |
+| **изчаква изпращане** | Accepted, not sent yet. It normally moves on within a minute. With the phone, if it stays here, Android may have stopped the app (check battery optimisation, step 3) |
 | **изпратено** | The phone sent it to the mobile network |
 | **доставено ✓** | The customer's phone confirmed receipt |
 | **неуспешно** | It failed; the reason is shown next to it (e.g. phone unreachable, invalid number, no SMS left on the plan). It can be sent again with **Изпрати SMS** |
@@ -604,7 +654,8 @@ repair-log/
   db.js              SQLite schema/setup and upgrades of older databases
   default-settings.js  Default statuses, colours, columns, print and SMS texts
   reports.js         Calculations behind the reports page
-  sms.js             SMS to customers via the shop's Android phone
+  sms.js             SMS to customers (chooses SMSAPI.bg or the phone)
+  smsapi.js          Sending through SMSAPI.bg
   lbx.js             Service label (.lbx) for the Brother QL-600 from the template
   print-templates/
     service-label.lbx  P-touch Editor template for the service label

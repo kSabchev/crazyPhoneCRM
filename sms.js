@@ -1,16 +1,21 @@
-// SMS notifications through "SMS Gateway for Android" (https://sms-gate.app)
-// running on the shop's Android phone: the server asks the phone to send
-// the SMS from its own SIM. Configured in .env:
+// SMS notifications to customers. Two ways to send, chosen by .env:
 //
-//   SMS_GATEWAY_URL       Local server mode (phone on the shop Wi-Fi):
-//                           http://<phone-ip>:8080
-//                         Cloud mode (phone anywhere with internet):
-//                           https://api.sms-gate.app/3rdparty/v1
-//   SMS_GATEWAY_USER      username shown in the app
-//   SMS_GATEWAY_PASSWORD  password shown in the app
+// 1. SMSAPI.bg — a paid SMS service, no phone needed (see smsapi.js).
+//    Used whenever SMSAPI_TOKEN is set.
 //
-// Without these (and always in DEMO_MODE) SMS is switched off: nothing is
+// 2. The shop's Android phone, through "SMS Gateway for Android"
+//    (https://sms-gate.app): the server asks the phone to send the SMS from
+//    its own SIM.
+//      SMS_GATEWAY_URL       Local server mode (phone on the shop Wi-Fi):
+//                              http://<phone-ip>:8080
+//                            Cloud mode (phone anywhere with internet):
+//                              https://api.sms-gate.app/3rdparty/v1
+//      SMS_GATEWAY_USER      username shown in the app
+//      SMS_GATEWAY_PASSWORD  password shown in the app
+//
+// Without either (and always in DEMO_MODE) SMS is switched off: nothing is
 // ever sent and the app doesn't offer to send.
+const smsapi = require('./smsapi');
 
 const SEND_TIMEOUT_MS = 15000;
 
@@ -26,7 +31,13 @@ function gatewayConfig() {
   };
 }
 
-const isConfigured = () => gatewayConfig() !== null;
+// Which way SMS goes: 'smsapi', 'phone', or null when SMS is off.
+function provider() {
+  if (smsapi.config()) return 'smsapi';
+  if (gatewayConfig()) return 'phone';
+  return null;
+}
+const isConfigured = () => provider() !== null;
 
 // Bulgarian number in international form: "0888 123 456" or
 // "+359 88 812 3456" -> "+359888123456". Anything else -> null.
@@ -61,9 +72,10 @@ function authHeader(cfg) {
   return 'Basic ' + Buffer.from(`${cfg.user}:${cfg.password}`).toString('base64');
 }
 
-// Asks the phone to send one SMS. Resolves to { gatewayId, state }, or
-// throws an Error with a message suitable for showing to staff.
+// Sends one SMS (through SMSAPI or the phone). Resolves to
+// { gatewayId, state }, or throws an Error suitable for showing to staff.
 async function sendSms(phone, text) {
+  if (provider() === 'smsapi') return smsapi.send(phone, text);
   const cfg = gatewayConfig();
   if (!cfg) throw new Error('SMS известията не са настроени');
   let res;
@@ -85,6 +97,7 @@ async function sendSms(phone, text) {
 
 // Current state of a sent message: { state, error }.
 async function getSmsState(gatewayId) {
+  if (provider() === 'smsapi') return smsapi.state(gatewayId);
   const cfg = gatewayConfig();
   if (!cfg || !gatewayId) return null;
   const res = await fetch(`${cfg.url}${cfg.path}/${encodeURIComponent(gatewayId)}`, {
@@ -120,20 +133,31 @@ function checkFailing(checks, key) {
   return c && (c.status === 'warn' || c.status === 'fail');
 }
 
-// Returns { state, details, checkedAt } where state is one of:
+// Returns { state, provider, details, checkedAt }; provider is 'smsapi' or
+// 'phone', and state one of:
 //   off      SMS not configured
-//   cloud    cloud mode: phone status not available here
-//   ready    phone answered and reports no problems
-//   warning  phone answered but reports a problem (e.g. low battery)
-//   offline  phone didn't answer (off, not on the Wi-Fi, app stopped)
-//   auth     phone answered but rejected the username/password
+//   cloud    phone in cloud mode: its status isn't available here
+//   ready    the service/phone answered and reports no problems
+//   warning  it answered but reports a problem (low credit/battery, …)
+//   offline  it didn't answer
+//   auth     it rejected the token / username+password
 async function getPhoneStatus({ fresh = false } = {}) {
-  const cfg = gatewayConfig();
-  if (!cfg) return { state: 'off', details: {}, checkedAt: new Date().toISOString() };
-  if (cfg.path === '/messages') return { state: 'cloud', details: {}, checkedAt: new Date().toISOString() };
-  if (!fresh && cachedStatus && Date.now() - cachedStatus.at < STATUS_CACHE_MS) return cachedStatus.value;
+  const which = provider();
+  if (!which) return { state: 'off', provider: null, details: {}, checkedAt: new Date().toISOString() };
+  if (!fresh && cachedStatus && cachedStatus.provider === which && Date.now() - cachedStatus.at < STATUS_CACHE_MS) {
+    return cachedStatus.value;
+  }
 
   let value;
+  if (which === 'smsapi') {
+    value = { ...(await smsapi.serviceStatus()), provider: 'smsapi' };
+    value.checkedAt = new Date().toISOString();
+    cachedStatus = { at: Date.now(), provider: which, value };
+    return value;
+  }
+
+  const cfg = gatewayConfig();
+  if (cfg.path === '/messages') return { state: 'cloud', provider: 'phone', details: {}, checkedAt: new Date().toISOString() };
   try {
     const res = await fetch(`${cfg.url}/health`, {
       headers: { Authorization: authHeader(cfg) },
@@ -165,8 +189,9 @@ async function getPhoneStatus({ fresh = false } = {}) {
   } catch (_) {
     value = { state: 'offline', details: {} };
   }
+  value.provider = 'phone';
   value.checkedAt = new Date().toISOString();
-  cachedStatus = { at: Date.now(), value };
+  cachedStatus = { at: Date.now(), provider: which, value };
   return value;
 }
 
@@ -178,6 +203,6 @@ const FINAL_STATES = ['Sent', 'Delivered', 'Failed'];
 const POLL_STATES = ['Pending', 'Processed', 'Sent'];
 
 module.exports = {
-  isConfigured, toInternationalBg, renderTemplate, smsParts, sendSms, getSmsState, FINAL_STATES, POLL_STATES,
+  isConfigured, provider, toInternationalBg, renderTemplate, smsParts, sendSms, getSmsState, FINAL_STATES, POLL_STATES,
   getPhoneStatus, resetPhoneStatusCache
 };

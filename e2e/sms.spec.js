@@ -118,7 +118,7 @@ test('the order shows its SMS, and "Изпрати SMS" can send again later', a
   const entry = page.locator('#smsList .sms-entry').first();
   await expect(entry).toContainText(intl(phone));
   await expect(entry).toContainText('alice');
-  await expect(entry).toContainText('чака телефона');
+  await expect(entry).toContainText('изчаква изпращане');
 
   await page.click('#historyToggle');
   await expect(page.locator('#historyList')).toContainText(`Изпрати SMS до ${intl(phone)}.`);
@@ -238,4 +238,31 @@ test('the SMS text can be changed in Настройки, with a part counter', a
   } finally {
     await page.request.put('/api/settings', { data: original });
   }
+});
+
+// With SMSAPI.bg configured the wording is about the service, not a phone.
+// The test server uses the phone gateway, so these two answers are given
+// here the way a server configured for SMSAPI would give them.
+test('with SMSAPI.bg, the header and SMS window describe the service and credit', async ({ page }) => {
+  await page.route('**/api/sms/config', route => route.fulfill({ json: { enabled: true, provider: 'smsapi' } }));
+  await page.route('**/api/sms/status*', route => route.fulfill({ json: {
+    state: 'warning', provider: 'smsapi', checkedAt: new Date().toISOString(),
+    details: { provider: 'smsapi', credit: 2, sender: 'CrazyPhone', test: false, problems: ['малко кредит — заредете профила в SMSAPI'] }
+  } }));
+  await page.reload();
+
+  const pill = page.locator('#smsPill');
+  await expect(pill).toHaveText('📱 SMS: внимание');
+  await expect(pill).toHaveAttribute('title', /SMSAPI\.bg е свързан, но малко кредит/);
+  await expect(pill).toHaveAttribute('title', /Кредит: 2/);
+  await expect(pill).toHaveAttribute('title', /Подател: CrazyPhone/);
+  await expect(pill).not.toHaveAttribute('title', /Батерия|Телефонът/);
+
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.click('#smsSendBtn');
+  await expect(page.locator('#smsViaHint')).toHaveText('Изпраща се чрез SMSAPI.bg');
+  await expect(page.locator('#smsPhoneStatus')).toContainText('SMSAPI.bg');
+  await page.click('#smsSkipBtn');
 });

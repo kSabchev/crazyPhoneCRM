@@ -92,13 +92,13 @@ function render(r){
 const SMS_STATES = [
   ['Delivered', 'доставени', 'ok'],
   ['Sent', 'изпратени', 'ok'],
-  ['Pending', 'чакат телефона', 'pending'],
+  ['Pending', 'изчакват изпращане', 'pending'],
   ['Processed', 'изпращат се', 'pending'],
   ['Sending', 'изпращат се', 'pending'],
   ['Failed', 'неуспешни', 'bad']
 ];
 const SMS_STATE_LABEL = {
-  Delivered: 'доставено ✓', Sent: 'изпратено', Pending: 'чака телефона',
+  Delivered: 'доставено ✓', Sent: 'изпратено', Pending: 'изчаква изпращане',
   Processed: 'изпраща се', Sending: 'изпраща се', Failed: 'неуспешно'
 };
 
