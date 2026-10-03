@@ -556,8 +556,11 @@ test('the header counts "отказани" and "забравени", and the for
   expect(labels.slice(-3)).toEqual(['издадени', 'отказани', 'забравени']);
   await expect(stat('отказани')).toHaveCSS('color', 'rgb(71, 85, 105)');
   await expect(stat('забравени')).toHaveCSS('color', 'rgb(154, 52, 18)');
-  const refusedBefore = Number(await stat('отказани').textContent());
-  const forgottenBefore = Number(await stat('забравени').textContent());
+  // From the server: right after login the table (and the counters) may
+  // not have loaded yet, and reading "0" there made the test flaky.
+  const all = await (await page.request.get('/api/tickets')).json();
+  const refusedBefore = all.filter(t => t.status === 'отказан').length;
+  const forgottenBefore = all.filter(t => t.status === 'забравен').length;
 
   const t = await createTicketViaApi(page);
   await page.reload();
