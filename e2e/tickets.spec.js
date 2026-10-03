@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const {
-  uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed
+  uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed, dismissPrintOffer
 } = require('./helpers');
 
 test.beforeEach(async ({ page }) => {
@@ -337,6 +337,7 @@ test('the unlock code and loaner phone are entered in the form and shown in the 
   await page.selectOption('#f_loaner', 'да');
   await page.click('#saveBtn');
   await expectModalClosed(page);
+  await dismissPrintOffer(page);
 
   const r = row(page, name);
   await expect(r.locator('.password-cell')).toHaveText('2580');
@@ -447,6 +448,7 @@ test('the phone field gets a light red background while typing a nonstandard num
   await page.fill('#f_desc', 'тест');
   await page.click('#saveBtn');
   await expectModalClosed(page);
+  await dismissPrintOffer(page);
   await expect(row(page, name).locator('.cust-phone')).toHaveText('12345');
 
   // Reopening shows the warning straight away; a new order starts clean.
@@ -850,4 +852,23 @@ test('choosing "отказан" in the order form shows the zeros before saving'
   await page.click('#saveBtn');
   await expectModalClosed(page);
   await expect(row(page, t.customer_name).locator('.customer-price-cell')).toHaveText(/^0,00\s€$/);
+});
+
+test('editable cells show a pencil on hover, and a line under the table explains it', async ({ page }) => {
+  const t = await createTicketViaApi(page, { comment: 'бележка' });
+  await page.reload();
+  const r = row(page, t.customer_name);
+  const after = loc => loc.evaluate(el => getComputedStyle(el, '::after').content);
+
+  for (const cls of ['.password-cell', '.comment-cell', '.repair-cell', '.customer-price-cell', '.service-price-cell']) {
+    await r.locator(cls).hover();
+    expect(await after(r.locator(cls)), cls).toBe('"✎"');
+  }
+  await r.locator('.status-cell').hover();
+  expect(await after(r.locator('.status-cell'))).toBe('"▾"');
+  // Not on cells that open the whole order.
+  await r.locator('.ticket-no').hover();
+  expect(await after(r.locator('.ticket-no'))).toBe('none');
+
+  await expect(page.locator('#tableHint')).toContainText('Бърза редакция');
 });

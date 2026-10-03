@@ -366,6 +366,28 @@ document.querySelectorAll('th.sortable').forEach(th=>{
   });
 });
 
+// ---------- Compact view ----------
+// One line per order: tighter spacing, long texts cut short ("…", full
+// text on hover). Remembered per browser. (Phones use cards instead.)
+function setCompact(on){
+  document.getElementById('ticketTable').classList.toggle('compact', on);
+  const btn = document.getElementById('compactToggle');
+  btn.setAttribute('aria-pressed', String(on));
+  btn.classList.toggle('active', on);
+  try { localStorage.setItem('compactTable', on ? '1' : '0'); } catch(_) {}
+}
+document.getElementById('compactToggle').addEventListener('click', ()=>{
+  setCompact(!document.getElementById('ticketTable').classList.contains('compact'));
+});
+setCompact((()=>{ try { return localStorage.getItem('compactTable') === '1'; } catch(_) { return false; } })());
+
+// Labels for the phone card layout ("Модел: iPhone 13").
+const CELL_LABELS = {
+  customer: 'Клиент', callBtn: 'Обаждане', model: 'Модел', issue: 'Проблем', password: 'Парола',
+  comment: 'Коментар', repairPerformed: 'Ремонт', loanerPhone: 'Об. тел', pravim: 'Правим', status: 'Статус',
+  kaparo: 'Капаро', servicePrice: 'Изкупна', customerPrice: 'Цена', dateIn: 'Приета', dateReturned: 'Върната'
+};
+
 function render(){
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const statusF = document.getElementById('statusFilter').value;
@@ -393,13 +415,15 @@ function render(){
       : 'Опитайте с друг термин за търсене или филтър по статус.';
   } else {
     empty.style.display = 'none';
-    const dv = (key) => visible.includes(key) ? '' : ' style="display:none;"';
+    // Each cell names its field and label: the phone card layout shows
+    // "label: value" lines, and hidden columns stay hidden there too.
+    const dv = (key) => ` data-field="${key}" data-label="${CELL_LABELS[key]}"${visible.includes(key) ? '' : ' style="display:none;"'}`;
     body.innerHTML = filtered.map(t=>{
       const [fg,bg] = statusBadgeColors(t.status);
       const editingBadge = (t.editing_by && t.editing_by !== currentUsername)
         ? `<div class="editing-badge">👁 ${escapeHtml(t.editing_by)}</div>` : '';
       return `<tr onclick="openEdit(${t.id})">
-        <td class="ticket-no">#${t.ticket_no}${editingBadge}</td>
+        <td class="ticket-no" data-field="number">#${t.ticket_no}${editingBadge}</td>
         <td${dv('customer')}>
           <div class="cust-name">${escapeHtml(t.customer_name)}</div>
           <div class="cust-phone${isStandardPhone(t.phone_contact) ? '' : ' phone-nonstandard'}"${isStandardPhone(t.phone_contact) ? '' : ` title="${PHONE_HINT}"`}>${escapeHtml(t.phone_contact)}</div>
@@ -738,7 +762,13 @@ async function saveTicket(){
   closeModal();
   loadTickets();
   loadDevices();
-  offerSmsIfNowWaiting(saved, previousStatus);
+  if(method === 'POST'){
+    // A new order: offer the prints first, then (if it was created as
+    // "чака клиент") the SMS.
+    openPrintOffer(saved, () => offerSmsIfNowWaiting(saved, null));
+  } else {
+    offerSmsIfNowWaiting(saved, previousStatus);
+  }
 }
 
 async function deleteTicket(){
@@ -1239,12 +1269,49 @@ async function renderElementToPdf(el, sizeMm){
   window.open(doc.output('bloburl'), '_blank');
 }
 
-async function printCopy(kind){
-  if(!editingTicket || !settings) return;
+// ---------- Offer to print after a new order is saved ----------
+// The prints are usually made right after taking a phone in, so a new
+// order offers both straight away. The window stays open after a print
+// (both are often needed); "Готово" closes it and runs `afterClose`.
+let printOfferTicket = null;
+let printOfferAfter = null;
+
+function openPrintOffer(ticket, afterClose){
+  printOfferTicket = ticket;
+  printOfferAfter = afterClose || null;
+  document.getElementById('printOfferTitle').textContent = `Поръчка #${ticket.ticket_no} е създадена`;
+  document.getElementById('printOfferSub').textContent = `${ticket.customer_name}, ${ticket.phone_model}`;
+  document.querySelectorAll('#printOfferOverlay [data-print]').forEach(btn => btn.classList.remove('done'));
+  document.getElementById('printOfferOverlay').classList.add('open');
+  document.querySelector('#printOfferOverlay [data-print="customer"]').focus();
+}
+
+function closePrintOffer(){
+  document.getElementById('printOfferOverlay').classList.remove('open');
+  const after = printOfferAfter;
+  printOfferTicket = null;
+  printOfferAfter = null;
+  if(after) after();
+}
+
+document.querySelectorAll('#printOfferOverlay [data-print]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if(!printOfferTicket) return;
+    await printCopy(btn.dataset.print, printOfferTicket);
+    btn.classList.add('done');
+  });
+});
+document.getElementById('printOfferDoneBtn').addEventListener('click', closePrintOffer);
+document.getElementById('printOfferOverlay').addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closePrintOffer(); });
+
+// Prints the customer card or downloads the service label for `ticket`
+// (the open order by default).
+async function printCopy(kind, ticket = editingTicket){
+  if(!ticket || !settings) return;
   const custEl = document.getElementById('printCustomerTemplate');
 
   if(kind === 'customer'){
-    custEl.innerHTML = buildCustomerPrintDoc(editingTicket);
+    custEl.innerHTML = buildCustomerPrintDoc(ticket);
     const img = custEl.querySelector('img');
     if(img && !img.complete){
       await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
@@ -1255,8 +1322,8 @@ async function printCopy(kind){
     // P-touch Editor file (built by the server from the shop's template):
     // it downloads, and opening it in P-touch Editor prints it.
     const a = document.createElement('a');
-    a.href = `/api/tickets/${editingTicket.id}/service-label.lbx`;
-    a.download = `poruchka-${editingTicket.ticket_no}.lbx`;
+    a.href = `/api/tickets/${ticket.id}/service-label.lbx`;
+    a.download = `poruchka-${ticket.ticket_no}.lbx`;
     document.body.appendChild(a);
     a.click();
     a.remove();

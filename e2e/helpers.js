@@ -48,6 +48,15 @@ async function expectModalOpen(page) {
   await expect(modal(page)).toHaveClass(/\bopen\b/);
 }
 
+// After creating an order through the form, the app offers to print it;
+// close that window to continue.
+async function dismissPrintOffer(page) {
+  const offer = page.locator("#printOfferOverlay");
+  await expect(offer).toHaveClass(new RegExp("(^| )open( |$)"));
+  await page.click("#printOfferDoneBtn");
+  await expect(offer).not.toHaveClass(new RegExp("(^| )open( |$)"));
+}
+
 module.exports = {
-  PASSWORD, uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed
+  PASSWORD, uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed, dismissPrintOffer
 };
