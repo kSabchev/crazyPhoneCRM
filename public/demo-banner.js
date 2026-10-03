@@ -9,7 +9,8 @@
   } catch (_) { return; }
   if (!info || !info.demo) return;
 
-  const logins = info.users.map(u => `${u.username} / ${u.password}`).join(' или ');
+  const ROLE = { admin: 'администратор', staff: 'служител' };
+  const logins = info.users.map(u => `${u.username} / ${u.password}${u.role ? ` (${ROLE[u.role] || u.role})` : ''}`).join(' или ');
   const banner = document.createElement('div');
   banner.className = 'demo-banner';
   banner.setAttribute('role', 'note');

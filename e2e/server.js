@@ -23,9 +23,10 @@ const FAKE_SMS_PORT = 3199;
   const bcrypt = require('bcrypt');
   const db = require('../db');
 
-  for (const username of ['alice', 'bob']) {
-    db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
-      .run(username, bcrypt.hashSync('secret123', 4));
+  // alice is an admin, bob a staff member — so both views are tested.
+  for (const [username, role] of [['alice', 'admin'], ['bob', 'staff']]) {
+    db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
+      .run(username, bcrypt.hashSync('secret123', 4), role);
   }
 
   require('../server');

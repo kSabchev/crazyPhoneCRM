@@ -3,6 +3,7 @@ let editingTicket = null;
 let settings = null;
 let liveEvents = null;
 let currentUsername = null;
+let currentRole = null; // 'admin' | 'staff'
 
 const statusStyles = {
   [STATUSES.FOR_SERVICE]: ['var(--status-forservice)','var(--status-forservice-bg)'],
@@ -42,22 +43,76 @@ async function checkSession(){
   const res = await fetch('/api/auth/me');
   if(res.ok){
     const data = await res.json();
-    showApp(data.username);
+    showApp(data.username, data.role);
   } else {
     showLogin();
   }
 }
+
+// ---------- Roles ----------
+// Admins can delete orders, open Settings and Справки; staff can't. The
+// server enforces this — the page just hides what staff can't use.
+const isAdmin = () => currentRole === 'admin';
+
+function applyRole(){
+  for(const id of ['reportsBtn', 'settingsBtn']){
+    document.getElementById(id).style.display = isAdmin() ? '' : 'none';
+  }
+  const who = document.getElementById('whoAmI');
+  who.textContent = currentUsername;
+  who.title = `${isAdmin() ? 'Администратор' : 'Служител'} — щракнете за смяна на паролата`;
+  document.getElementById('roleTag').textContent = isAdmin() ? '' : 'служител';
+}
+
+// ---------- Change your own password ----------
+function openPasswordDialog(){
+  for(const id of ['pwCurrent', 'pwNew', 'pwConfirm']) document.getElementById(id).value = '';
+  document.getElementById('pwError').textContent = '';
+  document.getElementById('passwordOverlay').classList.add('open');
+  document.getElementById('pwCurrent').focus();
+}
+function closePasswordDialog(){
+  document.getElementById('passwordOverlay').classList.remove('open');
+}
+async function savePassword(){
+  const current = document.getElementById('pwCurrent').value;
+  const next = document.getElementById('pwNew').value;
+  const error = document.getElementById('pwError');
+  if(next.length < 8){ error.textContent = 'Новата парола трябва да е поне 8 знака.'; return; }
+  if(next !== document.getElementById('pwConfirm').value){ error.textContent = 'Новата парола и потвърждението не съвпадат.'; return; }
+  const res = await fetch('/api/auth/password', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ currentPassword: current, newPassword: next })
+  });
+  if(res.status === 401){ closePasswordDialog(); showLogin(); return; }
+  if(!res.ok){
+    const data = await res.json().catch(()=>({}));
+    error.textContent = data.error || 'Паролата не можа да бъде сменена.';
+    return;
+  }
+  closePasswordDialog();
+  alert('Паролата е сменена.');
+}
+document.getElementById('whoAmI').addEventListener('click', openPasswordDialog);
+document.getElementById('pwSaveBtn').addEventListener('click', savePassword);
+document.getElementById('pwCancelBtn').addEventListener('click', closePasswordDialog);
+document.getElementById('passwordOverlay').addEventListener('keydown', (e)=>{
+  if(e.key === 'Escape') closePasswordDialog();
+  if(e.key === 'Enter'){ e.preventDefault(); savePassword(); }
+});
 
 function showLogin(){
   document.getElementById('loginScreen').style.display = 'flex';
   document.getElementById('appScreen').style.display = 'none';
 }
 
-async function showApp(username){
+async function showApp(username, role){
   currentUsername = username;
+  currentRole = role || 'staff';
+  applyRole();
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';
-  document.getElementById('whoAmI').textContent = username;
   await loadSettings();
   await loadDevices();
   loadSmsConfig();
@@ -112,7 +167,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e)=>{
   if(res.ok){
     const data = await res.json();
     document.getElementById('loginPass').value = '';
-    showApp(data.username);
+    showApp(data.username, data.role);
   } else {
     const data = await res.json().catch(()=>({}));
     errEl.textContent = data.error || 'Неуспешен вход.';
@@ -563,8 +618,9 @@ function openEdit(id){
   setPravimButton(t.pravim || 'circle');
   setEditOnlyFieldsVisible(true);
   document.getElementById('topActions').style.display = 'flex';
+  document.querySelector('#topActions [data-action="delete"]').style.display = isAdmin() ? '' : 'none';
   markPhoneField();
-  document.getElementById('deleteBtn').style.display = 'inline-block';
+  document.getElementById('deleteBtn').style.display = isAdmin() ? 'inline-block' : 'none';
   document.getElementById('printCustomerBtn').style.display = 'inline-block';
   document.getElementById('printServiceBtn').style.display = 'inline-block';
   document.getElementById('overlay').classList.add('open');

@@ -22,6 +22,7 @@ db.exec(`
     id INTEGER PRIMARY KEY AUTOINCREMENT,
     username TEXT UNIQUE NOT NULL,
     password_hash TEXT NOT NULL,
+    role TEXT NOT NULL DEFAULT 'admin',   -- 'admin' | 'staff'
     created_at TEXT NOT NULL DEFAULT (datetime('now'))
   );
 
@@ -90,6 +91,13 @@ db.exec(`
 `);
 
 // Migration for databases created before "date_returned" existed.
+// Migration for databases created before roles existed: every existing
+// account becomes an admin, so nobody loses access they had.
+const userColumns = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
+if (!userColumns.includes('role')) {
+  db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
+}
+
 const ticketColumns = db.prepare("PRAGMA table_info(tickets)").all().map(c => c.name);
 if (!ticketColumns.includes('date_returned')) {
   db.exec('ALTER TABLE tickets ADD COLUMN date_returned TEXT');

@@ -40,7 +40,7 @@
       <div class="stats" id="stats"></div>
       <div class="who">
         <button type="button" class="sms-pill" id="smsPill" style="display:none;" title="Състояние на телефона за SMS — щракнете за нова проверка"></button>
-        <span id="whoAmI"></span>
+        <button type="button" class="who-btn" id="whoAmI"></button><span class="role-tag" id="roleTag"></span>
         <button class="link-btn" id="reportsBtn">Справки</button>
         <button class="link-btn" id="settingsBtn">Настройки</button>
         <button class="link-btn" id="activityLogBtn">Дневник на промените</button>
@@ -260,6 +260,33 @@
       <div class="right">
         <button class="btn secondary" id="quickEditCancelBtn">Отказ</button>
         <button class="btn" id="quickEditSaveBtn">Запази</button>
+      </div>
+    </div>
+  </div>
+</div>
+
+<!-- CHANGE YOUR OWN PASSWORD (click your username in the header) -->
+<div class="overlay" id="passwordOverlay">
+  <div class="modal modal-small" role="dialog" aria-labelledby="pwTitle">
+    <h2 id="pwTitle">Смяна на парола</h2>
+    <div class="field">
+      <label for="pwCurrent">Текуща парола</label>
+      <input type="password" id="pwCurrent" autocomplete="current-password">
+    </div>
+    <div class="field">
+      <label for="pwNew">Нова парола <span class="hint">(поне 8 знака)</span></label>
+      <input type="password" id="pwNew" autocomplete="new-password">
+    </div>
+    <div class="field">
+      <label for="pwConfirm">Нова парола отново</label>
+      <input type="password" id="pwConfirm" autocomplete="new-password">
+    </div>
+    <div class="sms-error" id="pwError" role="alert"></div>
+    <div class="modal-actions">
+      <div class="left"></div>
+      <div class="right">
+        <button class="btn secondary" id="pwCancelBtn">Отказ</button>
+        <button class="btn" id="pwSaveBtn">Смени паролата</button>
       </div>
     </div>
   </div>
