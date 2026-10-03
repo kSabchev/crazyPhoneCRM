@@ -19,12 +19,6 @@ const COLUMN_LABELS = {
   dateReturned: 'Дата на връщане'
 };
 
-function escapeHtml(str){
-  const div = document.createElement('div');
-  div.textContent = str || '';
-  return div.innerHTML;
-}
-
 // ---------- Auth / bootstrap ----------
 async function init(){
   const meRes = await fetch('/api/auth/me');
@@ -133,9 +127,7 @@ function updateSmsTemplateCounter(){
     .replace(/\{модел\}/g, 'Samsung Galaxy S24')
     .replace(/\{магазин\}/g, document.getElementById('shopNameInput').value.trim() || settings.shopName);
   const len = [...sample].length;
-  const latin = /^[\x20-\x7E\r\n]*$/.test(sample);
-  const [single, multi] = latin ? [160, 153] : [70, 67];
-  const parts = len === 0 ? 0 : (len <= single ? 1 : Math.ceil(len / multi));
+  const parts = smsParts(sample);
   const counter = document.getElementById('smsTemplateCounter');
   counter.textContent = `≈ ${len} знака · ${parts} SMS (с примерни данни)`;
   counter.classList.toggle('multi', parts > 1);
@@ -212,14 +204,6 @@ function renderAll(){
 }
 
 const NEW_STATUS_DEFAULT_COLOR = '#6B7280';
-
-// White or dark text, whichever reads better on the badge colour (same rule
-// as the order table).
-function readableTextOn(hex){
-  const [r, g, b] = [1, 3, 5].map(i => parseInt(hex.slice(i, i + 2), 16) / 255)
-    .map(c => c <= 0.03928 ? c / 12.92 : Math.pow((c + 0.055) / 1.055, 2.4));
-  return 0.2126 * r + 0.7152 * g + 0.0722 * b > 0.4 ? '#211E1A' : '#FFFFFF';
-}
 
 function statusColor(s){
   return (settings.statusColors && settings.statusColors[s]) || NEW_STATUS_DEFAULT_COLOR;

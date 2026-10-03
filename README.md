@@ -276,8 +276,8 @@ How the demo behaves:
 This app is safe to expose to the internet as written, but you should:
 
 1. **Put it behind HTTPS.** Use a reverse proxy (e.g. nginx or Caddy) with a
-   TLS certificate (Let's Encrypt is free), and uncomment `secure: true` on
-   the cookie settings in `app.js` once HTTPS is in place.
+   TLS certificate (Let's Encrypt is free), and set `COOKIE_SECURE=true` in
+   `.env` once HTTPS is in place.
    Also set `TRUST_PROXY=loopback` in `.env`, so the login rate limit (10
    failed attempts per IP per 15 minutes) counts each user separately rather
    than everyone as the proxy's address.
@@ -684,7 +684,20 @@ node create-admin.js username password --admin    # also make an existing accoun
 ```
 repair-log/
   server.js          Entry point — starts the app on PORT
-  app.js             Express app: auth routes + ticket API + settings API
+  app.js             Express app: session, routes, scheduled jobs, static files
+  routes/            The API, one file per area
+    auth.js            Login, logout, your own password, accounts (admins)
+    settings.js        Настройки and the phone-model list
+    tickets.js         Orders, the service label, change history
+    reports.js         Справки (admins)
+    sms.js             SMS to customers, delivery-state polling
+  lib/               Helpers shared by the routes
+    auth.js            Login checks (requireAuth, requireAdmin)
+    live.js            Live updates and "who's editing" (server-sent events)
+    settings-store.js  Reading the settings, with defaults and upgrades
+    audit.js           Writing the change history
+    ticket-input.js    Checking and cleaning order fields
+    util.js            Dates, prices, async route wrapper
   db.js              SQLite schema/setup and upgrades of older databases
   env.js             Loads .env (skipped in tests, so they never use real settings)
   default-settings.js  Default statuses, colours, columns, print and SMS texts
@@ -708,7 +721,17 @@ repair-log/
     settings.html      Admin settings page
     reports.html       Reports page
     styles.css
-    app.js             Main app frontend logic (incl. PDF generation)
+    js/utils.js         Helpers shared by all pages (dates, money, escaping, SMS length)
+    js/app/             Main page, loaded in this order:
+      state.js            Shared state, status colours, constants
+      format.js           Prices, deposit and history values
+      session.js          Login, roles, password, live updates
+      table.js            Order table, sorting, compact view, counters
+      order-form.js       Order window and change history
+      sms.js              SMS window and phone/service indicator
+      quick-edit.js       Editing one cell from the table
+      print.js            Customer copy (PDF), service label, print offer
+      main.js             Remaining buttons; starts the app
     settings.js         Settings page frontend logic
     reports.js          Reports page frontend logic (incl. the chart)
     assets/logo.png     Shop logo, used on the customer print
