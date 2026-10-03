@@ -2,8 +2,9 @@
 // FORGET_AFTER_DAYS days becomes "забравен" (never collected). Run on
 // server start and then hourly (server.js). Recorded in the change history
 // as done by "автоматично", like any other status change.
-const WAITING_STATUS = 'чака клиент';
-const FORGOTTEN_STATUS = 'забравен';
+const STATUSES = require('./public/statuses');
+const WAITING_STATUS = STATUSES.WAITING;
+const FORGOTTEN_STATUS = STATUSES.FORGOTTEN;
 const FORGET_AFTER_DAYS = 30;
 const AUTO_USER = 'автоматично';
 const DAY_MS = 24 * 60 * 60 * 1000;

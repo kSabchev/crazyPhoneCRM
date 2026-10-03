@@ -5,12 +5,12 @@ let liveEvents = null;
 let currentUsername = null;
 
 const statusStyles = {
-  'за сервиз': ['var(--status-forservice)','var(--status-forservice-bg)'],
-  'в сервиз': ['var(--status-inservice)','var(--status-inservice-bg)'],
-  'чака клиент': ['var(--status-waiting)','var(--status-waiting-bg)'],
-  'издаден': ['var(--status-issued)','var(--status-issued-bg)'],
-  'отказан': ['var(--status-refused)','var(--status-refused-bg)'],
-  'забравен': ['var(--status-forgotten)','var(--status-forgotten-bg)']
+  [STATUSES.FOR_SERVICE]: ['var(--status-forservice)','var(--status-forservice-bg)'],
+  [STATUSES.IN_SERVICE]: ['var(--status-inservice)','var(--status-inservice-bg)'],
+  [STATUSES.WAITING]: ['var(--status-waiting)','var(--status-waiting-bg)'],
+  [STATUSES.COMPLETED]: ['var(--status-issued)','var(--status-issued-bg)'],
+  [STATUSES.REFUSED]: ['var(--status-refused)','var(--status-refused-bg)'],
+  [STATUSES.FORGOTTEN]: ['var(--status-forgotten)','var(--status-forgotten-bg)']
 };
 const FALLBACK_STATUS_STYLE = ['var(--status-neutral)','var(--status-neutral-bg)'];
 
@@ -134,10 +134,10 @@ document.getElementById('settingsBtn').addEventListener('click', ()=>{
 
 // The status considered "completed" for the purposes of the "in progress"
 // filter and the top stats. Matches the default Bulgarian status set.
-const COMPLETED_STATUS = 'издаден';
+const COMPLETED_STATUS = STATUSES.COMPLETED;
 // Finished orders: handed back, refused, or never collected. Everything else
 // counts as "В процес".
-const CLOSED_STATUSES = [COMPLETED_STATUS, 'отказан', 'забравен'];
+const CLOSED_STATUSES = STATUSES.CLOSED;
 
 // ---------- Settings ----------
 async function loadSettings(){
@@ -445,12 +445,12 @@ document.addEventListener('click', (e)=>{
 // status ("общо поръчки" shows all); clicking the active one again clears it.
 const STAT_COUNTERS = [
   { filter: '',             label: 'общо поръчки', color: null },
-  { filter: 'за сервиз',    label: 'за сервиз',    color: 'var(--status-forservice-text)' },
-  { filter: 'в сервиз',     label: 'в сервиза',    color: 'var(--status-inservice-text)' },
-  { filter: 'чака клиент',  label: 'чакат клиент', color: 'var(--status-waiting-text)' },
+  { filter: STATUSES.FOR_SERVICE, label: 'за сервиз',    color: 'var(--status-forservice-text)' },
+  { filter: STATUSES.IN_SERVICE,  label: 'в сервиза',    color: 'var(--status-inservice-text)' },
+  { filter: STATUSES.WAITING,     label: 'чакат клиент', color: 'var(--status-waiting-text)' },
   { filter: COMPLETED_STATUS, label: 'издадени',     color: 'var(--status-issued-text)' },
-  { filter: 'отказан',      label: 'отказани',     color: 'var(--status-refused-bg)' },
-  { filter: 'забравен',     label: 'забравени',    color: 'var(--status-forgotten-bg)' }
+  { filter: STATUSES.REFUSED,     label: 'отказани',     color: 'var(--status-refused-bg)' },
+  { filter: STATUSES.FORGOTTEN,   label: 'забравени',    color: 'var(--status-forgotten-bg)' }
 ];
 
 function renderStats(){
@@ -507,7 +507,7 @@ function openNew(){
   document.getElementById('f_date').value = localDateString(new Date());
   document.getElementById('f_date_returned').value = '';
   document.getElementById('f_model').value = '';
-  document.getElementById('f_status').value = (settings && settings.statuses[0]) || 'за сервиз';
+  document.getElementById('f_status').value = (settings && settings.statuses[0]) || STATUSES.FOR_SERVICE;
   document.getElementById('f_service_price').value = '';
   document.getElementById('f_customer_price').value = '';
   document.getElementById('f_kaparo').value = 'Не';
@@ -790,7 +790,7 @@ document.getElementById('closeActivityBtn').addEventListener('click', ()=>{
 // Offered automatically when an order moves to "чака клиент", and any time
 // from the order's "Изпрати SMS" button. Off unless the server has an SMS
 // gateway configured.
-const WAITING_STATUS = 'чака клиент';
+const WAITING_STATUS = STATUSES.WAITING;
 let smsEnabled = false;
 let smsTicketId = null;
 
@@ -1233,7 +1233,7 @@ document.getElementById('f_status').addEventListener('change', (e)=>{
   }
   // Moving to "отказан" sets Капаро and both prices to 0 (the server does
   // the same); shown here straight away, and still editable before saving.
-  if(e.target.value === 'отказан' && (!editingTicket || editingTicket.status !== 'отказан')){
+  if(e.target.value === STATUSES.REFUSED && (!editingTicket || editingTicket.status !== STATUSES.REFUSED)){
     for(const id of ['f_kaparo', 'f_service_price', 'f_customer_price']) document.getElementById(id).value = '0';
   }
 });

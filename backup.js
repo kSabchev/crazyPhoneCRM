@@ -7,7 +7,7 @@
 // Run manually with:  node backup.js
 // Schedule nightly with Windows Task Scheduler — see README for setup.
 
-require('dotenv').config();
+require('./env');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');

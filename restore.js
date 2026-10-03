@@ -12,7 +12,7 @@
 //   node restore.js <filename>                Restore that specific backup
 //   node restore.js latest                    Restore the most recent backup
 
-require('dotenv').config();
+require('./env');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');

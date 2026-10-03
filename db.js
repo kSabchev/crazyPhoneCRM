@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./env');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
@@ -157,6 +157,7 @@ db.exec(`
 
 // Seed default settings on first run.
 const DEFAULT_SETTINGS = require('./default-settings');
+const STATUSES = require('./public/statuses');
 
 const existingSettings = db.prepare('SELECT id FROM settings WHERE id = 1').get();
 if (!existingSettings) {
@@ -175,7 +176,7 @@ if (!existingSettings) {
 {
   const saved = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
   if (!saved.addedClosedStatuses) {
-    for (const status of ['отказан', 'забравен']) {
+    for (const status of [STATUSES.REFUSED, STATUSES.FORGOTTEN]) {
       if (!saved.statuses.includes(status)) saved.statuses.push(status);
     }
     saved.addedClosedStatuses = true;

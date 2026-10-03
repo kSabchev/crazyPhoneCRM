@@ -11,8 +11,9 @@
 
 const { smsParts } = require('./sms');
 
-const COMPLETED_STATUS = 'издаден';
-const CLOSED_STATUSES = [COMPLETED_STATUS, 'отказан', 'забравен'];
+const STATUSES = require('./public/statuses');
+const COMPLETED_STATUS = STATUSES.COMPLETED;
+const CLOSED_STATUSES = STATUSES.CLOSED;
 const DAY_MS = 24 * 60 * 60 * 1000;
 
 // Money is summed in whole cents so totals don't pick up float noise.

@@ -1,4 +1,4 @@
-require('dotenv').config();
+require('./env');
 const path = require('path');
 const express = require('express');
 const session = require('express-session');
@@ -8,7 +8,8 @@ const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { buildReport, COMPLETED_STATUS } = require('./reports');
 // Moving an order to this status zeroes what it would cost (see PUT).
-const REFUSED_STATUS = 'отказан';
+const STATUSES = require('./public/statuses');
+const REFUSED_STATUS = STATUSES.REFUSED;
 const REFUSED_AMOUNTS = { kaparo: '0', service_price: 0, customer_price: 0 };
 const { forgetStaleWaiting } = require('./auto-status');
 const sms = require('./sms');
@@ -217,6 +218,11 @@ function withStatusColors(settings) {
 function getSettings() {
   const row = db.prepare('SELECT data FROM settings WHERE id = 1').get();
   const saved = JSON.parse(row.data);
+  // The built-in statuses drive behaviour and can't be removed; a shop that
+  // removed one before that was enforced gets it back (at the end).
+  for (const s of STATUSES.SYSTEM) {
+    if (!saved.statuses.includes(s)) saved.statuses.push(s);
+  }
   // Shops set up before SMS existed get the default text.
   if (typeof saved.smsTemplate !== 'string') saved.smsTemplate = require('./default-settings').smsTemplate;
   // The customer card's title was replaced by the shop phone (SHOP_PHONE),
@@ -263,6 +269,10 @@ app.put('/api/settings', requireAuth, (req, res) => {
     const statuses = (body.statuses || []).map(s => String(s).trim()).filter(Boolean);
     if (statuses.length === 0) {
       return res.status(400).json({ error: 'Трябва да има поне един статус' });
+    }
+    const missing = STATUSES.SYSTEM.find(s => !statuses.includes(s));
+    if (missing) {
+      return res.status(400).json({ error: `Статусът „${missing}“ е системен и не може да бъде премахнат (${STATUSES.PURPOSE[missing]})` });
     }
     next.statuses = [...new Set(statuses)];
   }
@@ -498,7 +508,7 @@ app.post('/api/tickets', requireAuth, (req, res) => {
       t.dateReceived,
       t.dateReturned || (t.status === COMPLETED_STATUS ? localToday() : null),
       t.phoneModel,
-      t.status || 'за сервиз',
+      t.status || STATUSES.FOR_SERVICE,
       t.description,
       t.comment || '',
       t.repairPerformed || '',
