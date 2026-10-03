@@ -7,6 +7,9 @@ const bcrypt = require('bcrypt');
 const rateLimit = require('express-rate-limit');
 const db = require('./db');
 const { buildReport, COMPLETED_STATUS } = require('./reports');
+// Moving an order to this status zeroes what it would cost (see PUT).
+const REFUSED_STATUS = 'отказан';
+const REFUSED_AMOUNTS = { kaparo: '0', service_price: 0, customer_price: 0 };
 const { forgetStaleWaiting } = require('./auto-status');
 const sms = require('./sms');
 const { buildServiceLabel } = require('./lbx');
@@ -479,6 +482,9 @@ app.post('/api/tickets', requireAuth, (req, res) => {
   const nextNoRow = db.prepare('SELECT MAX(ticket_no) AS maxNo FROM tickets').get();
   const nextNo = (nextNoRow.maxNo || 0) + 1;
 
+  // Created already refused: nothing to charge (see the rule in PUT).
+  const refusedOnCreate = t.status === REFUSED_STATUS;
+
   const result = db
     .prepare(
       `INSERT INTO tickets
@@ -499,9 +505,9 @@ app.post('/api/tickets', requireAuth, (req, res) => {
       normalizeLoaner(t.loanerPhone),
       normalizePassword(t.phonePassword),
       normalizePravim(t.pravim, 'circle'),
-      t.kaparo && String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не',
-      toPrice(t.servicePrice),
-      toPrice(t.customerPrice)
+      refusedOnCreate ? REFUSED_AMOUNTS.kaparo : (t.kaparo && String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не'),
+      refusedOnCreate ? REFUSED_AMOUNTS.service_price : toPrice(t.servicePrice),
+      refusedOnCreate ? REFUSED_AMOUNTS.customer_price : toPrice(t.customerPrice)
     );
 
   const created = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
@@ -564,6 +570,11 @@ app.put('/api/tickets/:id', requireAuth, (req, res) => {
   // when the status is changed without touching the date field.
   if (next.status === COMPLETED_STATUS && existing.status !== COMPLETED_STATUS && !next.date_returned) {
     next.date_returned = localToday();
+  }
+  // A refused repair costs nothing: moving an order to "отказан" sets the
+  // deposit and both prices to 0 (staff can still change them afterwards).
+  if (next.status === REFUSED_STATUS && existing.status !== REFUSED_STATUS) {
+    Object.assign(next, REFUSED_AMOUNTS);
   }
 
   db.prepare(

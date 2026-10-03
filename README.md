@@ -523,7 +523,9 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
 - Besides "издаден", two more statuses close an order: **отказан** (repair
   refused) and **забравен** (phone never collected). Closed orders are left out
   of the "В процес" filter and the open-orders figures in reports. Only
-  "издаден" fills in the return date automatically.
+  "издаден" fills in the return date automatically. Moving an order to "отказан" sets
+  Капаро, Изкупна цена and Продажна цена to 0 (they can still be changed
+  afterwards, e.g. for a diagnostic fee).
 - An order left in **"чака клиент" for more than 30 days** becomes "забравен"
   automatically (checked on start and every hour). The history shows it as
   done by "автоматично", and the server log lists the order numbers. The 30

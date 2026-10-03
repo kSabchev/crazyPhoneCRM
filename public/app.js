@@ -225,8 +225,10 @@ function fmtKaparo(v){
 
 // True when the deposit equals the selling price — the customer has
 // already paid in full, so the table shows Капаро on a green background.
+// A price of 0 (e.g. a refused order) has nothing to pay, so it isn't green.
 function kaparoCoversPrice(t){
   if(t.customer_price === null || t.customer_price === undefined || t.customer_price === '') return false;
+  if(!(Number(t.customer_price) > 0)) return false;
   const m = String(t.kaparo ?? '').trim().match(/^(\d+(?:[.,]\d+)?)\s*(€|eur|евро)?$/i);
   return !!m && Math.abs(Number(m[1].replace(',', '.')) - Number(t.customer_price)) < 0.005;
 }
@@ -1209,6 +1211,11 @@ document.getElementById('f_status').addEventListener('change', (e)=>{
   const returned = document.getElementById('f_date_returned');
   if(e.target.value === COMPLETED_STATUS && !returned.value){
     returned.value = localDateString(new Date());
+  }
+  // Moving to "отказан" sets Капаро and both prices to 0 (the server does
+  // the same); shown here straight away, and still editable before saving.
+  if(e.target.value === 'отказан' && (!editingTicket || editingTicket.status !== 'отказан')){
+    for(const id of ['f_kaparo', 'f_service_price', 'f_customer_price']) document.getElementById(id).value = '0';
   }
 });
 document.getElementById('f_phone').addEventListener('input', (e)=>{
