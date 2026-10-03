@@ -8,14 +8,18 @@
 const WAITING_STATUS = STATUSES.WAITING;
 let smsEnabled = false;
 let smsTicketId = null;
+const SMS_VIA = {
+  phone: 'Изпраща се от телефона на сервиза',
+  smsapi: 'Изпраща се чрез SMSAPI.bg',
+  demo: 'Демо: SMS не се изпраща наистина — само се показва как работи'
+};
 
 async function loadSmsConfig(){
   try {
     const res = await fetch('/api/sms/config');
     const cfg = res.ok ? await res.json() : {};
     smsEnabled = cfg.enabled === true;
-    document.getElementById('smsViaHint').textContent = cfg.provider === 'smsapi'
-      ? 'Изпраща се чрез SMSAPI.bg' : 'Изпраща се от телефона на сервиза';
+    document.getElementById('smsViaHint').textContent = SMS_VIA[cfg.provider] || SMS_VIA.phone;
   } catch(_) { smsEnabled = false; }
   document.getElementById('smsPill').style.display = smsEnabled ? '' : 'none';
   if(smsEnabled){
@@ -44,8 +48,13 @@ const SERVICE_STATES = {
   auth:    { cls: 'bad',  label: 'SMS: грешни данни', text: 'SMSAPI.bg отказва достъп — проверете API ключа (SMSAPI_TOKEN) в .env.' }
 };
 
+// The public demo: SMS is simulated on the server, nothing is sent.
+const DEMO_STATES = {
+  ready: { cls: 'ok', label: 'SMS: демо', text: 'Демо режим: SMS се симулират — нищо не се изпраща наистина. Номер, завършващ на 000, показва неуспешно SMS.' }
+};
+
 function describePhoneStatus(s){
-  const states = s.provider === 'smsapi' ? SERVICE_STATES : PHONE_STATES;
+  const states = s.provider === 'smsapi' ? SERVICE_STATES : s.provider === 'demo' ? DEMO_STATES : PHONE_STATES;
   const info = states[s.state];
   if(!info) return null;
   const problems = s.details && s.details.problems && s.details.problems.length ? s.details.problems : [];

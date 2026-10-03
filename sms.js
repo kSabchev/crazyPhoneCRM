@@ -13,9 +13,13 @@
 //      SMS_GATEWAY_USER      username shown in the app
 //      SMS_GATEWAY_PASSWORD  password shown in the app
 //
-// Without either (and always in DEMO_MODE) SMS is switched off: nothing is
-// ever sent and the app doesn't offer to send.
+// Without either SMS is switched off: nothing is ever sent and the app
+// doesn't offer to send.
+//
+// In DEMO_MODE neither is used, even if set: SMS is simulated inside the
+// app instead (see sms-demo.js) and nothing ever leaves the server.
 const smsapi = require('./smsapi');
+const smsDemo = require('./sms-demo');
 
 const SEND_TIMEOUT_MS = 15000;
 
@@ -31,8 +35,9 @@ function gatewayConfig() {
   };
 }
 
-// Which way SMS goes: 'smsapi', 'phone', or null when SMS is off.
+// Which way SMS goes: 'demo', 'smsapi', 'phone', or null when SMS is off.
 function provider() {
+  if (smsDemo.config()) return 'demo';
   if (smsapi.config()) return 'smsapi';
   if (gatewayConfig()) return 'phone';
   return null;
@@ -75,6 +80,7 @@ function authHeader(cfg) {
 // Sends one SMS (through SMSAPI or the phone). Resolves to
 // { gatewayId, state }, or throws an Error suitable for showing to staff.
 async function sendSms(phone, text) {
+  if (provider() === 'demo') return smsDemo.send(phone, text);
   if (provider() === 'smsapi') return smsapi.send(phone, text);
   const cfg = gatewayConfig();
   if (!cfg) throw new Error('SMS известията не са настроени');
@@ -97,6 +103,7 @@ async function sendSms(phone, text) {
 
 // Current state of a sent message: { state, error }.
 async function getSmsState(gatewayId) {
+  if (provider() === 'demo') return smsDemo.state(gatewayId);
   if (provider() === 'smsapi') return smsapi.state(gatewayId);
   const cfg = gatewayConfig();
   if (!cfg || !gatewayId) return null;
@@ -133,8 +140,8 @@ function checkFailing(checks, key) {
   return c && (c.status === 'warn' || c.status === 'fail');
 }
 
-// Returns { state, provider, details, checkedAt }; provider is 'smsapi' or
-// 'phone', and state one of:
+// Returns { state, provider, details, checkedAt }; provider is 'demo',
+// 'smsapi' or 'phone', and state one of:
 //   off      SMS not configured
 //   cloud    phone in cloud mode: its status isn't available here
 //   ready    the service/phone answered and reports no problems
@@ -149,8 +156,8 @@ async function getPhoneStatus({ fresh = false } = {}) {
   }
 
   let value;
-  if (which === 'smsapi') {
-    value = { ...(await smsapi.serviceStatus()), provider: 'smsapi' };
+  if (which === 'demo' || which === 'smsapi') {
+    value = { ...(await (which === 'demo' ? smsDemo : smsapi).serviceStatus()), provider: which };
     value.checkedAt = new Date().toISOString();
     cachedStatus = { at: Date.now(), provider: which, value };
     return value;
