@@ -254,8 +254,9 @@ A **demo** copy (fake data only, never the shop's real app) can run on
    `Demo mode: database reset with 180 demo orders` and
    `Repair log running`.
 4. Open the `https://…onrender.com` address. A yellow **ДЕМО** banner shows
-   on every page and the login is pre-filled (`demo` / `demo1234`; a second
-   account, `demo2`, lets you try live updates in two browsers).
+   on every page and the login is pre-filled (`demo` / `demo1234`, an admin).
+   A second account, `demo2` (same password, staff), shows the staff view and
+   lets you try live updates in two browsers.
 
 How the demo behaves:
 
@@ -641,12 +642,34 @@ Give each staff member their own login rather than sharing one account —
 that's what makes the history/activity log meaningful, since every change is
 attributed to whoever was signed in when they made it.
 
-```bash
-node create-admin.js staffusername theirpassword
-```
+There are two roles:
 
-Run this once per staff member. There's currently no separate "role" — every
-signed-in account can view, create, edit, delete, and print any ticket.
+| | Admin (администратор) | Staff (служител) |
+|---|---|---|
+| Create, edit, print orders; change status; send SMS | ✓ | ✓ |
+| See and edit both prices | ✓ | ✓ |
+| **Delete orders** | ✓ | — |
+| **Настройки** (statuses, columns, texts, accounts) | ✓ | — |
+| **Справки** (revenue, profit, SMS usage) | ✓ | — |
+
+The server enforces this; staff simply don't see those links and buttons.
+
+**Managing accounts:** admins use **Настройки → Потребители** to add an
+account (with a role), change someone's role, set a new password for them, or
+remove an account. Changes apply immediately, even to someone already logged
+in. An admin can't demote or remove themselves, so there's always at least one
+admin. Accounts that existed before roles were added are admins.
+
+**Your own password:** anyone can change it by clicking their **username** in
+the header (the current password is required).
+
+**From the command line** (first admin, or if no admin can log in):
+
+```bash
+node create-admin.js username password            # new admin, or reset a password
+node create-admin.js username password --staff    # new staff account
+node create-admin.js username password --admin    # also make an existing account admin
+```
 
 ## Project structure
 

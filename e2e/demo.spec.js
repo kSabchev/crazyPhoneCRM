@@ -2,7 +2,7 @@
 // mode, so /api/demo is answered here as a demo server would answer it.
 const { test, expect } = require('@playwright/test');
 
-const DEMO = { demo: true, users: [{ username: 'demo', password: 'demo1234' }, { username: 'demo2', password: 'demo1234' }] };
+const DEMO = { demo: true, users: [{ username: 'demo', password: 'demo1234', role: 'admin' }, { username: 'demo2', password: 'demo1234', role: 'staff' }] };
 
 test('in demo mode, every page shows the banner and the login is pre-filled', async ({ page }) => {
   await page.route('**/api/demo', route => route.fulfill({ json: DEMO }));
@@ -10,7 +10,7 @@ test('in demo mode, every page shows the banner and the login is pre-filled', as
 
   const banner = page.locator('.demo-banner');
   await expect(banner).toContainText('ДЕМО версия');
-  await expect(banner).toContainText('demo / demo1234 или demo2 / demo1234');
+  await expect(banner).toContainText('demo / demo1234 (администратор) или demo2 / demo1234 (служител)');
   await expect(page.locator('#loginUser')).toHaveValue('demo');
   await expect(page.locator('#loginPass')).toHaveValue('demo1234');
 

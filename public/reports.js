@@ -49,6 +49,8 @@ async function init(){
   const meRes = await fetch('/api/auth/me');
   if(!meRes.ok){ window.location.href = '/'; return; }
   const me = await meRes.json();
+  // Справки (revenue, profit) is for admins only.
+  if(me.role !== 'admin'){ window.location.href = '/'; return; }
   document.getElementById('whoAmI').textContent = me.username;
   document.getElementById('reportsScreen').style.display = 'block';
 

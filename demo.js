@@ -10,11 +10,12 @@ const bcrypt = require('bcrypt');
 const DEFAULT_SETTINGS = require('./default-settings');
 const { FOR_SERVICE, IN_SERVICE, WAITING, COMPLETED, REFUSED, FORGOTTEN, CLOSED } = require('./public/statuses');
 
-// Shown on the login screen in demo mode. Two accounts, so the live
+// Shown on the login screen in demo mode. Two accounts — an admin and a
+// staff member, to show both views — so the live
 // updates and "who's viewing" indicator can be tried in two browsers.
 const DEMO_USERS = [
-  { username: 'demo', password: 'demo1234' },
-  { username: 'demo2', password: 'demo1234' }
+  { username: 'demo', password: 'demo1234', role: 'admin' },
+  { username: 'demo2', password: 'demo1234', role: 'staff' }
 ];
 
 const FIRST = ['Иван', 'Мария', 'Георги', 'Елена', 'Николай', 'Петя', 'Димитър', 'Десислава', 'Стоян', 'Виктория', 'Христо', 'Надежда'];
@@ -65,8 +66,8 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
     db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
       .run(JSON.stringify({ ...DEFAULT_SETTINGS, demoData: true }));
 
-    const addUser = db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)');
-    for (const u of DEMO_USERS) addUser.run(u.username, bcrypt.hashSync(u.password, 10));
+    const addUser = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)');
+    for (const u of DEMO_USERS) addUser.run(u.username, bcrypt.hashSync(u.password, 10), u.role);
 
     const insert = db.prepare(`
       INSERT INTO tickets (ticket_no, customer_name, phone_contact, date_received, date_returned, phone_model,

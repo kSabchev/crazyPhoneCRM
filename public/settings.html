@@ -104,6 +104,25 @@
     </div>
   </div>
 
+  <div class="settings-section" id="usersSection">
+    <h2>Потребители</h2>
+    <div class="section-sub">
+      Профили за вход. <strong>Администраторите</strong> могат да изтриват поръчки и да отварят Настройки и Справки;
+      <strong>служителите</strong> работят само с поръчките. Промените тук се запазват веднага.
+    </div>
+    <div class="editable-list" id="userList"></div>
+    <div class="add-row user-add-row">
+      <input type="text" id="newUserName" placeholder="Потребителско име" autocomplete="off">
+      <input type="password" id="newUserPassword" placeholder="Парола (поне 8 знака)" autocomplete="new-password">
+      <select id="newUserRole">
+        <option value="staff">служител</option>
+        <option value="admin">администратор</option>
+      </select>
+      <button class="btn secondary" id="addUserBtn">Добави</button>
+    </div>
+    <div class="sms-error" id="userError" role="alert"></div>
+  </div>
+
   <div class="save-bar">
     <span class="save-status" id="saveStatus"></span>
     <button class="btn secondary" id="resetBtn">Отхвърли промените</button>
