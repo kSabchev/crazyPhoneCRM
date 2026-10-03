@@ -366,6 +366,28 @@ document.querySelectorAll('th.sortable').forEach(th=>{
   });
 });
 
+// ---------- Compact view ----------
+// One line per order: tighter spacing, long texts cut short ("…", full
+// text on hover). Remembered per browser. (Phones use cards instead.)
+function setCompact(on){
+  document.getElementById('ticketTable').classList.toggle('compact', on);
+  const btn = document.getElementById('compactToggle');
+  btn.setAttribute('aria-pressed', String(on));
+  btn.classList.toggle('active', on);
+  try { localStorage.setItem('compactTable', on ? '1' : '0'); } catch(_) {}
+}
+document.getElementById('compactToggle').addEventListener('click', ()=>{
+  setCompact(!document.getElementById('ticketTable').classList.contains('compact'));
+});
+setCompact((()=>{ try { return localStorage.getItem('compactTable') === '1'; } catch(_) { return false; } })());
+
+// Labels for the phone card layout ("Модел: iPhone 13").
+const CELL_LABELS = {
+  customer: 'Клиент', callBtn: 'Обаждане', model: 'Модел', issue: 'Проблем', password: 'Парола',
+  comment: 'Коментар', repairPerformed: 'Ремонт', loanerPhone: 'Об. тел', pravim: 'Правим', status: 'Статус',
+  kaparo: 'Капаро', servicePrice: 'Изкупна', customerPrice: 'Цена', dateIn: 'Приета', dateReturned: 'Върната'
+};
+
 function render(){
   const q = document.getElementById('searchInput').value.trim().toLowerCase();
   const statusF = document.getElementById('statusFilter').value;
@@ -393,13 +415,15 @@ function render(){
       : 'Опитайте с друг термин за търсене или филтър по статус.';
   } else {
     empty.style.display = 'none';
-    const dv = (key) => visible.includes(key) ? '' : ' style="display:none;"';
+    // Each cell names its field and label: the phone card layout shows
+    // "label: value" lines, and hidden columns stay hidden there too.
+    const dv = (key) => ` data-field="${key}" data-label="${CELL_LABELS[key]}"${visible.includes(key) ? '' : ' style="display:none;"'}`;
     body.innerHTML = filtered.map(t=>{
       const [fg,bg] = statusBadgeColors(t.status);
       const editingBadge = (t.editing_by && t.editing_by !== currentUsername)
         ? `<div class="editing-badge">👁 ${escapeHtml(t.editing_by)}</div>` : '';
       return `<tr onclick="openEdit(${t.id})">
-        <td class="ticket-no">#${t.ticket_no}${editingBadge}</td>
+        <td class="ticket-no" data-field="number">#${t.ticket_no}${editingBadge}</td>
         <td${dv('customer')}>
           <div class="cust-name">${escapeHtml(t.customer_name)}</div>
           <div class="cust-phone${isStandardPhone(t.phone_contact) ? '' : ' phone-nonstandard'}"${isStandardPhone(t.phone_contact) ? '' : ` title="${PHONE_HINT}"`}>${escapeHtml(t.phone_contact)}</div>

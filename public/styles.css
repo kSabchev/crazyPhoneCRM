@@ -506,3 +506,60 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
 .print-offer-buttons .btn{flex:1 1 200px;}
 .print-offer-buttons .btn.done{border-color:#86EFAC;background:#F0FDF4;color:#166534;}
 .print-offer-buttons .btn.done::after{content:" ✓";}
+
+/* ---- Compact view: one line per order ---- */
+.view-toggle.active{border-color:var(--ink);background:var(--panel);font-weight:600;}
+@media (min-width:701px){
+  #ticketTable.compact tbody td{padding:5px 8px;white-space:nowrap;vertical-align:middle;}
+  #ticketTable.compact thead th{padding:6px 8px;}
+  #ticketTable.compact .cust-name, #ticketTable.compact .cust-phone{display:inline;}
+  #ticketTable.compact .cust-phone{margin-left:8px;}
+  #ticketTable.compact .cust-phone.phone-nonstandard{margin-left:13px;}
+  #ticketTable.compact .desc-cell{max-width:180px;overflow:hidden;text-overflow:ellipsis;}
+  #ticketTable.compact td[data-field="model"]{max-width:150px;overflow:hidden;text-overflow:ellipsis;}
+  #ticketTable.compact .call-icon-btn{width:26px;height:26px;font-size:13px;}
+  #ticketTable.compact .pravim-toggle{width:24px;height:24px;font-size:13px;}
+  #ticketTable.compact .badge{padding:2px 9px;font-size:11.5px;}
+  #ticketTable.compact .editing-badge{display:inline;margin-left:6px;}
+}
+
+/* ---- Phones: each order as a card instead of a table row ----
+   Same cells as the table (so taps, the status dropdown and the call button
+   keep working); laid out on a grid, with less-needed fields left for the
+   full order. Columns hidden in Settings stay hidden (inline style). */
+@media (max-width:700px){
+  .table-wrap{background:none;border:none;overflow:visible;}
+  #ticketTable thead{display:none;}
+  #ticketTable, #ticketTable tbody{display:block;}
+  #ticketTable tbody tr{
+    display:grid;grid-template-columns:1fr auto;gap:3px 12px;
+    grid-template-areas:"num status" "customer call" "model model" "issue issue" "price kaparo" "dateIn dateIn";
+    background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:10px 12px;margin-bottom:10px;
+  }
+  #ticketTable tbody tr:hover{background:#FBF7EF;}
+  #ticketTable tbody td{display:block;padding:0;border:none;font-size:14px;max-width:none;white-space:normal;}
+  #ticketTable td[data-field="number"]{grid-area:num;font-size:15px;align-self:center;}
+  #ticketTable td[data-field="status"]{grid-area:status;justify-self:end;align-self:center;}
+  #ticketTable td[data-field="customer"]{grid-area:customer;}
+  #ticketTable td[data-field="callBtn"]{grid-area:call;align-self:center;}
+  #ticketTable td[data-field="model"]{grid-area:model;}
+  #ticketTable td[data-field="issue"]{grid-area:issue;color:var(--ink);}
+  #ticketTable td[data-field="customerPrice"]{grid-area:price;}
+  #ticketTable td[data-field="kaparo"]{grid-area:kaparo;justify-self:end;}
+  #ticketTable td[data-field="dateIn"]{grid-area:dateIn;color:var(--ink-soft);font-size:12.5px;}
+  #ticketTable td[data-field="model"]::before, #ticketTable td[data-field="issue"]::before,
+  #ticketTable td[data-field="customerPrice"]::before, #ticketTable td[data-field="kaparo"]::before,
+  #ticketTable td[data-field="dateIn"]::before{content:attr(data-label) ": ";color:var(--ink-soft);font-size:12.5px;}
+  #ticketTable td[data-field="password"], #ticketTable td[data-field="comment"],
+  #ticketTable td[data-field="repairPerformed"], #ticketTable td[data-field="loanerPhone"],
+  #ticketTable td[data-field="pravim"], #ticketTable td[data-field="servicePrice"],
+  #ticketTable td[data-field="dateReturned"]{display:none !important;}
+  #ticketTable .quick-edit-cell:hover{background:none;}
+  #ticketTable .quick-edit-cell:hover::after, #ticketTable .status-cell:hover::after{content:none;}
+  #compactToggle, #tableHint{display:none;}
+  /* Header counters: one scrollable row instead of several. */
+  .stats{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;max-width:100%;}
+  .header-right{align-items:flex-start;width:100%;}
+  .who{flex-wrap:wrap;row-gap:4px;}
+  .stats{min-width:0;}
+}

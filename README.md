@@ -588,6 +588,14 @@ last 3 or 12 months, this year, or any dates). All amounts are in €.
 - Click a **status** in the table to change it straight from a dropdown,
   without opening the ticket. Changing it to "издаден" (here or in the
   ticket form) fills in today as the return date, unless one is already set.
+- **Компактен изглед** (button next to the filters) shows one line per order,
+  with long texts cut short (full text on hover). Each browser remembers it.
+- **On a phone**, orders are shown as cards (number, status, customer with a
+  call button, model, problem, price, deposit, date). Tap a card to open the
+  order; less-needed fields are in the full order.
+- **After a new order is saved**, the app offers to print the customer card
+  and/or the service label straight away.
+- Editable cells show a ✎ when you point at them.
 - The **counters at the top** are shortcuts: click one (e.g. "чакат клиент") to
   show only those orders; click it again, or "общо поръчки", to show all.
 - **Prices** can be typed with a comma or a point ("25,50" or "25.50").

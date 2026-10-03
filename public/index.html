@@ -56,11 +56,12 @@
     <select class="status-filter" id="statusFilter">
       <option value="">Всички статуси</option>
     </select>
+    <button class="btn secondary view-toggle" id="compactToggle" aria-pressed="false" title="По един ред на поръчка — дългите текстове се съкращават (целият текст при посочване)">Компактен изглед</button>
     <button class="btn" id="newTicketBtn">+ Нова сервизна поръчка</button>
   </div>
 
   <div class="table-wrap">
-    <table>
+    <table id="ticketTable">
       <thead>
         <tr>
           <th class="sortable" data-sort="number" tabindex="0" aria-sort="none" title="Подреди по тази колона">№<span class="sort-arrow" aria-hidden="true"></span></th>
