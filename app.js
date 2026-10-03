@@ -692,7 +692,7 @@ const RESEND_GUARD_SECONDS = 30;
 const asyncRoute = fn => (req, res, next) => Promise.resolve(fn(req, res, next)).catch(next);
 
 app.get('/api/sms/config', requireAuth, (req, res) => {
-  res.json({ enabled: sms.isConfigured() });
+  res.json({ enabled: sms.isConfigured(), provider: sms.provider() });
 });
 
 // Whether the shop phone is reachable and ready (see sms.getPhoneStatus).

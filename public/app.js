@@ -797,7 +797,10 @@ let smsTicketId = null;
 async function loadSmsConfig(){
   try {
     const res = await fetch('/api/sms/config');
-    smsEnabled = res.ok && (await res.json()).enabled === true;
+    const cfg = res.ok ? await res.json() : {};
+    smsEnabled = cfg.enabled === true;
+    document.getElementById('smsViaHint').textContent = cfg.provider === 'smsapi'
+      ? 'Изпраща се чрез SMSAPI.bg' : 'Изпраща се от телефона на сервиза';
   } catch(_) { smsEnabled = false; }
   document.getElementById('smsPill').style.display = smsEnabled ? '' : 'none';
   if(smsEnabled){
@@ -818,11 +821,27 @@ const PHONE_STATES = {
   cloud:   { cls: 'neutral', label: 'SMS: облак',           text: 'SMS през облачната услуга — състоянието на телефона не може да се провери оттук.' }
 };
 
+// The same states when SMS goes through SMSAPI.bg instead of the phone.
+const SERVICE_STATES = {
+  ready:   { cls: 'ok',   label: 'SMS: готов',        text: 'SMSAPI.bg е свързан и готов за изпращане на SMS.' },
+  warning: { cls: 'warn', label: 'SMS: внимание',     text: 'SMSAPI.bg е свързан, но' },
+  offline: { cls: 'bad',  label: 'SMS: няма връзка',  text: 'SMSAPI.bg не отговаря — проверете интернет връзката на компютъра. SMS няма да бъде изпратен.' },
+  auth:    { cls: 'bad',  label: 'SMS: грешни данни', text: 'SMSAPI.bg отказва достъп — проверете API ключа (SMSAPI_TOKEN) в .env.' }
+};
+
 function describePhoneStatus(s){
-  const info = PHONE_STATES[s.state];
+  const states = s.provider === 'smsapi' ? SERVICE_STATES : PHONE_STATES;
+  const info = states[s.state];
   if(!info) return null;
-  const lines = [info.text + (s.state === 'warning' && s.details.problems && s.details.problems.length ? `: ${s.details.problems.join(', ')}.` : '')];
+  const problems = s.details && s.details.problems && s.details.problems.length ? s.details.problems : [];
+  const lines = [s.state === 'warning' && problems.length
+    ? `${info.text}${s.provider === 'smsapi' ? ' ' : ': '}${problems.join(', ')}.`
+    : info.text];
   const d = s.details || {};
+  if(s.provider === 'smsapi'){
+    if(d.credit !== null && d.credit !== undefined) lines.push(`Кредит: ${d.credit}`);
+    lines.push(`Подател: ${d.sender || 'по подразбиране на SMSAPI'}`);
+  }
   if(d.battery !== null && d.battery !== undefined) lines.push(`Батерия: ${d.battery}%${d.charging ? ' (зарежда се)' : ''}`);
   if(d.network) lines.push(`Мрежа: ${d.network}`);
   if(d.failedLastHour !== null && d.failedLastHour !== undefined) lines.push(`Неуспешни SMS за последния час: ${d.failedLastHour}`);
@@ -945,7 +964,7 @@ async function confirmSms(){
 
 const SMS_STATE_LABELS = {
   Sending: 'изпраща се…',
-  Pending: 'чака телефона',
+  Pending: 'изчаква изпращане',
   Processed: 'изпраща се от телефона',
   Sent: 'изпратено',
   Delivered: 'доставено ✓',

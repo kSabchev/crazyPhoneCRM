@@ -169,17 +169,17 @@ test('SMS is off without a gateway and always off in demo mode', async () => {
   const saved = process.env.SMS_GATEWAY_URL;
   try {
     delete process.env.SMS_GATEWAY_URL;
-    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: false });
+    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: false, provider: null });
     await agent.post(`/api/tickets/${t.id}/sms`).send({}).expect(503);
 
     process.env.SMS_GATEWAY_URL = saved;
     process.env.DEMO_MODE = 'true';
-    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: false });
+    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: false, provider: null });
   } finally {
     process.env.SMS_GATEWAY_URL = saved;
     delete process.env.DEMO_MODE;
   }
-  assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: true });
+  assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: true, provider: 'phone' });
 });
 
 test('the SMS text is a setting with a default, and can be changed', async () => {
