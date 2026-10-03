@@ -151,7 +151,9 @@ function renderStatusList(){
       <input type="color" class="status-color" data-index="${i}" value="${statusColor(s)}" title="Цвят на „${escapeHtml(s)}“" aria-label="Цвят на ${escapeHtml(s)}">
       <button class="row-btn" data-action="up" data-index="${i}" ${i===0?'disabled':''}>↑</button>
       <button class="row-btn" data-action="down" data-index="${i}" ${i===settings.statuses.length-1?'disabled':''}>↓</button>
-      <button class="row-btn remove" data-action="remove" data-index="${i}">Премахни</button>
+      ${STATUSES.SYSTEM.includes(s)
+        ? `<span class="row-lock" title="Системен статус — ${escapeHtml(STATUSES.PURPOSE[s])}. Може да се пренарежда и да му се сменя цветът, но не и да се премахва.">🔒 системен</span>`
+        : `<button class="row-btn remove" data-action="remove" data-index="${i}">Премахни</button>`}
     </div>
   `).join('');
 

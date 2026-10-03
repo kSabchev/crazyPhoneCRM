@@ -507,8 +507,11 @@ you.
 Click **Settings** in the header to configure:
 
 - **Shop name** — shown as the title on both printed copies.
-- **Statuses** — add, remove, rename (by removing and re-adding), and reorder
-  the status options every ticket uses. There must always be at least one.
+- **Statuses** — add your own, reorder, and pick each status's colour. The six
+  built-in statuses (🔒 за сервиз, в сервиз, чака клиент, издаден, отказан,
+  забравен) trigger automatic actions — SMS offer, return date, zeroed
+  prices, auto-"забравен" — so they can't be removed or renamed; your own
+  statuses can. Their names are defined once, in `public/statuses.js`.
 - **Table columns** — choose which columns appear in the main ticket table.
   Ticket # always shows, for reference.
 - **Customer print copy** — the footer warning text (liability, the
@@ -652,6 +655,7 @@ repair-log/
   server.js          Entry point — starts the app on PORT
   app.js             Express app: auth routes + ticket API + settings API
   db.js              SQLite schema/setup and upgrades of older databases
+  env.js             Loads .env (skipped in tests, so they never use real settings)
   default-settings.js  Default statuses, colours, columns, print and SMS texts
   reports.js         Calculations behind the reports page
   sms.js             SMS to customers (chooses SMSAPI.bg or the phone)
@@ -678,6 +682,7 @@ repair-log/
     reports.js          Reports page frontend logic (incl. the chart)
     assets/logo.png     Shop logo, used on the customer print
     vendor/              html2canvas + jsPDF (self-hosted, no CDN)
+    statuses.js         The built-in status names (shared by server and pages)
     demo-banner.js      DEMO banner + pre-filled login (demo mode only)
   test/                API + backup/restore tests (npm test), incl. a fake
                          SMS phone so tests never send real SMS

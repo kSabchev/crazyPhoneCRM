@@ -1,6 +1,11 @@
 // Shared test setup. Each test file runs in its own process (node --test),
 // so pointing DATA_ROOT at a fresh temp folder before the app is required
 // gives every file its own empty database, never touching real data.
+// Never read the real .env in tests (see env.js): a live SMSAPI_TOKEN or
+// NAS path there must not leak into test runs. Inherited by the scripts
+// and servers the tests start.
+process.env.CRAZYPHONE_TEST = '1';
+
 const fs = require('fs');
 const os = require('os');
 const path = require('path');

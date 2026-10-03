@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { loadApp, login } = require('./helpers');
 
-const { app } = loadApp();
+const { app, db } = loadApp();
 let agent;
 
 test.before(async () => {
@@ -20,16 +20,47 @@ test('default settings are seeded on first run', async () => {
 });
 
 test('saved settings persist and are trimmed/deduplicated', async () => {
+  const SYSTEM = require('../public/statuses').SYSTEM;
   await agent.put('/api/settings').send({
     shopName: '  Нов сервиз  ',
-    statuses: ['приет', ' приет ', '', 'готов'],
+    statuses: ['приет', ' приет ', '', ...SYSTEM, 'готов', ' готов'],
     devices: ['Zeta', 'Alpha', 'Alpha']
   }).expect(200);
 
   const s = (await agent.get('/api/settings')).body;
   assert.equal(s.shopName, 'Нов сервиз');
-  assert.deepEqual(s.statuses, ['приет', 'готов']);
+  assert.deepEqual(s.statuses, ['приет', ...SYSTEM, 'готов']);
   assert.deepEqual(s.devices, ['Alpha', 'Zeta']);
+  await agent.put('/api/settings').send({ statuses: [...SYSTEM] }).expect(200);
+});
+
+test('built-in statuses can be reordered but not removed', async () => {
+  const SYSTEM = require('../public/statuses').SYSTEM;
+  const reordered = [...SYSTEM].reverse();
+  const s = (await agent.put('/api/settings').send({ statuses: reordered }).expect(200)).body;
+  assert.deepEqual(s.statuses, reordered);
+
+  for (const removed of SYSTEM) {
+    const res = await agent.put('/api/settings').send({ statuses: SYSTEM.filter(x => x !== removed) }).expect(400);
+    assert.match(res.body.error, new RegExp(`„${removed}“ е системен и не може да бъде премахнат`));
+  }
+  // Renaming is removing + adding, so it's refused too.
+  await agent.put('/api/settings')
+    .send({ statuses: SYSTEM.map(x => x === 'чака клиент' ? 'Чака клиент' : x) }).expect(400);
+  await agent.put('/api/settings').send({ statuses: [...SYSTEM] }).expect(200);
+});
+
+test('a shop that removed a built-in status earlier gets it back', async () => {
+  const SYSTEM = require('../public/statuses').SYSTEM;
+  const row = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
+  row.statuses = ['за сервиз', 'в сервиз', 'издаден', 'чака части']; // no чака клиент, отказан, забравен
+  db.prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify(row));
+
+  const s = (await agent.get('/api/settings')).body;
+  assert.deepEqual(s.statuses, ['за сервиз', 'в сервиз', 'издаден', 'чака части', 'чака клиент', 'отказан', 'забравен']);
+  // ...and the settings page can save again (it sends what it got).
+  await agent.put('/api/settings').send({ statuses: s.statuses }).expect(200);
+  for (const x of SYSTEM) assert.ok(s.statuses.includes(x));
 });
 
 test('unknown column keys are dropped', async () => {

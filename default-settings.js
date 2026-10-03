@@ -1,18 +1,20 @@
 // Default shop settings: statuses, visible table columns, the customer
 // print template and the phone-model suggestion list. Used to seed a new
 // database (db.js) and to reset the demo (demo.js).
+const STATUSES = require('./public/statuses');
+
 const DEFAULT_SETTINGS = {
   shopName: 'CrazyPhone',
   shopTagline: 'аксесоари и сервиз',
-  statuses: ['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен'],
+  statuses: [...STATUSES.SYSTEM],
   // Badge colour per status (#rrggbb); text colour is chosen for contrast.
   statusColors: {
-    'за сервиз': '#7C3AED',
-    'в сервиз': '#DC2626',
-    'чака клиент': '#FBBF24',
-    'издаден': '#16A34A',
-    'отказан': '#475569',
-    'забравен': '#9A3412'
+    [STATUSES.FOR_SERVICE]: '#7C3AED',
+    [STATUSES.IN_SERVICE]: '#DC2626',
+    [STATUSES.WAITING]: '#FBBF24',
+    [STATUSES.COMPLETED]: '#16A34A',
+    [STATUSES.REFUSED]: '#475569',
+    [STATUSES.FORGOTTEN]: '#9A3412'
   },
   columns: ['customer', 'callBtn', 'model', 'issue', 'password', 'comment', 'repairPerformed', 'loanerPhone', 'pravim', 'status', 'kaparo', 'servicePrice', 'customerPrice', 'dateIn', 'dateReturned'],
   // SMS sent when an order is moved to "чака клиент" (after confirming).

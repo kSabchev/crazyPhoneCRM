@@ -8,6 +8,7 @@
 // wipe real data.
 const bcrypt = require('bcrypt');
 const DEFAULT_SETTINGS = require('./default-settings');
+const { FOR_SERVICE, IN_SERVICE, WAITING, COMPLETED, REFUSED, FORGOTTEN, CLOSED } = require('./public/statuses');
 
 // Shown on the login screen in demo mode. Two accounts, so the live
 // updates and "who's viewing" indicator can be tried in two browsers.
@@ -92,40 +93,40 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
       const returned = addDays(received, daysIn + daysRepair + daysWaiting);
 
       // The newest orders are still in progress, at different stages.
-      let status = 'издаден';
+      let status = COMPLETED;
       if (returned > now) status = addDays(received, daysIn + daysRepair) > now
-        ? (addDays(received, daysIn) > now ? 'за сервиз' : 'в сервиз')
-        : 'чака клиент';
+        ? (addDays(received, daysIn) > now ? FOR_SERVICE : IN_SERVICE)
+        : WAITING;
       // A few finished orders were refused (handed back unrepaired) or never
       // collected.
-      if (status === 'издаден') {
+      if (status === COMPLETED) {
         const r = rnd();
-        if (r < 0.05) status = 'отказан';
-        else if (r < 0.09) status = 'забравен';
+        if (r < 0.05) status = REFUSED;
+        else if (r < 0.09) status = FORGOTTEN;
       }
-      const done = status === 'издаден';
-      const closed = done || status === 'отказан' || status === 'забравен';
+      const done = status === COMPLETED;
+      const closed = CLOSED.includes(status);
       const deposit = !closed && rnd() < 0.4 ? 20 : 'Не';
 
       const by = rnd() < 0.5 ? 'demo' : 'demo2';
       const id = insert.run(
-        no, name, phone, isoDate(received), done || status === 'отказан' ? isoDate(returned) : null, pick(MODELS),
+        no, name, phone, isoDate(received), done || status === REFUSED ? isoDate(returned) : null, pick(MODELS),
         status, issue, pick(COMMENTS),
-        status === 'за сервиз' || status === 'отказан' ? '' : repair,
+        status === FOR_SERVICE || status === REFUSED ? '' : repair,
         rnd() < 0.15 ? 'да' : 'не',
         pick(PASSWORDS),
         closed ? 'tick' : pick(['circle', 'circle', 'tick']),
         deposit,
-        status === 'за сервиз' || status === 'отказан' ? null : cost + Math.round(rnd() * 10),
+        status === FOR_SERVICE || status === REFUSED ? null : cost + Math.round(rnd() * 10),
         done && rnd() > 0.05 ? price + Math.round(rnd() * 20) : null
       ).lastInsertRowid;
 
       // Status history, so reports can show time spent in each status.
-      audit.run(id, no, 'created', JSON.stringify({ customer_name: name, status: 'за сервиз', phone_password_set: false }), by, atTime(received, 10));
+      audit.run(id, no, 'created', JSON.stringify({ customer_name: name, status: FOR_SERVICE, phone_password_set: false }), by, atTime(received, 10));
       const steps = [
-        ['за сервиз', 'в сервиз', addDays(received, daysIn)],
-        ['в сервиз', 'чака клиент', addDays(received, daysIn + daysRepair)],
-        ['чака клиент', closed ? status : 'издаден', returned]
+        [FOR_SERVICE, IN_SERVICE, addDays(received, daysIn)],
+        [IN_SERVICE, WAITING, addDays(received, daysIn + daysRepair)],
+        [WAITING, closed ? status : COMPLETED, returned]
       ];
       for (const [from, to, at] of steps) {
         if (at > now) break;

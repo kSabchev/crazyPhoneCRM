@@ -37,12 +37,10 @@ test('an existing shop gets the two new statuses added at the end, once', () => 
   assert.equal(savedSettings().addedClosedStatuses, true);
 });
 
-test('removing them in Settings is not undone on the next start', async () => {
-  await agent.put('/api/settings').send({ statuses: OLD_STATUSES }).expect(200);
-  delete require.cache[require.resolve('../db')];
-  require('../db');
-  assert.deepEqual(savedSettings().statuses, OLD_STATUSES);
-  await agent.put('/api/settings').send({ statuses: [...OLD_STATUSES, 'отказан', 'забравен'] }).expect(200);
+test('they are built-in statuses and can no longer be removed', async () => {
+  const res = await agent.put('/api/settings').send({ statuses: OLD_STATUSES }).expect(400);
+  assert.match(res.body.error, /„отказан“ е системен/);
+  assert.deepEqual(savedSettings().statuses, [...OLD_STATUSES, 'отказан', 'забравен']);
 });
 
 test('the new statuses can be set, and do not auto-fill the return date', async () => {

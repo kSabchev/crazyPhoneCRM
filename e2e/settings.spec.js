@@ -153,3 +153,34 @@ test('closing or reloading the tab with unsaved changes triggers the browser war
   await d.dismiss();
   await expect(page.locator('#shopNameInput')).toHaveValue('Незапазено име');
 });
+
+test('built-in statuses are locked; custom statuses can be removed', async ({ page }) => {
+  await page.goto('/settings.html');
+  const rows = page.locator('#statusList .editable-row');
+  const builtIn = ['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен'];
+  for (const name of builtIn) {
+    const r = rows.filter({ hasText: name });
+    await expect(r.locator('.row-lock')).toHaveText('🔒 системен');
+    await expect(r.locator('button.remove')).toHaveCount(0);
+    // Still recolourable and movable.
+    await expect(r.locator('input.status-color')).toBeVisible();
+  }
+  await expect(rows.filter({ hasText: 'чака клиент' }).locator('.row-lock')).toHaveAttribute('title', /SMS/);
+
+  await page.fill('#newStatusInput', 'чака части');
+  await page.click('#addStatusBtn');
+  const custom = rows.filter({ hasText: 'чака части' });
+  await expect(custom.locator('.row-lock')).toHaveCount(0);
+  await custom.locator('button.remove').click();
+  await expect(rows.filter({ hasText: 'чака части' })).toHaveCount(0);
+});
+
+test('built-in statuses can be reordered and saved', async ({ page }) => {
+  await page.goto('/settings.html');
+  const first = page.locator('#statusList .editable-row').first();
+  await expect(first).toContainText('за сервиз');
+  await first.locator('button[data-action="down"]').click();
+  await expect(page.locator('#statusList .editable-row').nth(1)).toContainText('за сервиз');
+  await page.click('#saveBtn');
+  await expect(page.locator('#saveStatus')).toHaveText('Запазено.');
+});
