@@ -821,3 +821,33 @@ test('the counters work from the keyboard', async ({ page }) => {
   await page.keyboard.press('Enter');
   await expect(page.locator('#statusFilter')).toHaveValue('забравен');
 });
+
+test('quick-changing the status to "отказан" sets Капаро and both prices to 0', async ({ page }) => {
+  const t = await createTicketViaApi(page, { kaparo: '20', servicePrice: '35', customerPrice: '90' });
+  await page.reload();
+  const r = row(page, t.customer_name);
+
+  await r.locator('.status-cell .badge').click();
+  await r.locator('.status-select').selectOption('отказан');
+  await expect(r.locator('.badge')).toHaveText('отказан');
+  await expect(r.locator('.service-price-cell')).toHaveText(/^0,00\s€$/);
+  await expect(r.locator('.customer-price-cell')).toHaveText(/^0,00\s€$/);
+  await expect(r.locator('td').filter({ hasText: /^0,00\s€$/ })).toHaveCount(3); // + Капаро
+  // A 0 deposit "covering" a 0 price is not shown as paid.
+  await expect(r.locator('td.kaparo-paid')).toHaveCount(0);
+});
+
+test('choosing "отказан" in the order form shows the zeros before saving', async ({ page }) => {
+  const t = await createTicketViaApi(page, { kaparo: '20', servicePrice: '35', customerPrice: '90' });
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await expect(page.locator('#f_customer_price')).toHaveValue('90');
+
+  await page.selectOption('#f_status', 'отказан');
+  for (const id of ['#f_kaparo', '#f_service_price', '#f_customer_price']) {
+    await expect(page.locator(id)).toHaveValue('0');
+  }
+  await page.click('#saveBtn');
+  await expectModalClosed(page);
+  await expect(row(page, t.customer_name).locator('.customer-price-cell')).toHaveText(/^0,00\s€$/);
+});
