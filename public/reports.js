@@ -3,26 +3,15 @@
 // status/workload/data-quality tables. All figures are computed on the
 // server (reports.js); this file only displays them.
 
-const eur = new Intl.NumberFormat('bg-BG', { style: 'currency', currency: 'EUR' });
 const monthLongFmt = new Intl.DateTimeFormat('bg-BG', { month: 'long', year: 'numeric', timeZone: 'UTC' });
 
-function escapeHtml(str){
-  const div = document.createElement('div');
-  div.textContent = str == null ? '' : String(str);
-  return div.innerHTML;
-}
-
-const fmtMoney = v => eur.format(v);
+const fmtMoney = v => EUR.format(v);
 const fmtDays = v => v === null ? '—' : `${String(v).replace('.', ',')} дни`;
 const monthDate = ym => new Date(ym + '-01T00:00:00Z');
 // Intl's short bg-BG month is numeric ("10.25 г."), so abbreviate by hand: "окт 25".
 const SHORT_MONTHS = ['яну','фев','мар','апр','май','юни','юли','авг','сеп','окт','ное','дек'];
 const fmtMonth = ym => `${SHORT_MONTHS[Number(ym.slice(5, 7)) - 1]} ${ym.slice(2, 4)}`;
 const fmtMonthLong = ym => { const s = monthLongFmt.format(monthDate(ym)); return s[0].toUpperCase() + s.slice(1); };
-
-function localDateString(d){
-  return `${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
-}
 
 // ---------- Period ----------
 function presetRange(preset){
@@ -103,14 +92,6 @@ const SMS_STATE_LABEL = {
   Delivered: 'доставено ✓', Sent: 'изпратено', Pending: 'изчаква изпращане',
   Processed: 'изпраща се', Sending: 'изпраща се', Failed: 'неуспешно'
 };
-
-// SQLite datetime('now') is UTC: "YYYY-MM-DD HH:MM:SS" -> local "dd.mm.yyyy hh:mm".
-function fmtUtcTime(s){
-  const d = new Date(s.replace(' ', 'T') + 'Z');
-  if(isNaN(d)) return s;
-  const p = n => String(n).padStart(2, '0');
-  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
-}
 
 function renderSms(s){
   if(!s) return;
