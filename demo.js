@@ -8,6 +8,7 @@
 // wipe real data.
 const bcrypt = require('bcrypt');
 const DEFAULT_SETTINGS = require('./default-settings');
+const { toInternationalBg, renderTemplate } = require('./sms');
 const { FOR_SERVICE, IN_SERVICE, WAITING, COMPLETED, REFUSED, FORGOTTEN, CLOSED } = require('./public/statuses');
 
 // Shown on the login screen in demo mode. Two accounts — an admin and a
@@ -60,7 +61,7 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
   const pick = list => list[Math.floor(rnd() * list.length)];
 
   db.transaction(() => {
-    db.exec('DELETE FROM audit_log; DELETE FROM tickets; DELETE FROM users;');
+    db.exec('DELETE FROM sms_messages; DELETE FROM audit_log; DELETE FROM tickets; DELETE FROM users;');
     try { db.exec('DELETE FROM sessions'); } catch (_) { /* store not created yet */ }
 
     db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
@@ -77,6 +78,13 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
     const audit = db.prepare(`
       INSERT INTO audit_log (ticket_id, ticket_no, action, changes, performed_by, performed_at)
       VALUES (?, ?, ?, ?, ?, ?)`);
+    // The "ready for pickup" SMS each order got on reaching "чака клиент"
+    // in the last 60 days (as if SMS started recently; every 20th not
+    // delivered), so Справки has SMS history to show without a huge list.
+    const smsSince = addDays(now, -60);
+    const sms = db.prepare(`
+      INSERT INTO sms_messages (ticket_id, ticket_no, phone, text, state, gateway_id, error, sent_by, created_at, updated_at)
+      VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`);
 
     const start = addDays(now, -365);
     for (let no = 1; no <= count; no++) {
@@ -110,8 +118,9 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
       const deposit = !closed && rnd() < 0.4 ? 20 : 'Не';
 
       const by = rnd() < 0.5 ? 'demo' : 'demo2';
+      const model = pick(MODELS);
       const id = insert.run(
-        no, name, phone, isoDate(received), done || status === REFUSED ? isoDate(returned) : null, pick(MODELS),
+        no, name, phone, isoDate(received), done || status === REFUSED ? isoDate(returned) : null, model,
         status, issue, pick(COMMENTS),
         status === FOR_SERVICE || status === REFUSED ? '' : repair,
         rnd() < 0.15 ? 'да' : 'не',
@@ -131,7 +140,15 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
       ];
       for (const [from, to, at] of steps) {
         if (at > now) break;
-        audit.run(id, no, 'updated', JSON.stringify({ status: { from, to } }), by, atTime(at, 12 + Math.floor(rnd() * 6)));
+        const when = atTime(at, 12 + Math.floor(rnd() * 6));
+        audit.run(id, no, 'updated', JSON.stringify({ status: { from, to } }), by, when);
+        const to359 = toInternationalBg(phone);
+        if (to === WAITING && to359 && at >= smsSince) {
+          const ok = no % 20 !== 0;
+          const text = renderTemplate(DEFAULT_SETTINGS.smsTemplate, { ticket_no: no, customer_name: name, phone_model: model }, DEFAULT_SETTINGS.shopName);
+          sms.run(id, no, to359, text, ok ? 'Delivered' : 'Failed', `demo-seed-${no}`, ok ? null : 'Демо: номерът не съществува', by, when, when);
+          audit.run(id, no, 'sms', JSON.stringify({ phone: to359, ok }), by, when);
+        }
       }
     }
   })();

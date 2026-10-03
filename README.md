@@ -206,8 +206,11 @@ works over the internet instead: use
 `SMS_GATEWAY_URL=https://api.sms-gate.app/3rdparty/v1` with the cloud
 credentials shown in the app. Messages then pass through that service.
 
-Without `SMSAPI_TOKEN` or `SMS_GATEWAY_URL` (and always in demo mode) SMS is switched off: the
+Without `SMSAPI_TOKEN` or `SMS_GATEWAY_URL` SMS is switched off: the
 app never offers to send, and the header pill isn't shown.
+
+In demo mode SMS is always simulated (see "Public demo on Render"), even if
+these are set.
 
 ### Troubleshooting SMS
 
@@ -264,6 +267,10 @@ How the demo behaves:
   start**: after each deploy, and each time the free instance wakes up after
   being idle. Visitors' changes never last. It refuses to start if the
   database contains real (non-demo) orders.
+- SMS is simulated (`sms-demo.js`): visitors can send an SMS and watch it
+  become "доставено", but no SMS service or phone is contacted and nothing
+  is ever sent. A number ending in 000 shows a failed SMS. The demo data
+  includes the last 60 days of SMS history for Справки.
 - The free instance sleeps when idle, so the first visit after a while can
   take up to a minute.
 - Every push to `main` redeploys the demo automatically. This can be turned
@@ -703,6 +710,7 @@ repair-log/
   default-settings.js  Default statuses, colours, columns, print and SMS texts
   reports.js         Calculations behind the reports page
   sms.js             SMS to customers (chooses SMSAPI.bg or the phone)
+  sms-demo.js        Simulated SMS for the public demo (nothing is sent)
   smsapi.js          Sending through SMSAPI.bg
   lbx.js             Service label (.lbx) for the Brother QL-600 from the template
   print-templates/

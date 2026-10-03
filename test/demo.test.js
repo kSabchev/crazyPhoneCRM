@@ -36,6 +36,10 @@ test('demo mode fills the database with realistic fake orders and demo logins', 
   const report = (await agent.get('/api/reports?from=2025-10-01&to=2026-09-30').expect(200)).body;
   assert.ok(report.revenue.totals.revenue > 0);
   assert.ok(report.statusTime.length >= 3);
+  // Past "ready for pickup" SMS, a few of them failed, for the SMS report.
+  assert.ok(count("SELECT COUNT(*) n FROM sms_messages WHERE state = 'Delivered'") > 20);
+  assert.ok(count("SELECT COUNT(*) n FROM sms_messages WHERE state = 'Failed'") > 0);
+  assert.equal(count('SELECT COUNT(*) n FROM sms_messages s LEFT JOIN tickets t ON t.id = s.ticket_id WHERE t.id IS NULL'), 0);
 });
 
 test('restarting demo mode throws away visitors\' changes', async () => {
@@ -44,8 +48,11 @@ test('restarting demo mode throws away visitors\' changes', async () => {
     customerName: 'Посетител', phoneContact: '0888123456', phoneModel: 'X', dateReceived: '2026-09-30', description: 'd'
   }).expect(201);
   await agent.put('/api/settings').send({ shopName: 'Променено' }).expect(200);
+  db.prepare(`INSERT INTO sms_messages (ticket_id, ticket_no, phone, text, state, sent_by)
+    VALUES (1, 1, '+359888123456', 'от посетител', 'Delivered', 'demo')`).run();
 
   prepareDemo(db);
+  assert.equal(count("SELECT COUNT(*) n FROM sms_messages WHERE text = 'от посетител'"), 0);
   assert.equal(count('SELECT COUNT(*) n FROM tickets'), 180);
   assert.equal(count("SELECT COUNT(*) n FROM tickets WHERE customer_name = 'Посетител'"), 0);
   const settings = JSON.parse(db.prepare('SELECT data FROM settings').get().data);

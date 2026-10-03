@@ -164,7 +164,7 @@ test('the status check picks up Sent, Delivered and Failed from the phone', asyn
   assert.equal(row.error, 'Invalid number');
 });
 
-test('SMS is off without a gateway and always off in demo mode', async () => {
+test('SMS is off without a gateway; demo mode simulates it instead of using the phone', async () => {
   const t = await create();
   const saved = process.env.SMS_GATEWAY_URL;
   try {
@@ -174,7 +174,7 @@ test('SMS is off without a gateway and always off in demo mode', async () => {
 
     process.env.SMS_GATEWAY_URL = saved;
     process.env.DEMO_MODE = 'true';
-    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: false, provider: null });
+    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: true, provider: 'demo' });
   } finally {
     process.env.SMS_GATEWAY_URL = saved;
     delete process.env.DEMO_MODE;

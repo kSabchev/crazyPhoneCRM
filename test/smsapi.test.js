@@ -174,11 +174,11 @@ test('a wrong token shows as auth; an unreachable SMSAPI as offline', async () =
   assert.equal((await status()).state, 'ready');
 });
 
-test('SMSAPI is off in demo mode', async () => {
+test('SMSAPI is not used in demo mode (SMS is simulated instead)', async () => {
   process.env.DEMO_MODE = 'true';
   try {
-    assert.equal(sms.provider(), null);
-    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: false, provider: null });
+    assert.equal(sms.provider(), 'demo');
+    assert.deepEqual((await agent.get('/api/sms/config')).body, { enabled: true, provider: 'demo' });
   } finally {
     delete process.env.DEMO_MODE;
   }
