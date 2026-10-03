@@ -78,8 +78,23 @@ test('an open ticket keeps unsaved typing while other changes stream in', async 
 });
 
 test('changes made while a screen was disconnected appear once it reconnects', async () => {
+  const pending = new Set();
+  bob.on('request', r => { if (/\/api\/(?!events)/.test(r.url())) pending.add(r); });
+  bob.on('requestfinished', r => pending.delete(r));
+  bob.on('requestfailed', r => pending.delete(r));
+
   // Simulate bob's live connection dropping (server restart, Wi-Fi, sleep).
+  // Only once it's open: the page connects after its first loads, so an
+  // earlier "disconnect" did nothing and the connection opened afterwards.
+  await bob.waitForFunction(() => liveEvents && liveEvents.readyState === EventSource.OPEN);
   await bob.evaluate(() => disconnectLiveUpdates());
+  // Let the reload that runs on connecting finish (settings, then models,
+  // then orders), or it could still fetch the order created below.
+  for (let quiet = 0; quiet < 5; ) {
+    await bob.waitForTimeout(100);
+    quiet = pending.size ? 0 : quiet + 1;
+  }
+
   const t = await createTicketViaApi(alice);
   await bob.waitForTimeout(500);
   await expect(row(bob, t.customer_name)).toHaveCount(0);
