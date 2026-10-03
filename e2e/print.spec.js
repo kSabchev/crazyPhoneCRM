@@ -88,3 +88,57 @@ test('the customer card does not show the unlock code', async ({ page }) => {
   await capturePdf(page);
   await expect(page.locator('#printCustomerTemplate')).not.toContainText('Z-шаблон 7');
 });
+
+// ---- Offer to print right after a new order is saved ----
+async function createThroughForm(page, fields = {}) {
+  const name = `Печат ${Date.now().toString(36)}${Math.random().toString(36).slice(2, 5)}`;
+  await page.click('#newTicketBtn');
+  await page.fill('#f_customer', name);
+  await page.fill('#f_phone', '0888 123 456');
+  await page.fill('#f_model', 'iPhone 13');
+  await page.fill('#f_desc', 'Счупен дисплей');
+  if (fields.status) await page.selectOption('#f_status', fields.status);
+  await page.click('#saveBtn');
+  return name;
+}
+
+test('a new order offers to print both copies, and stays open until Готово', async ({ page }) => {
+  const name = await createThroughForm(page);
+  const offer = page.locator('#printOfferOverlay');
+  await expect(offer).toHaveClass(/\bopen\b/);
+  await expect(page.locator('#printOfferTitle')).toHaveText(/^Поръчка #\d+ е създадена$/);
+  await expect(page.locator('#printOfferSub')).toContainText(name);
+
+  await page.click('#printOfferOverlay [data-print="customer"]');
+  const { width } = await capturePdf(page);
+  expect(width).toBeCloseTo(100, 0);
+  await expect(page.locator('#printCustomerTemplate')).toContainText(name);
+  await expect(page.locator('#printOfferOverlay [data-print="customer"]')).toHaveClass(/\bdone\b/);
+  await expect(offer).toHaveClass(/\bopen\b/);
+
+  const ticketNo = (await page.locator('#printOfferTitle').textContent()).match(/#(\d+)/)[1];
+  const download = await downloadServiceLabel(page, page.locator('#printOfferOverlay [data-print="service"]'));
+  expect(download.suggestedFilename()).toBe(`poruchka-${ticketNo}.lbx`);
+
+  await page.click('#printOfferDoneBtn');
+  await expect(offer).not.toHaveClass(/\bopen\b/);
+});
+
+test('editing an existing order does not offer to print', async ({ page }) => {
+  const t = await createTicketViaApi(page);
+  await page.reload();
+  await row(page, t.customer_name).locator('.ticket-no').click();
+  await page.fill('#f_comment', 'само промяна');
+  await page.click('#saveBtn');
+  await page.waitForTimeout(400);
+  await expect(page.locator('#printOfferOverlay')).not.toHaveClass(/\bopen\b/);
+});
+
+test('a new order created as "чака клиент" offers the SMS after the prints', async ({ page }) => {
+  await createThroughForm(page, { status: 'чака клиент' });
+  await expect(page.locator('#printOfferOverlay')).toHaveClass(/\bopen\b/);
+  await expect(page.locator('#smsOverlay')).not.toHaveClass(/\bopen\b/);
+  await page.click('#printOfferDoneBtn');
+  await expect(page.locator('#smsOverlay')).toHaveClass(/\bopen\b/);
+  await page.click('#smsSkipBtn');
+});

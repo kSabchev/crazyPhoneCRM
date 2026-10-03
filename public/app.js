@@ -738,7 +738,13 @@ async function saveTicket(){
   closeModal();
   loadTickets();
   loadDevices();
-  offerSmsIfNowWaiting(saved, previousStatus);
+  if(method === 'POST'){
+    // A new order: offer the prints first, then (if it was created as
+    // "чака клиент") the SMS.
+    openPrintOffer(saved, () => offerSmsIfNowWaiting(saved, null));
+  } else {
+    offerSmsIfNowWaiting(saved, previousStatus);
+  }
 }
 
 async function deleteTicket(){
@@ -1239,12 +1245,49 @@ async function renderElementToPdf(el, sizeMm){
   window.open(doc.output('bloburl'), '_blank');
 }
 
-async function printCopy(kind){
-  if(!editingTicket || !settings) return;
+// ---------- Offer to print after a new order is saved ----------
+// The prints are usually made right after taking a phone in, so a new
+// order offers both straight away. The window stays open after a print
+// (both are often needed); "Готово" closes it and runs `afterClose`.
+let printOfferTicket = null;
+let printOfferAfter = null;
+
+function openPrintOffer(ticket, afterClose){
+  printOfferTicket = ticket;
+  printOfferAfter = afterClose || null;
+  document.getElementById('printOfferTitle').textContent = `Поръчка #${ticket.ticket_no} е създадена`;
+  document.getElementById('printOfferSub').textContent = `${ticket.customer_name}, ${ticket.phone_model}`;
+  document.querySelectorAll('#printOfferOverlay [data-print]').forEach(btn => btn.classList.remove('done'));
+  document.getElementById('printOfferOverlay').classList.add('open');
+  document.querySelector('#printOfferOverlay [data-print="customer"]').focus();
+}
+
+function closePrintOffer(){
+  document.getElementById('printOfferOverlay').classList.remove('open');
+  const after = printOfferAfter;
+  printOfferTicket = null;
+  printOfferAfter = null;
+  if(after) after();
+}
+
+document.querySelectorAll('#printOfferOverlay [data-print]').forEach(btn => {
+  btn.addEventListener('click', async () => {
+    if(!printOfferTicket) return;
+    await printCopy(btn.dataset.print, printOfferTicket);
+    btn.classList.add('done');
+  });
+});
+document.getElementById('printOfferDoneBtn').addEventListener('click', closePrintOffer);
+document.getElementById('printOfferOverlay').addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closePrintOffer(); });
+
+// Prints the customer card or downloads the service label for `ticket`
+// (the open order by default).
+async function printCopy(kind, ticket = editingTicket){
+  if(!ticket || !settings) return;
   const custEl = document.getElementById('printCustomerTemplate');
 
   if(kind === 'customer'){
-    custEl.innerHTML = buildCustomerPrintDoc(editingTicket);
+    custEl.innerHTML = buildCustomerPrintDoc(ticket);
     const img = custEl.querySelector('img');
     if(img && !img.complete){
       await new Promise(resolve => { img.onload = resolve; img.onerror = resolve; });
@@ -1255,8 +1298,8 @@ async function printCopy(kind){
     // P-touch Editor file (built by the server from the shop's template):
     // it downloads, and opening it in P-touch Editor prints it.
     const a = document.createElement('a');
-    a.href = `/api/tickets/${editingTicket.id}/service-label.lbx`;
-    a.download = `poruchka-${editingTicket.ticket_no}.lbx`;
+    a.href = `/api/tickets/${ticket.id}/service-label.lbx`;
+    a.download = `poruchka-${ticket.ticket_no}.lbx`;
     document.body.appendChild(a);
     a.click();
     a.remove();

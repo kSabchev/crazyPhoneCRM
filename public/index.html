@@ -88,6 +88,10 @@
       <div>Добавете първата сервизна поръчка, за да започнете дневника.</div>
     </div>
   </div>
+  <div class="table-hint" id="tableHint">
+    <span class="hint-pencil">✎</span> Бърза редакция: щракнете <strong>статус</strong>, <strong>парола</strong>, <strong>коментар</strong>,
+    <strong>извършен ремонт</strong> или <strong>цена</strong> в таблицата. Щракнете номера или клиента, за да отворите цялата поръчка.
+  </div>
 </div>
 
 <!-- TICKET MODAL -->
@@ -288,6 +292,23 @@
         <button class="btn secondary" id="pwCancelBtn">Отказ</button>
         <button class="btn" id="pwSaveBtn">Смени паролата</button>
       </div>
+    </div>
+  </div>
+</div>
+
+<!-- OFFER TO PRINT (right after a new order is saved) -->
+<div class="overlay" id="printOfferOverlay">
+  <div class="modal modal-small" role="dialog" aria-labelledby="printOfferTitle">
+    <h2 id="printOfferTitle">Поръчката е създадена</h2>
+    <div class="sub" id="printOfferSub"></div>
+    <p class="print-offer-question">Да се разпечата ли?</p>
+    <div class="print-offer-buttons">
+      <button class="btn secondary" data-print="customer">Разпечатай за клиента</button>
+      <button class="btn secondary" data-print="service">Разпечатай за сервиза</button>
+    </div>
+    <div class="modal-actions">
+      <div class="left"><span class="hint-text">Може да разпечатате и двете; по-късно — от поръчката</span></div>
+      <div class="right"><button class="btn" id="printOfferDoneBtn">Готово</button></div>
     </div>
   </div>
 </div>
