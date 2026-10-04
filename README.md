@@ -709,9 +709,10 @@ repair-log/
   env.js             Loads .env (skipped in tests, so they never use real settings)
   default-settings.js  Default statuses, colours, columns, print and SMS texts
   reports.js         Calculations behind the reports page
-  sms.js             SMS to customers (chooses SMSAPI.bg or the phone)
-  sms-demo.js        Simulated SMS for the public demo (nothing is sent)
-  smsapi.js          Sending through SMSAPI.bg
+  sms.js             SMS to customers: the list of providers, uses the first set up
+  sms-demo.js        Provider: simulated SMS for the public demo (nothing is sent)
+  smsapi.js          Provider: SMSAPI.bg
+  gateway.js         Provider: the Android phone (SMS Gateway for Android)
   lbx.js             Service label (.lbx) for the Brother QL-600 from the template
   print-templates/
     service-label.lbx  P-touch Editor template for the service label
