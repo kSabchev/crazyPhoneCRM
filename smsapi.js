@@ -8,7 +8,8 @@
 //                  message but doesn't deliver or charge it
 //   SMSAPI_URL     optional: API address (default https://api.smsapi.bg)
 //
-// Used instead of the phone gateway whenever SMSAPI_TOKEN is set (sms.js).
+// One of the SMS providers listed in sms.js; used instead of the phone
+// gateway whenever SMSAPI_TOKEN is set.
 
 const TIMEOUT_MS = 15000;
 // Below this many credits the header shows a "top up soon" warning.
