@@ -4,8 +4,7 @@ const express = require('express');
 const db = require('../db');
 const sms = require('../sms');
 const { requireAuth } = require('../lib/auth');
-const { broadcastChange } = require('../lib/live');
-const { logAudit } = require('../lib/audit');
+const { ticketEvents } = require('../lib/ticket-events');
 const { getSettings } = require('../lib/settings-store');
 const { asyncRoute } = require('../lib/util');
 const { ticketsRepo } = require('../lib/tickets-repo');
@@ -87,8 +86,7 @@ router.post('/api/tickets/:id/sms', requireAuth, asyncRoute(async (req, res) => 
       .run(failure, lastInsertRowid);
   }
 
-  logAudit(ticket.id, ticket.ticket_no, 'sms', { phone, ok: !failure }, req.session.username);
-  broadcastChange('tickets');
+  ticketEvents.emit('sms', { ticket, phone, ok: !failure, user: req.session.username });
   const saved = db.prepare('SELECT * FROM sms_messages WHERE id = ?').get(lastInsertRowid);
   if (failure) return res.status(502).json({ error: failure, sms: saved });
   res.status(201).json(saved);
@@ -111,7 +109,7 @@ async function pollSmsStates() {
       changed++;
     }
   }
-  if (changed) broadcastChange('tickets');
+  if (changed) ticketEvents.emit('smsStates', { count: changed });
   return changed;
 }
 

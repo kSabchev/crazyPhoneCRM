@@ -4,8 +4,8 @@ const db = require('../db');
 const STATUSES = require('../public/statuses');
 const { buildServiceLabel } = require('../lbx');
 const { requireAuth, requireAdmin } = require('../lib/auth');
-const { broadcastChange, getEditingBy } = require('../lib/live');
-const { logAudit, diffTickets } = require('../lib/audit');
+const { getEditingBy } = require('../lib/live');
+const { ticketEvents } = require('../lib/ticket-events');
 const { applyTransition } = require('../public/status-rules');
 const { getSettings } = require('../lib/settings-store');
 const { localToday, toPrice } = require('../lib/util');
@@ -49,27 +49,8 @@ router.post('/api/tickets', requireAuth, (req, res) => {
   }, { today: localToday() });
 
   const created = tickets.create(fields);
-
-  logAudit(created.id, created.ticket_no, 'created', {
-    customer_name: created.customer_name,
-    phone_contact: created.phone_contact,
-    date_received: created.date_received,
-    date_returned: created.date_returned,
-    phone_model: created.phone_model,
-    status: created.status,
-    description: created.description,
-    comment: created.comment,
-    repair_performed: created.repair_performed,
-    loaner_phone: created.loaner_phone,
-    // Never the value itself — only whether one was entered.
-    phone_password_set: !!created.phone_password,
-    pravim: created.pravim,
-    kaparo: created.kaparo,
-    service_price: created.service_price,
-    customer_price: created.customer_price
-  }, req.session.username);
-
-  broadcastChange('tickets');
+  // History and live updates: lib/ticket-listeners.js.
+  ticketEvents.emit('created', { after: created, user: req.session.username });
   res.status(201).json(created);
 });
 
@@ -108,13 +89,7 @@ router.put('/api/tickets/:id', requireAuth, (req, res) => {
   next = applyTransition(existing, next, { today: localToday() });
 
   const updated = tickets.update(existing.id, next);
-
-  const diff = diffTickets(existing, next);
-  if (Object.keys(diff).length > 0) {
-    logAudit(existing.id, existing.ticket_no, 'updated', diff, req.session.username);
-  }
-
-  broadcastChange('tickets');
+  ticketEvents.emit('updated', { before: existing, after: updated, user: req.session.username });
   res.json(updated);
 });
 
@@ -122,15 +97,8 @@ router.delete('/api/tickets/:id', requireAdmin, (req, res) => {
   const existing = tickets.get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
 
-  logAudit(existing.id, existing.ticket_no, 'deleted', {
-    customer_name: existing.customer_name,
-    phone_contact: existing.phone_contact,
-    phone_model: existing.phone_model,
-    status: existing.status
-  }, req.session.username);
-
   tickets.remove(existing.id);
-  broadcastChange('tickets');
+  ticketEvents.emit('deleted', { before: existing, user: req.session.username });
   res.json({ ok: true });
 });
 

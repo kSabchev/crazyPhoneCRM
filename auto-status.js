@@ -4,7 +4,7 @@
 // as done by "автоматично", like any other status change.
 const STATUSES = require('./public/statuses');
 const { applyTransition, FORGET_AFTER_DAYS } = require('./public/status-rules');
-const { diffTickets } = require('./lib/ticket-diff');
+const { ticketEvents } = require('./lib/ticket-events');
 const { ticketsRepo } = require('./lib/tickets-repo');
 const { localToday } = require('./lib/util');
 const WAITING_STATUS = STATUSES.WAITING;
@@ -30,9 +30,6 @@ function forgetStaleWaiting(db, { now = Date.now() } = {}) {
     .filter(t => now - t.waitingSince > FORGET_AFTER_DAYS * DAY_MS);
   if (stale.length === 0) return [];
 
-  const logChange = db.prepare(`
-    INSERT INTO audit_log (ticket_id, ticket_no, action, changes, performed_by, performed_at)
-    VALUES (?, ?, 'updated', ?, ?, ?)`);
   const today = localToday(new Date(now));
   const changed = [];
 
@@ -42,8 +39,9 @@ function forgetStaleWaiting(db, { now = Date.now() } = {}) {
       if (!before || before.status !== WAITING_STATUS) continue; // changed in the meantime
       // The status rules apply here too, like any other status change.
       const after = applyTransition(before, { ...before, status: FORGOTTEN_STATUS }, { today });
-      tickets.update(t.id, after);
-      logChange.run(t.id, t.ticketNo, JSON.stringify(diffTickets(before, after)), AUTO_USER, toAuditTime(now));
+      const saved = tickets.update(t.id, after);
+      // History and live updates: lib/ticket-listeners.js.
+      ticketEvents.emit('updated', { before, after: saved, user: AUTO_USER, at: toAuditTime(now) });
       changed.push(t);
     }
   })();

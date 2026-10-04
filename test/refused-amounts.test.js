@@ -44,7 +44,8 @@ test('the change is recorded in the history', async () => {
   await agent.put(`/api/tickets/${t.id}`).send({ status: 'отказан' }).expect(200);
   const update = (await agent.get(`/api/tickets/${t.id}/history`)).body.find(e => e.action === 'updated');
   assert.deepEqual(update.changes.status, { from: 'за сервиз', to: 'отказан' });
-  assert.deepEqual(update.changes.kaparo, { from: 20, to: '0' });
+  // The history records the order as saved: Капаро is stored as a number.
+  assert.deepEqual(update.changes.kaparo, { from: 20, to: 0 });
   assert.deepEqual(update.changes.customer_price, { from: 90, to: 0 });
   assert.deepEqual(update.changes.service_price, { from: null, to: 0 });
 });
