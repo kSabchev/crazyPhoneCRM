@@ -96,106 +96,15 @@ db.exec(`
   -- better-sqlite3-session-store on startup, with the schema it needs.
 `);
 
-// Migration for databases created before "date_returned" existed.
-// Migration for databases created before roles existed: every existing
-// account becomes an admin, so nobody loses access they had.
-const userColumns = db.prepare("PRAGMA table_info(users)").all().map(c => c.name);
-if (!userColumns.includes('role')) {
-  db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
-}
-
-const ticketColumns = db.prepare("PRAGMA table_info(tickets)").all().map(c => c.name);
-if (!ticketColumns.includes('date_returned')) {
-  db.exec('ALTER TABLE tickets ADD COLUMN date_returned TEXT');
-}
-// Migration for databases created before comment/repair/loaner-phone existed.
-for (const col of ['comment', 'repair_performed', 'loaner_phone']) {
-  if (!ticketColumns.includes(col)) {
-    db.exec(`ALTER TABLE tickets ADD COLUMN ${col} TEXT`);
-  }
-}
-// Migration for databases created before the "pravim" tri-state marker existed.
-if (!ticketColumns.includes('pravim')) {
-  db.exec("ALTER TABLE tickets ADD COLUMN pravim TEXT NOT NULL DEFAULT 'circle'");
-}
-// Migration for databases created before "kaparo" (deposit) existed.
-if (!ticketColumns.includes('kaparo')) {
-  db.exec('ALTER TABLE tickets ADD COLUMN kaparo REAL');
-}
-// Migration for databases created before "phone_password" (the customer's
-// unlock code) existed. Also shows its new table column, since the saved
-// column list would otherwise leave it hidden.
-const addedPasswordColumn = !ticketColumns.includes('phone_password');
-if (addedPasswordColumn) {
-  db.exec('ALTER TABLE tickets ADD COLUMN phone_password TEXT');
-}
-
-// "Оборотен телефон" used to be free text (often the loaner's model); it is
-// now a да/не choice. Convert any other value: "Не"/empty -> "не", anything
-// else -> "да" with the original text appended to the comment so nothing
-// is lost. Runs on every start but only touches values not yet converted.
-const legacyLoaners = db.prepare(
-  "SELECT id, loaner_phone, comment FROM tickets WHERE loaner_phone IS NULL OR loaner_phone NOT IN ('да', 'не')"
-).all();
-if (legacyLoaners.length) {
-  const setLoaner = db.prepare('UPDATE tickets SET loaner_phone = ?, comment = ? WHERE id = ?');
-  db.transaction(() => {
-    for (const t of legacyLoaners) {
-      const text = (t.loaner_phone || '').trim();
-      const lower = text.toLowerCase();
-      if (lower === '' || lower === 'не') {
-        setLoaner.run('не', t.comment, t.id);
-      } else if (lower === 'да') {
-        setLoaner.run('да', t.comment, t.id);
-      } else {
-        const note = `Оборотен телефон: ${text}`;
-        setLoaner.run('да', t.comment ? `${t.comment}\n${note}` : note, t.id);
-      }
-    }
-  })();
-}
-
-// Indexes for the queries that run constantly:
-// - the ticket list (every page load and every live update) sorts by
-//   date_received DESC, ticket_no DESC — this index returns rows already
-//   in that order instead of sorting the whole table each time;
-// - a ticket's history looks up audit_log by ticket_id;
-// - the global audit view takes the newest 200 entries by performed_at.
-// (No index on status yet: status filtering happens in the browser, so
-// the database never searches by it.)
-db.exec(`
-  CREATE INDEX IF NOT EXISTS idx_tickets_date_received ON tickets (date_received, ticket_no);
-  CREATE INDEX IF NOT EXISTS idx_audit_ticket_id ON audit_log (ticket_id);
-  CREATE INDEX IF NOT EXISTS idx_audit_performed_at ON audit_log (performed_at);
-`);
-
-// Seed default settings on first run.
+// Default settings on first run. Before the migrations: some of them
+// update the saved settings.
 const DEFAULT_SETTINGS = require('./default-settings');
-const STATUSES = require('./public/statuses');
-
-const existingSettings = db.prepare('SELECT id FROM settings WHERE id = 1').get();
-if (!existingSettings) {
+if (!db.prepare('SELECT id FROM settings WHERE id = 1').get()) {
   db.prepare('INSERT INTO settings (id, data) VALUES (1, ?)').run(JSON.stringify(DEFAULT_SETTINGS));
-} else if (addedPasswordColumn) {
-  const saved = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
-  if (!saved.columns.includes('password')) {
-    saved.columns.push('password');
-    db.prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify(saved));
-  }
 }
 
-// One-time addition of the closed statuses "отказан" (repair refused) and
-// "забравен" (never collected) to shops set up before they existed. Marked
-// as done so a shop that later removes them in Settings keeps them removed.
-{
-  const saved = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
-  if (!saved.addedClosedStatuses) {
-    for (const status of [STATUSES.REFUSED, STATUSES.FORGOTTEN]) {
-      if (!saved.statuses.includes(status)) saved.statuses.push(status);
-    }
-    saved.addedClosedStatuses = true;
-    db.prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify(saved));
-  }
-}
+// Changes to databases created by older versions of the app, each applied
+// once, in order (see migrations.js).
+require('./migrations').migrate(db);
 
 module.exports = db;

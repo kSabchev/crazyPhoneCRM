@@ -4,12 +4,13 @@ const express = require('express');
 const db = require('../db');
 const sms = require('../sms');
 const { requireAuth } = require('../lib/auth');
-const { broadcastChange } = require('../lib/live');
-const { logAudit } = require('../lib/audit');
+const { ticketEvents } = require('../lib/ticket-events');
 const { getSettings } = require('../lib/settings-store');
 const { asyncRoute } = require('../lib/util');
+const { ticketsRepo } = require('../lib/tickets-repo');
 
 const router = express.Router();
+const tickets = ticketsRepo(db);
 
 const MAX_SMS_LENGTH = 600;
 const RESEND_GUARD_SECONDS = 30;
@@ -29,7 +30,7 @@ function smsForTicket(ticketId) {
 }
 
 router.get('/api/tickets/:id/sms', requireAuth, (req, res) => {
-  const ticket = db.prepare('SELECT id FROM tickets WHERE id = ?').get(req.params.id);
+  const ticket = tickets.get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
   res.json(smsForTicket(ticket.id));
 });
@@ -37,7 +38,7 @@ router.get('/api/tickets/:id/sms', requireAuth, (req, res) => {
 // What would be sent: the number in international form and the text from
 // the template, for the confirmation window.
 router.get('/api/tickets/:id/sms/preview', requireAuth, (req, res) => {
-  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  const ticket = tickets.get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
   const settings = getSettings();
   res.json({
@@ -50,7 +51,7 @@ router.get('/api/tickets/:id/sms/preview', requireAuth, (req, res) => {
 
 router.post('/api/tickets/:id/sms', requireAuth, asyncRoute(async (req, res) => {
   if (!sms.isConfigured()) return res.status(503).json({ error: 'SMS известията не са настроени' });
-  const ticket = db.prepare('SELECT * FROM tickets WHERE id = ?').get(req.params.id);
+  const ticket = tickets.get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
 
   const phone = sms.toInternationalBg(ticket.phone_contact);
@@ -85,8 +86,7 @@ router.post('/api/tickets/:id/sms', requireAuth, asyncRoute(async (req, res) => 
       .run(failure, lastInsertRowid);
   }
 
-  logAudit(ticket.id, ticket.ticket_no, 'sms', { phone, ok: !failure }, req.session.username);
-  broadcastChange('tickets');
+  ticketEvents.emit('sms', { ticket, phone, ok: !failure, user: req.session.username });
   const saved = db.prepare('SELECT * FROM sms_messages WHERE id = ?').get(lastInsertRowid);
   if (failure) return res.status(502).json({ error: failure, sms: saved });
   res.status(201).json(saved);
@@ -109,7 +109,7 @@ async function pollSmsStates() {
       changed++;
     }
   }
-  if (changed) broadcastChange('tickets');
+  if (changed) ticketEvents.emit('smsStates', { count: changed });
   return changed;
 }
 

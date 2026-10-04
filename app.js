@@ -12,6 +12,7 @@ const SqliteStore = require('better-sqlite3-session-store')(session);
 const db = require('./db');
 const { forgetStaleWaiting } = require('./auto-status');
 const live = require('./lib/live');
+require('./lib/ticket-listeners'); // history + live updates after every order change
 const smsRoutes = require('./routes/sms');
 
 const app = express();
@@ -92,13 +93,12 @@ app.use(smsRoutes.router);               // SMS to customers
 app.pollSmsStates = smsRoutes.pollSmsStates;
 
 // On start and hourly: orders waiting for the customer for over 30 days
-// become "забравен". Open screens refresh live.
+// become "забравен" (history and live updates via the order events).
 app.runMaintenance = () => {
   const forgotten = forgetStaleWaiting(db);
   if (forgotten.length) {
     console.log(`[${new Date().toISOString()}] Marked ${forgotten.length} order(s) as "забравен" after 30+ days waiting: ` +
       forgotten.map(t => `#${t.ticketNo}`).join(', '));
-    live.broadcastChange('tickets');
   }
   return forgotten;
 };

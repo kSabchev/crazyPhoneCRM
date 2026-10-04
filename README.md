@@ -702,11 +702,15 @@ repair-log/
     auth.js            Login checks (requireAuth, requireAdmin)
     live.js            Live updates and "who's editing" (server-sent events)
     settings-store.js  Reading the settings, with defaults and upgrades
+    tickets-repo.js    All SQL for orders: get, list, create, update, remove
+    ticket-events.js   Announces every change to an order
+    ticket-listeners.js  After every change: history + live updates
     audit.js           Writing the change history
     ticket-diff.js     What changed between two versions of an order (no database)
     ticket-input.js    Checking and cleaning order fields
     util.js            Dates, prices, async route wrapper
-  db.js              SQLite schema/setup and upgrades of older databases
+  db.js              SQLite schema and setup
+  migrations.js      Numbered changes for older databases (each runs once)
   env.js             Loads .env (skipped in tests, so they never use real settings)
   default-settings.js  Default statuses, colours, columns, print and SMS texts
   reports.js         Calculations behind the reports page
