@@ -11,6 +11,8 @@
 //
 // One of the SMS providers listed in sms.js.
 
+const { assertTestUrl } = require('./lib/test-guard');
+
 const SEND_TIMEOUT_MS = 15000;
 const HEALTH_TIMEOUT_MS = 5000;
 
@@ -35,6 +37,7 @@ function authHeader(cfg) {
 async function send(phone, text) {
   const cfg = config();
   if (!cfg) throw new Error('SMS известията не са настроени');
+  assertTestUrl(cfg.url, 'SMS_GATEWAY_URL'); // tests: only the fake phone
   let res;
   try {
     res = await fetch(cfg.url + cfg.path, {
@@ -56,6 +59,7 @@ async function send(phone, text) {
 async function state(gatewayId) {
   const cfg = config();
   if (!cfg || !gatewayId) return null;
+  assertTestUrl(cfg.url, 'SMS_GATEWAY_URL');
   const res = await fetch(`${cfg.url}${cfg.path}/${encodeURIComponent(gatewayId)}`, {
     headers: { Authorization: authHeader(cfg) },
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS)
@@ -90,6 +94,7 @@ async function serviceStatus() {
   const cfg = config();
   if (!cfg) return { state: 'off', details: {} };
   if (cfg.path === '/messages') return { state: 'cloud', details: {} };
+  assertTestUrl(cfg.url, 'SMS_GATEWAY_URL');
   try {
     const res = await fetch(`${cfg.url}/health`, {
       headers: { Authorization: authHeader(cfg) },

@@ -103,6 +103,13 @@ npm run test:e2e
 They start their own copy of the server on port 3100 with a throwaway
 database, so they are also safe to run next to the live app.
 
+This is enforced, not just intended: during tests (`CRAZYPHONE_TEST=1`)
+the app refuses to use a data, backup or NAS folder outside the system temp
+folder, and refuses to send SMS anywhere but the tests' fake services on
+this computer (`lib/test-guard.js`). The real `.env` is never read.
+Traces of failed browser tests also go to the temp folder
+(`crazyphone-test-results`; the path is printed on failure).
+
 Both suites run automatically on GitHub (API tests on Windows and Linux,
 Node 22 and 24; browser tests on Linux) for every pull request and every
 push to `main` — see

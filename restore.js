@@ -24,6 +24,9 @@ const DB_PATH = path.join(BASE_DIR, 'data', 'repair-log.db');
 const BACKUP_DIR = path.join(BASE_DIR, 'backups');
 const PRE_RESTORE_DIR = path.join(BASE_DIR, 'data', 'pre-restore');
 
+// Tests: only temp folders, never the real database.
+require('./lib/test-guard').assertTestFolder(process.env.DATA_ROOT, 'DATA_ROOT');
+
 function listBackups() {
   if (!fs.existsSync(BACKUP_DIR)) return [];
   return fs.readdirSync(BACKUP_DIR)

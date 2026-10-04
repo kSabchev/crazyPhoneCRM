@@ -8,11 +8,8 @@ const Database = require('better-sqlite3');
 // so redeploying a new code version never touches them at all. Optional —
 // defaults to the app folder itself, exactly as before, if not set.
 // Tests must always use their own temp folder (test/helpers.js sets it in
-// loadApp): never fall back to the app folder, where a developer's own
-// database lives.
-if (process.env.CRAZYPHONE_TEST === '1' && !process.env.DATA_ROOT) {
-  throw new Error('db.js loaded in a test before DATA_ROOT was set — call loadApp() before requiring modules that use the database');
-}
+// loadApp) — never the app folder or a real data folder.
+require('./lib/test-guard').assertTestFolder(process.env.DATA_ROOT, 'DATA_ROOT');
 const BASE_DIR = process.env.DATA_ROOT ? path.resolve(process.env.DATA_ROOT) : __dirname;
 
 const DATA_DIR = path.join(BASE_DIR, 'data');
