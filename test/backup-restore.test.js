@@ -63,7 +63,7 @@ test('backup copies the live database, including writes still in the WAL', () =>
     live.close();
   }
 
-  const backups = listDir(path.join(dataRoot, 'backups'));
+  const backups = listDir(path.join(dataRoot, 'backups')).filter(f => f.endsWith('.db')); // not backup-log.json
   assert.equal(backups.length, 1);
   assert.match(backups[0], /^repair-log_.*\.db$/);
   assert.deepEqual(namesIn(path.join(dataRoot, 'backups', backups[0])), ['a', 'in-wal-only']);

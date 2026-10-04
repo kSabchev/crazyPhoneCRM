@@ -130,11 +130,37 @@ document.getElementById('loginForm').addEventListener('submit', async (e)=>{
     const data = await res.json();
     document.getElementById('loginPass').value = '';
     showApp(data.username, data.role);
+    if(data.role === 'admin') checkBackupsAfterLogin(); // only right after logging in
   } else {
     const data = await res.json().catch(()=>({}));
     errEl.textContent = data.error || 'Неуспешен вход.';
   }
 });
+
+// ---------- Failed backups notice ----------
+// Right after an admin logs in: if any of the latest backups failed, say so.
+// The full list (green / red) is at the bottom of Справки.
+async function checkBackupsAfterLogin(){
+  try {
+    const res = await fetch('/api/backups');
+    if(!res.ok) return;
+    const { runs } = await res.json();
+    const failed = runs.filter(r => !r.ok);
+    if(!failed.length) return;
+    document.getElementById('backupAlertSub').textContent = failed.length === 1
+      ? `1 от последните ${runs.length} резервни копия е неуспешно:`
+      : `${failed.length} от последните ${runs.length} резервни копия са неуспешни:`;
+    document.getElementById('backupAlertList').innerHTML = failed.map(r =>
+      `<li><strong>${escapeHtml(fmtIsoTime(r.startedAt))}</strong> — ${escapeHtml(r.error || 'неизвестна грешка')}</li>`).join('');
+    document.getElementById('backupAlertOverlay').classList.add('open');
+    document.getElementById('backupAlertDoneBtn').focus();
+  } catch(_) { /* the notice is a convenience: never block logging in */ }
+}
+function closeBackupAlert(){
+  document.getElementById('backupAlertOverlay').classList.remove('open');
+}
+document.getElementById('backupAlertDoneBtn').addEventListener('click', closeBackupAlert);
+document.getElementById('backupAlertOverlay').addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeBackupAlert(); });
 
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   disconnectLiveUpdates();

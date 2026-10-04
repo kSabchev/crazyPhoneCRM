@@ -31,13 +31,23 @@ function fmtDate(d){
   return `${day}.${m}.${y}`;
 }
 
+// A moment as local "10.09.2026 18:42".
+function fmtLocalDateTime(d){
+  const p = n => String(n).padStart(2, '0');
+  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+}
+
 // SQLite datetime('now') is UTC, e.g. "2026-09-10 15:42:19" -> local
 // "10.09.2026 18:42".
 function fmtUtcTime(s){
   const d = new Date(s.replace(' ', 'T') + 'Z');
-  if(isNaN(d)) return s;
-  const p = n => String(n).padStart(2, '0');
-  return `${p(d.getDate())}.${p(d.getMonth() + 1)}.${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`;
+  return isNaN(d) ? s : fmtLocalDateTime(d);
+}
+
+// An ISO time ("2026-09-10T15:42:19.000Z") -> local "10.09.2026 18:42".
+function fmtIsoTime(s){
+  const d = new Date(s);
+  return isNaN(d) ? String(s ?? '—') : fmtLocalDateTime(d);
 }
 
 // Money is shown the same way everywhere (table, history, print, reports):

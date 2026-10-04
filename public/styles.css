@@ -485,6 +485,17 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
 .report-table .nowrap{white-space:nowrap;}
 .report-table .muted, .muted{color:var(--ink-soft);font-size:12px;}
 .report-table .sms-row-failed td{background:var(--phone-warning-bg);}
+/* Backups in Справки: a green row for a successful run, red for a failed one. */
+.report-table .backup-row-ok td{background:#DCFCE7;}
+.report-table .backup-row-failed td{background:var(--phone-warning-bg);}
+.backup-status{display:inline-block;padding:3px 10px;border-radius:20px;font-size:12px;font-weight:700;white-space:nowrap;color:#FFFFFF;}
+.backup-status-ok{background:#16A34A;}
+.backup-status-failed{background:#DC2626;}
+.backup-file{font-family:Consolas,monospace;font-size:12px;white-space:nowrap;}
+.backup-details{min-width:260px;}
+/* After an admin logs in: the failed-backups notice. */
+.backup-alert-list{margin:0 0 4px;padding:10px 12px 10px 28px;background:var(--phone-warning-bg);border:1px solid var(--phone-warning-border);border-radius:8px;font-size:13px;color:#7F1D1D;}
+.backup-alert-list li{margin:3px 0;}
 .sms-truncated{margin:8px 0 0;}
 
 /* Price fields: even-width digits, like the table. */

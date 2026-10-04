@@ -374,6 +374,14 @@ Both do the same two things each time they run:
    that's unreachable that night logs a warning instead of failing the whole
    backup.
 
+**Backup log (Windows, `backup.js`).** Every run, successful or not, is
+recorded in `backups/backup-log.json`, which keeps the latest 5. They're listed
+at the bottom of **Справки** (green: successful, red: failed, with the reason).
+If any of them failed, an admin sees a notice right after logging in. A run
+counts as failed if no backup could be made, or if the copy to the NAS
+failed (the local copy is then still saved, and the scheduled task itself
+still reports success, as before). `backup.sh` doesn't record runs.
+
 ### If the app is running on Windows — `backup.js`
 
 Run manually with `node backup.js`. No extra tools needed — it reuses the

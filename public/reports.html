@@ -111,6 +111,17 @@
     <div class="section-sub">Поръчки с липсващи или нечетими данни, които правят горните числа по-неточни.</div>
     <div id="dataQuality"></div>
   </div>
+
+  <div class="settings-section report-section" id="backups">
+    <h2>Резервни копия</h2>
+    <div class="section-sub" id="backupSub">Последните резервни копия на базата данни (правят се автоматично всяка нощ), най-новото най-горе. Не зависи от избрания период.</div>
+    <div class="table-wrap report-table">
+      <table>
+        <thead><tr><th>Дата и час</th><th>Състояние</th><th>Файл</th><th class="num">Размер</th><th>Копие на NAS</th><th>Подробности</th></tr></thead>
+        <tbody id="backupTable"></tbody>
+      </table>
+    </div>
+  </div>
 </div>
 
 <script src="demo-banner.js"></script>
