@@ -249,8 +249,23 @@ function renderStatusList(){
       const preview = picker.parentElement.querySelector('.status-preview');
       preview.style.background = picker.value;
       preview.style.color = readableTextOn(picker.value);
+      renderRules();
     });
   });
+  renderRules();
+}
+
+// ---------- Automatic rules (read-only) ----------
+// What the app does by itself on a status change (status-rules.js — the
+// same list the server and the order form use), with each status's badge.
+function renderRules(){
+  document.getElementById('ruleList').innerHTML = STATUS_RULES.RULES.map(r=>{
+    const bg = statusColor(r.status);
+    return `<li class="rule-item">
+      <span class="badge" style="background:${bg};color:${readableTextOn(bg)}">${escapeHtml(r.status)}</span>
+      <span class="rule-text"><span class="rule-when">${escapeHtml(r.when)}:</span> ${escapeHtml(r.text)}</span>
+    </li>`;
+  }).join('');
 }
 
 document.getElementById('addStatusBtn').addEventListener('click', ()=>{

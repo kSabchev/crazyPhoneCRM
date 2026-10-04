@@ -5,17 +5,13 @@ const STATUSES = require('../public/statuses');
 const { buildServiceLabel } = require('../lbx');
 const { requireAuth, requireAdmin } = require('../lib/auth');
 const { broadcastChange, getEditingBy } = require('../lib/live');
-const { logAudit, TRACKED_FIELDS } = require('../lib/audit');
+const { logAudit, diffTickets } = require('../lib/audit');
+const { applyTransition } = require('../public/status-rules');
 const { getSettings } = require('../lib/settings-store');
 const { localToday, toPrice } = require('../lib/util');
 const { validateTicketInput, normalizePravim, normalizeLoaner, normalizePassword } = require('../lib/ticket-input');
 
 const router = express.Router();
-
-const COMPLETED_STATUS = STATUSES.COMPLETED;
-// Moving an order to this status zeroes what it would cost (see PUT).
-const REFUSED_STATUS = STATUSES.REFUSED;
-const REFUSED_AMOUNTS = { kaparo: '0', service_price: 0, customer_price: 0 };
 
 router.get('/api/tickets', requireAuth, (req, res) => {
   const rows = db.prepare('SELECT * FROM tickets ORDER BY date_received DESC, ticket_no DESC').all();
@@ -33,33 +29,33 @@ router.post('/api/tickets', requireAuth, (req, res) => {
   const nextNoRow = db.prepare('SELECT MAX(ticket_no) AS maxNo FROM tickets').get();
   const nextNo = (nextNoRow.maxNo || 0) + 1;
 
-  // Created already refused: nothing to charge (see the rule in PUT).
-  const refusedOnCreate = t.status === REFUSED_STATUS;
+  // New orders get the status rules too (e.g. created already refused:
+  // nothing to charge) — see public/status-rules.js.
+  const fields = applyTransition(null, {
+    customer_name: t.customerName,
+    phone_contact: t.phoneContact,
+    date_received: t.dateReceived,
+    date_returned: t.dateReturned || null,
+    phone_model: t.phoneModel,
+    status: t.status || STATUSES.FOR_SERVICE,
+    description: t.description,
+    comment: t.comment || '',
+    repair_performed: t.repairPerformed || '',
+    loaner_phone: normalizeLoaner(t.loanerPhone),
+    phone_password: normalizePassword(t.phonePassword),
+    pravim: normalizePravim(t.pravim, 'circle'),
+    kaparo: t.kaparo && String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не',
+    service_price: toPrice(t.servicePrice),
+    customer_price: toPrice(t.customerPrice)
+  }, { today: localToday() });
 
   const result = db
     .prepare(
       `INSERT INTO tickets
         (ticket_no, customer_name, phone_contact, date_received, date_returned, phone_model, status, description, comment, repair_performed, loaner_phone, phone_password, pravim, kaparo, service_price, customer_price)
-       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`
+       VALUES (@ticket_no, @customer_name, @phone_contact, @date_received, @date_returned, @phone_model, @status, @description, @comment, @repair_performed, @loaner_phone, @phone_password, @pravim, @kaparo, @service_price, @customer_price)`
     )
-    .run(
-      nextNo,
-      t.customerName,
-      t.phoneContact,
-      t.dateReceived,
-      t.dateReturned || (t.status === COMPLETED_STATUS ? localToday() : null),
-      t.phoneModel,
-      t.status || STATUSES.FOR_SERVICE,
-      t.description,
-      t.comment || '',
-      t.repairPerformed || '',
-      normalizeLoaner(t.loanerPhone),
-      normalizePassword(t.phonePassword),
-      normalizePravim(t.pravim, 'circle'),
-      refusedOnCreate ? REFUSED_AMOUNTS.kaparo : (t.kaparo && String(t.kaparo).trim() ? String(t.kaparo).trim() : 'Не'),
-      refusedOnCreate ? REFUSED_AMOUNTS.service_price : toPrice(t.servicePrice),
-      refusedOnCreate ? REFUSED_AMOUNTS.customer_price : toPrice(t.customerPrice)
-    );
+    .run({ ticket_no: nextNo, ...fields });
 
   const created = db.prepare('SELECT * FROM tickets WHERE id = ?').get(result.lastInsertRowid);
 
@@ -94,7 +90,7 @@ router.put('/api/tickets/:id', requireAuth, (req, res) => {
   const invalid = validateTicketInput(t, { partial: true });
   if (invalid) return res.status(400).json({ error: invalid });
 
-  const next = {
+  let next = {
     customer_name: t.customerName ?? existing.customer_name,
     phone_contact: t.phoneContact ?? existing.phone_contact,
     date_received: t.dateReceived ?? existing.date_received,
@@ -116,17 +112,9 @@ router.put('/api/tickets/:id', requireAuth, (req, res) => {
   if (t.servicePrice === undefined) next.service_price = existing.service_price;
   if (t.customerPrice === undefined) next.customer_price = existing.customer_price;
 
-  // Marking a ticket "издаден" means it was handed back today, unless a
-  // return date is already set or was sent. Keeps reports accurate even
-  // when the status is changed without touching the date field.
-  if (next.status === COMPLETED_STATUS && existing.status !== COMPLETED_STATUS && !next.date_returned) {
-    next.date_returned = localToday();
-  }
-  // A refused repair costs nothing: moving an order to "отказан" sets the
-  // deposit and both prices to 0 (staff can still change them afterwards).
-  if (next.status === REFUSED_STATUS && existing.status !== REFUSED_STATUS) {
-    Object.assign(next, REFUSED_AMOUNTS);
-  }
+  // E.g. "издаден" fills in today's return date, "отказан" zeroes the
+  // amounts — see public/status-rules.js.
+  next = applyTransition(existing, next, { today: localToday() });
 
   db.prepare(
     `UPDATE tickets SET
@@ -142,15 +130,7 @@ router.put('/api/tickets/:id', requireAuth, (req, res) => {
     req.params.id
   );
 
-  // Record only what actually changed, for a readable audit trail. The
-  // unlock code is sensitive: the history only notes that it changed,
-  // never the old or new value.
-  const diff = {};
-  for (const [col] of TRACKED_FIELDS) {
-    if (String(existing[col] ?? '') !== String(next[col] ?? '')) {
-      diff[col] = col === 'phone_password' ? { changed: true } : { from: existing[col], to: next[col] };
-    }
-  }
+  const diff = diffTickets(existing, next);
   if (Object.keys(diff).length > 0) {
     logAudit(existing.id, existing.ticket_no, 'updated', diff, req.session.username);
   }

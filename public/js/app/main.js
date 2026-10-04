@@ -17,17 +17,21 @@ document.querySelectorAll('#overlay [data-action]').forEach(btn=>{
 document.getElementById('overlay').addEventListener('click', (e)=>{ if(e.target.id==='overlay') closeModal(); });
 document.getElementById('searchInput').addEventListener('input', render);
 document.getElementById('statusFilter').addEventListener('change', render);
-// Marking a ticket "издаден" fills in today's return date (if none is set
-// yet), so it's visible and can still be changed before saving.
+// Choosing a status shows what the status rules will do (status-rules.js,
+// the same rules the server applies on saving) — e.g. "издаден" fills in
+// today's return date, "отказан" zeroes the amounts. Still editable.
+const RULE_FIELDS = {
+  date_returned: { id: 'f_date_returned', show: v => v || '' },
+  kaparo: { id: 'f_kaparo', show: v => v ?? '' },
+  service_price: { id: 'f_service_price', show: priceForInput },
+  customer_price: { id: 'f_customer_price', show: priceForInput }
+};
 document.getElementById('f_status').addEventListener('change', (e)=>{
-  const returned = document.getElementById('f_date_returned');
-  if(e.target.value === COMPLETED_STATUS && !returned.value){
-    returned.value = localDateString(new Date());
-  }
-  // Moving to "отказан" sets Капаро and both prices to 0 (the server does
-  // the same); shown here straight away, and still editable before saving.
-  if(e.target.value === STATUSES.REFUSED && (!editingTicket || editingTicket.status !== STATUSES.REFUSED)){
-    for(const id of ['f_kaparo', 'f_service_price', 'f_customer_price']) document.getElementById(id).value = '0';
+  const form = { status: e.target.value };
+  for(const [field, { id }] of Object.entries(RULE_FIELDS)) form[field] = document.getElementById(id).value;
+  const next = STATUS_RULES.applyTransition(editingTicket, form, { today: localDateString(new Date()) });
+  for(const [field, { id, show }] of Object.entries(RULE_FIELDS)){
+    if(next[field] !== form[field]) document.getElementById(id).value = show(next[field]);
   }
 });
 document.getElementById('f_phone').addEventListener('input', (e)=>{

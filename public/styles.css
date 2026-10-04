@@ -317,6 +317,12 @@ tbody tr:hover{background:#FBF7EF;}
 .settings-section .section-sub{font-size:13px;color:var(--ink-soft);margin-bottom:16px;}
 
 .editable-list{margin-bottom:12px;}
+.rule-list{list-style:none;margin:0;padding:0;}
+.rule-item{display:flex;align-items:baseline;gap:12px;padding:8px 0;border-top:1px solid var(--line);}
+.rule-item:first-child{border-top:none;}
+.rule-item .badge{flex:0 0 auto;min-width:96px;text-align:center;}
+.rule-text{font-size:14px;}
+.rule-when{color:var(--ink-soft);}
 .editable-row{
   display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--line);
 }

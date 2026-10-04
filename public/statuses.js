@@ -8,6 +8,7 @@
 //   COMPLETED  return date filled in; counts as handed back in reports
 //   REFUSED    Капаро and both prices set to 0
 //   COMPLETED, REFUSED, FORGOTTEN are "closed": not open work
+// The automatic changes themselves are written in status-rules.js.
 (function (root, factory) {
   if (typeof module === 'object' && module.exports) module.exports = factory();
   else root.STATUSES = factory();

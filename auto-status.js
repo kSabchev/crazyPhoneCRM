@@ -3,9 +3,13 @@
 // server start and then hourly (server.js). Recorded in the change history
 // as done by "автоматично", like any other status change.
 const STATUSES = require('./public/statuses');
+const { applyTransition, FORGET_AFTER_DAYS } = require('./public/status-rules');
+const { diffTickets, TRACKED_FIELDS } = require('./lib/ticket-diff');
+const { localToday } = require('./lib/util');
 const WAITING_STATUS = STATUSES.WAITING;
 const FORGOTTEN_STATUS = STATUSES.FORGOTTEN;
-const FORGET_AFTER_DAYS = 30;
+// Only the order fields the history tracks can be changed by a rule.
+const UPDATABLE = new Set(TRACKED_FIELDS.map(([col]) => col));
 const AUTO_USER = 'автоматично';
 const DAY_MS = 24 * 60 * 60 * 1000;
 
@@ -38,21 +42,28 @@ function forgetStaleWaiting(db, { now = Date.now() } = {}) {
     .filter(t => now - t.waitingSince > FORGET_AFTER_DAYS * DAY_MS);
   if (stale.length === 0) return [];
 
-  const setStatus = db.prepare(
-    "UPDATE tickets SET status = ?, updated_at = datetime('now') WHERE id = ? AND status = ?"
-  );
+  const getWaiting = db.prepare('SELECT * FROM tickets WHERE id = ? AND status = ?');
   const logChange = db.prepare(`
     INSERT INTO audit_log (ticket_id, ticket_no, action, changes, performed_by, performed_at)
     VALUES (?, ?, 'updated', ?, ?, ?)`);
-  const changes = JSON.stringify({ status: { from: WAITING_STATUS, to: FORGOTTEN_STATUS } });
+  const today = localToday(new Date(now));
+  const changed = [];
 
   db.transaction(() => {
     for (const t of stale) {
-      setStatus.run(FORGOTTEN_STATUS, t.id, WAITING_STATUS);
-      logChange.run(t.id, t.ticketNo, changes, AUTO_USER, toAuditTime(now));
+      const before = getWaiting.get(t.id, WAITING_STATUS);
+      if (!before) continue; // changed by someone in the meantime
+      // The status rules apply here too, like any other status change.
+      const after = applyTransition(before, { ...before, status: FORGOTTEN_STATUS }, { today });
+      const diff = diffTickets(before, after);
+      const cols = Object.keys(diff).filter(col => UPDATABLE.has(col));
+      db.prepare(`UPDATE tickets SET ${cols.map(c => `${c} = @${c}`).join(', ')}, updated_at = datetime('now') WHERE id = @id`)
+        .run({ ...Object.fromEntries(cols.map(c => [c, after[c]])), id: t.id });
+      logChange.run(t.id, t.ticketNo, JSON.stringify(diff), AUTO_USER, toAuditTime(now));
+      changed.push(t);
     }
   })();
-  return stale;
+  return changed;
 }
 
 module.exports = { forgetStaleWaiting, FORGET_AFTER_DAYS, AUTO_USER };
