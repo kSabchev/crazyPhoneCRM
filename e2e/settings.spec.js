@@ -184,3 +184,19 @@ test('built-in statuses can be reordered and saved', async ({ page }) => {
   await page.click('#saveBtn');
   await expect(page.locator('#saveStatus')).toHaveText('Запазено.');
 });
+
+test('Настройки lists the automatic status rules, with each status in its colour', async ({ page }) => {
+  await page.goto('/settings.html');
+  const items = page.locator('#ruleList .rule-item');
+  await expect(items).toHaveCount(3);
+  await expect(items.nth(0)).toContainText('издаден');
+  await expect(items.nth(0)).toContainText('Датата на връщане се попълва');
+  await expect(items.nth(1)).toContainText('отказан');
+  await expect(items.nth(1)).toContainText('стават 0');
+  await expect(items.nth(2)).toContainText('повече от 30 дни става „забравен“');
+
+  // The badges follow the colour picker before saving, like the status list.
+  const row = page.locator('#statusList .editable-row', { hasText: 'отказан' });
+  await row.locator('input.status-color').fill('#123456');
+  await expect(items.nth(1).locator('.badge')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
+});

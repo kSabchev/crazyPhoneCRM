@@ -703,6 +703,7 @@ repair-log/
     live.js            Live updates and "who's editing" (server-sent events)
     settings-store.js  Reading the settings, with defaults and upgrades
     audit.js           Writing the change history
+    ticket-diff.js     What changed between two versions of an order (no database)
     ticket-input.js    Checking and cleaning order fields
     util.js            Dates, prices, async route wrapper
   db.js              SQLite schema/setup and upgrades of older databases
@@ -746,6 +747,7 @@ repair-log/
     assets/logo.png     Shop logo, used on the customer print
     vendor/              html2canvas + jsPDF (self-hosted, no CDN)
     statuses.js         The built-in status names (shared by server and pages)
+    status-rules.js     What happens on a status change (shared by server, form, Настройки)
     demo-banner.js      DEMO banner + pre-filled login (demo mode only)
   test/                API + backup/restore tests (npm test), incl. a fake
                          SMS phone so tests never send real SMS
