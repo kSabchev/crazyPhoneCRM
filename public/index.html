@@ -298,6 +298,18 @@
 </div>
 
 <!-- OFFER TO PRINT (right after a new order is saved) -->
+<div class="overlay" id="backupAlertOverlay">
+  <div class="modal modal-small" role="alertdialog" aria-labelledby="backupAlertTitle" aria-describedby="backupAlertSub">
+    <h2 id="backupAlertTitle">Неуспешно резервно копие</h2>
+    <div class="sub" id="backupAlertSub"></div>
+    <ul class="backup-alert-list" id="backupAlertList"></ul>
+    <div class="modal-actions">
+      <div class="left"><a class="btn secondary" href="/reports.html#backups" id="backupAlertReportsLink">Виж в Справки</a></div>
+      <div class="right"><button class="btn" id="backupAlertDoneBtn">Разбрах</button></div>
+    </div>
+  </div>
+</div>
+
 <div class="overlay" id="printOfferOverlay">
   <div class="modal modal-small" role="dialog" aria-labelledby="printOfferTitle">
     <h2 id="printOfferTitle">Поръчката е създадена</h2>

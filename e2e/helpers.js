@@ -57,6 +57,15 @@ async function dismissPrintOffer(page) {
   await expect(offer).not.toHaveClass(new RegExp("(^| )open( |$)"));
 }
 
+// Replaces the test server's backup log (newest first), as backup.js
+// would leave it. [] = no backups recorded.
+function setBackupLog(runs) {
+  const dir = require('path').join(process.env.CRAZYPHONE_E2E_DATA_ROOT, 'backups');
+  require('fs').mkdirSync(dir, { recursive: true });
+  require('fs').writeFileSync(require('path').join(dir, 'backup-log.json'), JSON.stringify(runs));
+}
+
 module.exports = {
-  PASSWORD, uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed, dismissPrintOffer
+  PASSWORD, uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed, dismissPrintOffer,
+  setBackupLog
 };

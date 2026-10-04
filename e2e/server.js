@@ -12,7 +12,7 @@ const FAKE_SMS_PORT = 3199;
 (async () => {
   // Never read the real .env (see env.js) — e.g. a live SMSAPI_TOKEN.
   process.env.CRAZYPHONE_TEST = '1';
-  process.env.DATA_ROOT = fs.mkdtempSync(path.join(os.tmpdir(), 'crazyphone-e2e-'));
+  process.env.DATA_ROOT = process.env.CRAZYPHONE_E2E_DATA_ROOT || fs.mkdtempSync(path.join(os.tmpdir(), 'crazyphone-e2e-'));
   process.env.SESSION_SECRET = 'e2e-secret';
 
   const gateway = await startFakeGateway({ port: FAKE_SMS_PORT, user: 'sms', password: 'secret' });
