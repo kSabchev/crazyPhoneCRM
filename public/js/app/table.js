@@ -162,30 +162,30 @@ function render(){
       const [fg,bg] = statusBadgeColors(t.status);
       const editingBadge = (t.editing_by && t.editing_by !== currentUsername)
         ? `<div class="editing-badge">👁 ${escapeHtml(t.editing_by)}</div>` : '';
-      return `<tr onclick="openEdit(${t.id})">
+      return `<tr data-id="${t.id}">
         <td class="ticket-no" data-field="number">#${t.ticket_no}${editingBadge}</td>
         <td${dv('customer')}>
           <div class="cust-name">${escapeHtml(t.customer_name)}</div>
           <div class="cust-phone${isStandardPhone(t.phone_contact) ? '' : ' phone-nonstandard'}"${isStandardPhone(t.phone_contact) ? '' : ` title="${PHONE_HINT}"`}>${escapeHtml(t.phone_contact)}</div>
         </td>
-        <td${dv('callBtn')} class="call-cell" onclick="event.stopPropagation()">
+        <td${dv('callBtn')} class="call-cell">
           <a href="${telHref(t.phone_contact)}" class="call-icon-btn" title="Обади се на ${escapeHtml(t.phone_contact)}">📞</a>
         </td>
         <td${dv('model')}>${escapeHtml(t.phone_model)}</td>
         <td class="desc-cell"${dv('issue')} title="${escapeHtml(t.description)}">${escapeHtml(t.description) || '—'}</td>
-        <td class="password-cell quick-edit-cell"${dv('password')} onclick="openQuickEdit(event, ${t.id}, 'phonePassword')" title="Щракнете, за да промените паролата">${t.phone_password ? `<span class="password-value">${escapeHtml(t.phone_password)}</span>` : '—'}</td>
-        <td class="desc-cell quick-edit-cell comment-cell"${dv('comment')} onclick="openQuickEdit(event, ${t.id}, 'comment')" title="${escapeHtml(t.comment) || 'Щракнете, за да добавите коментар'}">${escapeHtml(t.comment) || '—'}</td>
-        <td class="desc-cell quick-edit-cell repair-cell"${dv('repairPerformed')} onclick="openQuickEdit(event, ${t.id}, 'repairPerformed')" title="${escapeHtml(t.repair_performed) || 'Щракнете, за да добавите извършен ремонт'}">${escapeHtml(t.repair_performed) || '—'}</td>
+        <td class="password-cell quick-edit-cell"${dv('password')} data-quick="phonePassword" title="Щракнете, за да промените паролата">${t.phone_password ? `<span class="password-value">${escapeHtml(t.phone_password)}</span>` : '—'}</td>
+        <td class="desc-cell quick-edit-cell comment-cell"${dv('comment')} data-quick="comment" title="${escapeHtml(t.comment) || 'Щракнете, за да добавите коментар'}">${escapeHtml(t.comment) || '—'}</td>
+        <td class="desc-cell quick-edit-cell repair-cell"${dv('repairPerformed')} data-quick="repairPerformed" title="${escapeHtml(t.repair_performed) || 'Щракнете, за да добавите извършен ремонт'}">${escapeHtml(t.repair_performed) || '—'}</td>
         <td${dv('loanerPhone')}>${escapeHtml(t.loaner_phone)}</td>
-        <td${dv('pravim')} class="pravim-cell" onclick="togglePravim(event, ${t.id})"><span class="pravim-toggle pravim-${t.pravim||'circle'}">${PRAVIM_SYMBOLS[t.pravim||'circle']}</span></td>
-        <td${dv('status')} class="status-cell" onclick="startStatusEdit(event, ${t.id})">${
+        <td${dv('pravim')} class="pravim-cell"><span class="pravim-toggle pravim-${t.pravim||'circle'}">${PRAVIM_SYMBOLS[t.pravim||'circle']}</span></td>
+        <td${dv('status')} class="status-cell">${
           quickStatusId === t.id
             ? statusSelectHtml(t)
             : `<span class="badge" style="color:${fg};background:${bg};" title="Щракнете за смяна на статуса">${escapeHtml(t.status)}</span>`
         }</td>
         <td class="price${kaparoCoversPrice(t) ? ' kaparo-paid' : ''}"${dv('kaparo')}>${escapeHtml(fmtKaparo(t.kaparo))}</td>
-        <td class="price quick-edit-cell service-price-cell"${dv('servicePrice')} onclick="openQuickEdit(event, ${t.id}, 'servicePrice')" title="Щракнете, за да промените изкупната цена">${fmtPrice(t.service_price)}</td>
-        <td class="price quick-edit-cell customer-price-cell"${dv('customerPrice')} onclick="openQuickEdit(event, ${t.id}, 'customerPrice')" title="Щракнете, за да промените продажната цена">${fmtPrice(t.customer_price)}</td>
+        <td class="price quick-edit-cell service-price-cell"${dv('servicePrice')} data-quick="servicePrice" title="Щракнете, за да промените изкупната цена">${fmtPrice(t.service_price)}</td>
+        <td class="price quick-edit-cell customer-price-cell"${dv('customerPrice')} data-quick="customerPrice" title="Щракнете, за да промените продажната цена">${fmtPrice(t.customer_price)}</td>
         <td${dv('dateIn')}>${fmtDate(t.date_received)}</td>
         <td${dv('dateReturned')}>${fmtDate(t.date_returned)}</td>
       </tr>`;
@@ -210,8 +210,7 @@ function statusSelectHtml(t){
   const options = settings ? settings.statuses.slice() : [];
   // Keep a status that was since removed from settings selectable as-is.
   if(!options.includes(t.status)) options.unshift(t.status);
-  return `<select class="status-select" aria-label="Статус на поръчка #${t.ticket_no}"
-      onchange="saveQuickStatus(${t.id}, this.value)" onkeydown="if(event.key==='Escape') cancelStatusEdit()">
+  return `<select class="status-select" aria-label="Статус на поръчка #${t.ticket_no}">
     ${options.map(s=>`<option value="${escapeHtml(s)}"${s===t.status?' selected':''}>${escapeHtml(s)}</option>`).join('')}
   </select>`;
 }
@@ -258,6 +257,31 @@ async function saveQuickStatus(id, status){
 // Clicking anywhere outside the open dropdown closes it without saving.
 document.addEventListener('click', (e)=>{
   if(quickStatusId !== null && !e.target.closest('.status-select')) cancelStatusEdit();
+});
+
+// ---------- Clicks in the table ----------
+// One listener for the whole table instead of onclick="…" on every row
+// and cell (which a strict Content-Security-Policy would block). Each row
+// carries its order's id (data-id); what a click does depends on the cell:
+// the editable ones carry data-quick with the field they edit.
+const tableBody = document.getElementById('tableBody');
+tableBody.addEventListener('click', (e)=>{
+  const row = e.target.closest('tr[data-id]');
+  if(!row) return;
+  const id = Number(row.dataset.id);
+  const cell = e.target.closest('td');
+  if(cell && cell.classList.contains('call-cell')){ e.stopPropagation(); return; } // the 📞 link works by itself
+  if(cell && cell.dataset.quick) return openQuickEdit(e, id, cell.dataset.quick);
+  if(cell && cell.classList.contains('pravim-cell')) return togglePravim(e, id);
+  if(cell && cell.classList.contains('status-cell')) return startStatusEdit(e, id);
+  openEdit(id);
+});
+tableBody.addEventListener('change', (e)=>{
+  if(!e.target.matches('.status-select')) return;
+  saveQuickStatus(Number(e.target.closest('tr[data-id]').dataset.id), e.target.value);
+});
+tableBody.addEventListener('keydown', (e)=>{
+  if(e.target.matches('.status-select') && e.key === 'Escape') cancelStatusEdit();
 });
 
 // Header counters, each a shortcut: clicking one filters the table to that
