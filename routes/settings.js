@@ -5,8 +5,10 @@ const STATUSES = require('../public/statuses');
 const { requireAuth, requireAdmin } = require('../lib/auth');
 const { broadcastChange } = require('../lib/live');
 const { COLUMN_KEYS, HEX_COLOR, getSettings, withStatusColors, withShopPhone } = require('../lib/settings-store');
+const { ticketsRepo } = require('../lib/tickets-repo');
 
 const router = express.Router();
+const tickets = ticketsRepo(db);
 
 router.get('/api/settings', requireAuth, (req, res) => {
   res.json(withShopPhone(getSettings()));
@@ -99,8 +101,7 @@ router.put('/api/settings', requireAdmin, (req, res) => {
 // tickets, so the dropdown "learns" new models as they're typed in.
 router.get('/api/devices', requireAuth, (req, res) => {
   const settings = getSettings();
-  const usedRows = db.prepare('SELECT DISTINCT phone_model FROM tickets WHERE phone_model IS NOT NULL AND phone_model != \'\'').all();
-  const used = usedRows.map(r => r.phone_model);
+  const used = tickets.usedPhoneModels();
 
   const seen = new Map(); // lowercase -> original casing
   for (const d of [...settings.devices, ...used]) {
