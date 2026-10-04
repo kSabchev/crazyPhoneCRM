@@ -25,6 +25,11 @@ const LOCAL_BACKUP_DIR = path.join(BASE_DIR, 'backups');
 // UNC path with backslashes/Cyrillic/spaces.
 const NAS_BACKUP_DIR = process.env.NAS_BACKUP_DIR || null;
 
+// Tests: only temp folders, never the real data or the NAS.
+const { assertTestFolder } = require('./lib/test-guard');
+assertTestFolder(process.env.DATA_ROOT, 'DATA_ROOT');
+if (NAS_BACKUP_DIR) assertTestFolder(NAS_BACKUP_DIR, 'NAS_BACKUP_DIR');
+
 async function main() {
   if (!fs.existsSync(DB_PATH)) {
     console.error(`ERROR: database not found at ${DB_PATH}`);

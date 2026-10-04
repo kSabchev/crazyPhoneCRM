@@ -11,6 +11,8 @@
 // One of the SMS providers listed in sms.js; used instead of the phone
 // gateway whenever SMSAPI_TOKEN is set.
 
+const { assertTestUrl } = require('./lib/test-guard');
+
 const TIMEOUT_MS = 15000;
 // Below this many credits the header shows a "top up soon" warning.
 const LOW_CREDIT = 5;
@@ -60,6 +62,7 @@ const FAILURE_TEXT = {
 };
 
 async function call(cfg, path, { method = 'GET', form } = {}) {
+  assertTestUrl(cfg.url, 'SMSAPI_URL'); // tests: only the fake SMSAPI
   const res = await fetch(`${cfg.url}${path}`, {
     method,
     headers: {
@@ -78,6 +81,7 @@ async function call(cfg, path, { method = 'GET', form } = {}) {
 async function send(phone, text) {
   const cfg = config();
   if (!cfg) throw new Error('SMSAPI не е настроен');
+  assertTestUrl(cfg.url, 'SMSAPI_URL'); // before the try below, so the reason shows
   const form = {
     to: phone.replace(/^\+/, ''),
     message: text,
