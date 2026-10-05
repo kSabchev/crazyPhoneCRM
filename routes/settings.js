@@ -1,3 +1,4 @@
+// @ts-check
 // The shop's settings (Настройки) and the phone-model suggestion list.
 const express = require('express');
 const db = require('../db');

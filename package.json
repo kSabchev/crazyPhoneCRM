@@ -10,7 +10,8 @@
     "start": "node server.js",
     "test": "node --test --test-force-exit \"test/**/*.test.js\"",
     "test:e2e": "playwright test",
-    "create-admin": "node create-admin.js"
+    "create-admin": "node create-admin.js",
+    "typecheck": "tsc -p ."
   },
   "dependencies": {
     "bcrypt": "^6.0.0",
@@ -26,6 +27,12 @@
   },
   "devDependencies": {
     "@playwright/test": "^1.63.0",
-    "supertest": "^7.3.0"
+    "@types/bcrypt": "^6.0.0",
+    "@types/better-sqlite3": "^9.6.0",
+    "@types/express": "^5.0.6",
+    "@types/express-session": "^1.19.0",
+    "@types/node": "^26.6.4",
+    "supertest": "^7.3.0",
+    "typescript": "^7.0.2"
   }
 }

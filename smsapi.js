@@ -1,3 +1,4 @@
+// @ts-check
 // SMS through SMSAPI.bg (https://www.smsapi.bg) — a paid SMS service, no
 // phone needed. Configured in .env:
 //
@@ -41,12 +42,15 @@ function smsapiError(body, status) {
   const code = body && body.error;
   const hint = ERROR_HINTS[code];
   const text = body && body.message ? `${body.message}` : `HTTP ${status}`;
-  const err = new Error(`SMSAPI: ${hint ? hint + ' — ' : ''}${text}${code ? ` (код ${code})` : ''}`);
+  const err = /** @type {Error & { code?: number }} */ (new Error(`SMSAPI: ${hint ? hint + ' — ' : ''}${text}${code ? ` (код ${code})` : ''}`));
   err.code = code;
   return err;
 }
 
 // SMSAPI status names -> the app's SMS states (see sms.js).
+/** @typedef {import('./types/app').SmsProvider} SmsProvider The interface every provider implements (see sms.js). */
+
+/** @type {Record<string, import('./types/app').SmsState>} */
 const STATE_MAP = {
   QUEUE: 'Pending', ACCEPTED: 'Pending', PENDING: 'Pending', RENEWAL: 'Pending',
   SENT: 'Sent',
@@ -61,6 +65,13 @@ const FAILURE_TEXT = {
   STOP: 'спряно'
 };
 
+// `body` is whatever SMSAPI answered (JSON), not checked further.
+/**
+ * @param {{ url: string, token: string }} cfg
+ * @param {string} path
+ * @param {{ method?: string, form?: Record<string, string> }} [options]
+ * @returns {Promise<{ res: Response, body: any }>}
+ */
 async function call(cfg, path, { method = 'GET', form } = {}) {
   assertTestUrl(cfg.url, 'SMSAPI_URL'); // tests: only the fake SMSAPI
   const res = await fetch(`${cfg.url}${path}`, {
@@ -78,6 +89,7 @@ async function call(cfg, path, { method = 'GET', form } = {}) {
 
 // Sends one SMS. `phone` is "+359…"; SMSAPI wants digits only.
 // Resolves to { gatewayId, state } or throws an Error for staff to read.
+/** @param {string} phone @param {string} [text] @returns {ReturnType<SmsProvider['send']>} */
 async function send(phone, text) {
   const cfg = config();
   if (!cfg) throw new Error('SMSAPI не е настроен');
@@ -107,6 +119,7 @@ async function send(phone, text) {
 // Current state of a sent message: { state, error } or null if unknown.
 // NOTE: uses SMSAPI's sms.do?status=<id> lookup — confirm against a real
 // account; if SMSAPI answers differently the SMS simply stays "Pending".
+/** @param {string} id @returns {ReturnType<SmsProvider['state']>} */
 async function state(id) {
   const cfg = config();
   if (!cfg || !id) return null;
@@ -120,6 +133,7 @@ async function state(id) {
 
 // Is SMSAPI reachable and the token valid? Also reports the credit left.
 // Returns { state, details } with state ready / warning / offline / auth.
+/** @returns {ReturnType<SmsProvider['serviceStatus']>} */
 async function serviceStatus() {
   const cfg = config();
   if (!cfg) return { state: 'off', details: {} };

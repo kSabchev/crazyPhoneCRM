@@ -1,3 +1,4 @@
+// @ts-check
 // SMS from the shop's Android phone, through "SMS Gateway for Android"
 // (https://sms-gate.app): the server asks the phone to send the SMS from
 // its own SIM. Configured in .env:
@@ -12,6 +13,8 @@
 // One of the SMS providers listed in sms.js.
 
 const { assertTestUrl } = require('./lib/test-guard');
+
+/** @typedef {import('./types/app').SmsProvider} SmsProvider The interface every provider implements (see sms.js). */
 
 const SEND_TIMEOUT_MS = 15000;
 const HEALTH_TIMEOUT_MS = 5000;
@@ -34,6 +37,7 @@ function authHeader(cfg) {
 
 // Sends one SMS. Resolves to { gatewayId, state }, or throws an Error
 // suitable for showing to staff.
+/** @param {string} phone @param {string} [text] @returns {ReturnType<SmsProvider['send']>} */
 async function send(phone, text) {
   const cfg = config();
   if (!cfg) throw new Error('SMS известията не са настроени');
@@ -51,11 +55,12 @@ async function send(phone, text) {
   }
   if (res.status === 401) throw new Error('Грешно потребителско име или парола за SMS приложението');
   if (!res.ok) throw new Error(`SMS приложението върна грешка (${res.status})`);
-  const body = await res.json().catch(() => ({}));
+  const body = /** @type {any} */ (await res.json().catch(() => ({}))); // the phone app's answer
   return { gatewayId: body.id || null, state: body.state || 'Pending' };
 }
 
 // Current state of a sent message: { state, error }, or null if unknown.
+/** @param {string} gatewayId @returns {ReturnType<SmsProvider['state']>} */
 async function state(gatewayId) {
   const cfg = config();
   if (!cfg || !gatewayId) return null;
@@ -65,7 +70,7 @@ async function state(gatewayId) {
     signal: AbortSignal.timeout(SEND_TIMEOUT_MS)
   });
   if (!res.ok) return null;
-  const body = await res.json().catch(() => ({}));
+  const body = /** @type {any} */ (await res.json().catch(() => ({}))); // the phone app's answer
   const recipient = Array.isArray(body.recipients) ? body.recipients[0] : null;
   return {
     state: (recipient && recipient.state) || body.state || null,
@@ -90,6 +95,7 @@ function checkFailing(checks, key) {
 }
 
 // Returns { state, details } with state cloud / ready / warning / offline / auth.
+/** @returns {ReturnType<SmsProvider['serviceStatus']>} */
 async function serviceStatus() {
   const cfg = config();
   if (!cfg) return { state: 'off', details: {} };
@@ -102,7 +108,7 @@ async function serviceStatus() {
     });
     if (res.status === 401) return { state: 'auth', details: {} };
     // The app answers 503 (with a body) when a check fails; still useful.
-    const body = await res.json().catch(() => ({}));
+    const body = /** @type {any} */ (await res.json().catch(() => ({}))); // the phone app's answer
     const checks = body.checks || {};
     const problems = [];
     if (checkFailing(checks, 'battery:level')) problems.push('ниска батерия');

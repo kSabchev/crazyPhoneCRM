@@ -1,3 +1,4 @@
+// @ts-check
 // Automatic status change: an order left in "чака клиент" for more than
 // FORGET_AFTER_DAYS days becomes "забравен" (never collected). Run on
 // server start and then hourly (server.js). Recorded in the change history

@@ -38,6 +38,23 @@ jobs:
 
       - run: npm test
 
+  typecheck:
+    # TypeScript checks the files marked // @ts-check (see tsconfig.json).
+    # Nothing is compiled: the app still runs the .js files as they are.
+    name: Type check
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - run: npm ci --ignore-scripts
+
+      - run: npm run typecheck
+
   e2e:
     # Browser tests exercise the frontend, which doesn't vary by server OS,
     # so one Linux run is enough.

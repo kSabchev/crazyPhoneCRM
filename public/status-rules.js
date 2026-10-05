@@ -1,3 +1,4 @@
+// @ts-check
 // What happens automatically when an order's status changes — the single
 // place these rules are written. Used by the server (creating and editing
 // orders, the hourly "забравен" check) and by the order form, which shows
@@ -37,6 +38,13 @@
   // The order as it should be saved, given how it was (`before`; null for a
   // new order) and how it's being saved (`after`). `today` is YYYY-MM-DD in
   // the shop's time zone. Returns a new object; neither input is changed.
+  /**
+   * @template {{ status: string }} T
+   * @param {{ status: string } | null} before
+   * @param {T} after
+   * @param {{ today: string }} options
+   * @returns {T}
+   */
   function applyTransition(before, after, { today }) {
     const next = { ...after };
     if (before && before.status === next.status) return next;
