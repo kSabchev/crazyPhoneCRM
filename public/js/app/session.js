@@ -1,14 +1,17 @@
 // Main page: login, roles, changing your password, live updates.
 
 // ---------- Auth ----------
+// Runs when the page opens. Until it answers neither screen is shown, so a
+// logged-in user doesn't see the login form flash up first (e.g. coming
+// back from Справки or Настройки).
 async function checkSession(){
-  const res = await fetch('/api/auth/me');
-  if(res.ok){
-    const data = await res.json();
-    showApp(data.username, data.role);
-  } else {
-    showLogin();
-  }
+  let data = null;
+  try {
+    const res = await fetch('/api/auth/me');
+    if(res.ok) data = await res.json();
+  } catch(_) { /* server unreachable (e.g. restarting): offer the login form */ }
+  if(data) showApp(data.username, data.role);
+  else showLogin();
 }
 
 // ---------- Roles ----------
