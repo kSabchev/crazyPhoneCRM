@@ -9,7 +9,10 @@
 <body>
 
 <!-- LOGIN SCREEN -->
-<div class="login-screen" id="loginScreen">
+<!-- Both screens start hidden: checkSession() shows the right one once the
+     server says whether you're logged in, so the login form never flashes
+     up for someone who is. -->
+<div class="login-screen" id="loginScreen" style="display:none;">
   <form class="login-card" id="loginForm">
     <img src="assets/logo.png" alt="CrazyPhone" class="login-logo">
     <h1>CrazyPhone</h1>
