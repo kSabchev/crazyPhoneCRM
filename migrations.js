@@ -1,3 +1,4 @@
+// @ts-check
 // Database changes, in order. Each one runs exactly once: SQLite's
 // PRAGMA user_version records how many have been applied. To change the
 // database, add a step at the END of the list — never edit, reorder or

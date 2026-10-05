@@ -1,3 +1,4 @@
+// @ts-check
 // Orders: list, create, edit, delete, the service label, and the history.
 const express = require('express');
 const db = require('../db');
@@ -16,11 +17,8 @@ const router = express.Router();
 const tickets = ticketsRepo(db);
 
 router.get('/api/tickets', requireAuth, (req, res) => {
-  const rows = tickets.list();
-  for (const row of rows) {
-    row.editing_by = getEditingBy(row.id);
-  }
-  res.json(rows);
+  // With who's viewing each order right now ("👁 name" in the table).
+  res.json(tickets.list().map(row => ({ ...row, editing_by: getEditingBy(row.id) })));
 });
 
 router.post('/api/tickets', requireAuth, (req, res) => {
@@ -118,16 +116,16 @@ router.get('/api/tickets/:id/service-label.lbx', requireAuth, (req, res) => {
 router.get('/api/tickets/:id/history', requireAuth, (req, res) => {
   const existing = tickets.get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
-  const rows = db
+  const rows = /** @type {import('../types/app').AuditRow[]} */ (db
     .prepare('SELECT * FROM audit_log WHERE ticket_id = ? ORDER BY performed_at DESC, id DESC')
-    .all(req.params.id);
+    .all(req.params.id));
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
 
 router.get('/api/audit', requireAuth, (req, res) => {
-  const rows = db
+  const rows = /** @type {import('../types/app').AuditRow[]} */ (db
     .prepare('SELECT * FROM audit_log ORDER BY performed_at DESC, id DESC LIMIT 200')
-    .all();
+    .all());
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
 

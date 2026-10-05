@@ -1,3 +1,4 @@
+// @ts-check
 // SMS notifications to customers. Sent only when staff confirm it in the
 // app (it asks when an order moves to "чака клиент") — see ../sms.js.
 const express = require('express');
@@ -96,10 +97,10 @@ router.post('/api/tickets/:id/sms', requireAuth, asyncRoute(async (req, res) => 
 // Failed). Called every minute by server.js; only looks at the last 24 hours.
 async function pollSmsStates() {
   if (!sms.isConfigured()) return 0;
-  const open = db.prepare(`
+  const open = /** @type {import('../types/app').SmsMessage[]} */ (db.prepare(`
     SELECT * FROM sms_messages
     WHERE gateway_id IS NOT NULL AND state IN (${sms.POLL_STATES.map(() => '?').join(',')})
-      AND created_at > datetime('now', '-1 day')`).all(...sms.POLL_STATES);
+      AND created_at > datetime('now', '-1 day')`).all(...sms.POLL_STATES));
   let changed = 0;
   for (const m of open) {
     const now = await sms.getSmsState(m.gateway_id).catch(() => null);

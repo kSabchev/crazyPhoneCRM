@@ -1,3 +1,4 @@
+// @ts-check
 // Справки (admins): revenue, turnaround, workload, SMS — see ../reports.js.
 const express = require('express');
 const db = require('../db');

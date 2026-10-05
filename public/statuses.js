@@ -1,3 +1,4 @@
+// @ts-check
 // The built-in ("system") order statuses — the single place their names are
 // written. Loaded by the server (require) and by the pages (<script>, as
 // window.STATUSES), so every feature agrees on them.

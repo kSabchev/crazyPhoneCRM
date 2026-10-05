@@ -1,7 +1,8 @@
+// @ts-check
 // Logging in and out, your own password, and managing accounts (admins).
 const express = require('express');
 const bcrypt = require('bcrypt');
-const rateLimit = require('express-rate-limit');
+const { rateLimit } = require('express-rate-limit');
 const db = require('../db');
 const { requireAuth, requireAdmin } = require('../lib/auth');
 
@@ -25,7 +26,7 @@ router.post('/api/auth/login', loginLimiter, (req, res) => {
     return res.status(400).json({ error: 'Потребителското име и паролата са задължителни' });
   }
 
-  const user = db.prepare('SELECT * FROM users WHERE username = ?').get(username);
+  const user = /** @type {import('../types/app').UserRow | undefined} */ (db.prepare('SELECT * FROM users WHERE username = ?').get(username));
   if (!user || !bcrypt.compareSync(password, user.password_hash)) {
     return res.status(401).json({ error: 'Невалидно потребителско име или парола' });
   }
@@ -59,12 +60,12 @@ function passwordProblem(pw) {
 // through the app — only admins manage accounts and they can't demote or
 // remove themselves, so any admin they act on is a second admin. Kept in
 // case that ever changes.
-const adminCount = () => db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'").get().n;
+const adminCount = () => /** @type {{ n: number }} */ (db.prepare("SELECT COUNT(*) AS n FROM users WHERE role = 'admin'").get()).n;
 
 // Anyone: change your own password (the current one is required).
 router.post('/api/auth/password', requireAuth, (req, res) => {
   const { currentPassword, newPassword } = req.body || {};
-  const row = db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id);
+  const row = /** @type {{ password_hash: string }} */ (db.prepare('SELECT password_hash FROM users WHERE id = ?').get(req.user.id));
   if (typeof currentPassword !== 'string' || !bcrypt.compareSync(currentPassword, row.password_hash)) {
     return res.status(400).json({ error: 'Текущата парола е грешна' });
   }
@@ -97,7 +98,8 @@ router.post('/api/users', requireAdmin, (req, res) => {
 });
 
 router.put('/api/users/:id', requireAdmin, (req, res) => {
-  const target = db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(req.params.id);
+  const target = /** @type {Pick<import('../types/app').UserRow, 'id' | 'username' | 'role'> | undefined} */ (
+    db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(req.params.id));
   if (!target) return res.status(404).json({ error: 'Потребителят не е намерен' });
   const { role, password } = req.body || {};
 
@@ -121,7 +123,7 @@ router.put('/api/users/:id', requireAdmin, (req, res) => {
 });
 
 router.delete('/api/users/:id', requireAdmin, (req, res) => {
-  const target = db.prepare('SELECT id, role FROM users WHERE id = ?').get(req.params.id);
+  const target = /** @type {Pick<import('../types/app').UserRow, 'id' | 'role'> | undefined} */ (db.prepare('SELECT id, role FROM users WHERE id = ?').get(req.params.id));
   if (!target) return res.status(404).json({ error: 'Потребителят не е намерен' });
   if (target.id === req.user.id) return res.status(400).json({ error: 'Не можете да премахнете собствения си профил' });
   if (target.role === 'admin' && adminCount() <= 1) {

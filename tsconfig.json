@@ -1,0 +1,21 @@
+{
+  // Type checking only — nothing is compiled or emitted; the app still runs
+  // the .js files as they are. `npm run typecheck` (also run in CI).
+  //
+  // Files are checked once they start with `// @ts-check`, so checking can
+  // be added one file at a time. Shared types: types/*.d.ts.
+  "compilerOptions": {
+    "allowJs": true,
+    "checkJs": false,
+    "noEmit": true,
+    "target": "es2023",
+    "module": "nodenext",
+    "moduleResolution": "nodenext",
+    "lib": ["es2023"],
+    "types": ["node"],
+    "strict": false,
+    "skipLibCheck": true
+  },
+  "include": ["*.js", "lib/**/*.js", "routes/**/*.js", "public/statuses.js", "public/status-rules.js", "types/**/*.d.ts"],
+  "exclude": ["node_modules", "public/vendor", "e2e", "test", "playwright.config.js"]
+}

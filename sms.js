@@ -1,3 +1,4 @@
+// @ts-check
 // SMS notifications to customers. Each way of sending is a provider module
 // with the same four functions:
 //
@@ -9,6 +10,7 @@
 // The first provider in PROVIDERS that is set up is used. Without any, SMS
 // is switched off: nothing is ever sent and the app doesn't offer to send.
 // A new way of sending is one new module and one line in the list.
+/** @type {Array<[name: string, provider: import('./types/app').SmsProvider]>} */
 const PROVIDERS = [
   // In DEMO_MODE SMS is simulated inside the app and nothing ever leaves
   // the server. (The real providers also switch themselves off in

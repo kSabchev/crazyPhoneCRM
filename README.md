@@ -110,8 +110,23 @@ this computer (`lib/test-guard.js`). The real `.env` is never read.
 Traces of failed browser tests also go to the temp folder
 (`crazyphone-test-results`; the path is printed on failure).
 
-Both suites run automatically on GitHub (API tests on Windows and Linux,
-Node 22 and 24; browser tests on Linux) for every pull request and every
+### Type checking
+
+```bash
+npm run typecheck
+```
+
+TypeScript checks the server code for mistakes such as a misspelled field
+name, a wrong event payload or an SMS provider that doesn't match the
+shared interface. Nothing is compiled — the app still runs the `.js`
+files as they are, so deployment doesn't change. Types are written in JSDoc
+comments; the shared ones (an order, the SMS provider interface, the order
+events, a backup run) are in `types/app.d.ts`. A file is checked once it
+starts with `// @ts-check` (see `tsconfig.json`) — so far `lib/`,
+`routes/` and the SMS, status and migration modules.
+
+Both suites and the type check run automatically on GitHub (API tests on
+Windows and Linux, Node 22 and 24; browser tests and the type check on Linux) for every pull request and every
 push to `main` — see
 `.github/workflows/test.yml`.
 
