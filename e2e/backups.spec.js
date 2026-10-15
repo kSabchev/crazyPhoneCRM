@@ -1,5 +1,6 @@
 // The backup log: the latest runs at the bottom of Справки (green / red),
 // and a notice right after an admin logs in if any of them failed.
+const assert = require('node:assert/strict');
 const { test, expect } = require('@playwright/test');
 const { login, setBackupLog } = require('./helpers');
 
@@ -65,26 +66,69 @@ test('the notice links to the backups in Справки', async ({ page }) => {
   await expect(page.locator('#backupTable tr.backup-row-failed')).toHaveCount(1);
 });
 
-test('no notice when the latest backups all succeeded, for staff, or on reopening the page', async ({ page }) => {
+test('no notice when the latest backups all succeeded, or for staff', async ({ page }) => {
   setBackupLog([ok('2026-10-04T00:30:00.000Z', 'a.db')]);
   await login(page, 'alice');
   await page.waitForTimeout(500);
   await expect(page.locator('#backupAlertOverlay')).not.toHaveClass(/\bopen\b/);
+  await expect(page.locator('#backupWarning')).toBeHidden();
 
   // Staff can't do anything about backups (and Справки is admin-only).
   setBackupLog([failed('2026-10-03T00:30:00.000Z', 'грешка')]);
   await page.click('#logoutBtn');
   await login(page, 'bob');
-  await page.waitForTimeout(500);
+  await page.waitForTimeout(800);
   await expect(page.locator('#backupAlertOverlay')).not.toHaveClass(/\bopen\b/);
+  await expect(page.locator('#backupWarning')).toBeHidden();
+});
 
-  // Only right after logging in — not every time the page is opened.
-  await page.click('#logoutBtn');
+test('reopening the page shows the red sign, not the notice; the sign opens it again', async ({ page }) => {
+  setBackupLog([failed('2026-10-03T00:30:00.000Z', 'грешка при копиране')]);
   await login(page, 'alice');
   await page.locator('#backupAlertDoneBtn').click();
+
   await page.reload();
   await expect(page.locator('#whoAmI')).toHaveText('alice');
+  const sign = page.locator('#backupWarning');
+  await expect(sign).toBeVisible();
   await page.waitForTimeout(500);
   await expect(page.locator('#backupAlertOverlay')).not.toHaveClass(/\bopen\b/);
 
+  // Left of "общо поръчки", on the counters' row.
+  const signBox = await sign.boundingBox();
+  const totalBox = await page.locator('#stats .stat').first().boundingBox();
+  assert.ok(signBox.x + signBox.width <= totalBox.x, 'sign is left of the counters');
+  assert.ok(Math.abs((signBox.y + signBox.height / 2) - (totalBox.y + totalBox.height / 2)) < 20, 'on the same row');
+
+  await sign.click();
+  await expect(page.locator('#backupAlertOverlay')).toHaveClass(/\bopen\b/);
+  await expect(page.locator('#backupAlertList')).toContainText('грешка при копиране');
+});
+
+test('a backup that fails while an admin is logged in is announced straight away', async ({ page }) => {
+  setBackupLog([ok('2026-10-03T00:30:00.000Z', 'a.db')]);
+  await login(page, 'alice');
+  await expect(page.locator('#backupWarning')).toBeHidden();
+
+  // Tonight's backup fails (the server notices within a moment in tests).
+  setBackupLog([failed('2026-10-04T00:30:00.000Z', 'Базата данни не е намерена'), ok('2026-10-03T00:30:00.000Z', 'a.db')]);
+  await expect(page.locator('#backupAlertOverlay')).toHaveClass(/\bopen\b/);
+  await expect(page.locator('#backupAlertList')).toContainText('Базата данни не е намерена');
+  await page.locator('#backupAlertDoneBtn').click();
+  await expect(page.locator('#backupWarning')).toBeVisible();
+
+  // A successful run after it doesn't pop up again (the failure is known)...
+  setBackupLog([ok('2026-10-05T00:30:00.000Z', 'b.db'), failed('2026-10-04T00:30:00.000Z', 'Базата данни не е намерена')]);
+  await page.waitForTimeout(1200);
+  await expect(page.locator('#backupAlertOverlay')).not.toHaveClass(/\bopen\b/);
+
+  // ...but another failure does.
+  setBackupLog([failed('2026-10-06T00:30:00.000Z', 'NAS'), ok('2026-10-05T00:30:00.000Z', 'b.db'), failed('2026-10-04T00:30:00.000Z', 'Базата данни не е намерена')]);
+  await expect(page.locator('#backupAlertOverlay')).toHaveClass(/\bopen\b/);
+  await expect(page.locator('#backupAlertList li')).toHaveCount(2);
+
+  // Once the latest runs are all successful again, the sign goes away.
+  await page.locator('#backupAlertDoneBtn').click();
+  setBackupLog([ok('2026-10-07T00:30:00.000Z', 'c.db')]);
+  await expect(page.locator('#backupWarning')).toBeHidden();
 });

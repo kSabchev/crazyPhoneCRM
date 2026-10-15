@@ -39,7 +39,8 @@ module.exports = defineConfig({
   webServer: {
     command: 'node e2e/server.js',
     url: `http://127.0.0.1:${PORT}/health`,
-    env: { PORT: String(PORT), CRAZYPHONE_E2E_DATA_ROOT: process.env.CRAZYPHONE_E2E_DATA_ROOT },
+    // BACKUP_LOG_CHECK_MS: notice new backup runs within a moment, not a minute.
+    env: { PORT: String(PORT), CRAZYPHONE_E2E_DATA_ROOT: process.env.CRAZYPHONE_E2E_DATA_ROOT, BACKUP_LOG_CHECK_MS: '300' },
     reuseExistingServer: false
   }
 });
