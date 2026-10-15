@@ -298,7 +298,11 @@ const STAT_COUNTERS = [
 
 function renderStats(){
   const current = document.getElementById('statusFilter').value;
-  document.getElementById('stats').innerHTML = STAT_COUNTERS.map(c=>{
+  const stats = document.getElementById('stats');
+  // The counters are rebuilt on every redraw (e.g. a colleague's change
+  // arriving live): keep keyboard focus on the same counter.
+  const focused = stats.contains(document.activeElement) ? document.activeElement.dataset.filter : null;
+  stats.innerHTML = STAT_COUNTERS.map(c=>{
     const count = c.filter === '' ? tickets.length : tickets.filter(t=> t.status === c.filter).length;
     const active = c.filter !== '' && current === c.filter;
     const title = c.filter === '' ? 'Покажи всички поръчки' : `Покажи само „${c.filter}“`;
@@ -306,6 +310,10 @@ function renderStats(){
       <span class="num"${c.color ? ` style="color:${c.color}"` : ''}>${count}</span><span class="lbl">${c.label}</span>
     </button>`;
   }).join('');
+  if(focused !== null){
+    const again = [...stats.querySelectorAll('.stat')].find(b => b.dataset.filter === focused);
+    if(again) again.focus();
+  }
 }
 
 function filterByCounter(status){

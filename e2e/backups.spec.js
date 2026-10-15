@@ -94,9 +94,11 @@ test('reopening the page shows the red sign, not the notice; the sign opens it a
   await page.waitForTimeout(500);
   await expect(page.locator('#backupAlertOverlay')).not.toHaveClass(/\bopen\b/);
 
-  // Left of "общо поръчки", on the counters' row.
-  const signBox = await sign.boundingBox();
-  const totalBox = await page.locator('#stats .stat').first().boundingBox();
+  // Left of "общо поръчки", on the counters' row. Measured together in one
+  // step: the counters are rebuilt on every redraw.
+  const [signBox, totalBox] = await page.evaluate(() =>
+    [document.getElementById('backupWarning'), document.querySelector('#stats .stat')]
+      .map(el => { const r = el.getBoundingClientRect(); return { x: r.x, y: r.y, width: r.width, height: r.height }; }));
   assert.ok(signBox.x + signBox.width <= totalBox.x, 'sign is left of the counters');
   assert.ok(Math.abs((signBox.y + signBox.height / 2) - (totalBox.y + totalBox.height / 2)) < 20, 'on the same row');
 
