@@ -76,6 +76,11 @@ header{
 .brand .tag{font-size:13px;color:var(--ink-soft);border-left:1px solid var(--line);padding-left:12px;}
 .header-right{display:flex;flex-direction:column;align-items:flex-end;gap:8px;}
 .stats{display:flex;gap:22px;flex-wrap:wrap;justify-content:flex-end;}
+.stats-row{display:flex;align-items:center;gap:22px;justify-content:flex-end;}
+.stats-row .stats{min-width:0;}
+/* Admins: a failed backup among the latest (click: the notice). */
+.backup-warning{flex:0 0 auto;width:40px;height:40px;border-radius:50%;border:2px solid #DC2626;background:#FEE2E2;color:#DC2626;font-size:20px;line-height:1;cursor:pointer;padding:0 0 3px;}
+.backup-warning:hover,.backup-warning:focus-visible{background:#DC2626;color:#FFFFFF;outline:none;}
 .stat{text-align:right;background:none;border:none;border-bottom:2px solid transparent;padding:2px 4px 4px;margin:0;font:inherit;color:inherit;cursor:pointer;border-radius:3px 3px 0 0;}
 .stat:hover{background:rgba(0,0,0,0.04);}
 .stat:focus-visible{outline:2px solid var(--copper);outline-offset:1px;}
@@ -576,6 +581,7 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
   #compactToggle, #tableHint{display:none;}
   /* Header counters: one scrollable row instead of several. */
   .stats{flex-wrap:nowrap;overflow-x:auto;justify-content:flex-start;max-width:100%;}
+  .stats-row{justify-content:flex-start;max-width:100%;} /* the ⚠ sign stays put; the counters scroll */
   .header-right{align-items:flex-start;width:100%;}
   .who{flex-wrap:wrap;row-gap:4px;}
   .stats{min-width:0;}

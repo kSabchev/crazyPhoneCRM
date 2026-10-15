@@ -40,7 +40,11 @@
       <span class="tag">регистър на сервизни поръчки за телефони</span>
     </div>
     <div class="header-right">
-      <div class="stats" id="stats"></div>
+      <div class="stats-row">
+        <!-- Admins: shown while any of the latest backups failed (backups.js). -->
+        <button type="button" class="backup-warning" id="backupWarning" style="display:none;">⚠</button>
+        <div class="stats" id="stats"></div>
+      </div>
       <div class="who">
         <button type="button" class="sms-pill" id="smsPill" style="display:none;" title="Състояние на телефона за SMS — щракнете за нова проверка"></button>
         <button type="button" class="who-btn" id="whoAmI"></button><span class="role-tag" id="roleTag"></span>
@@ -361,6 +365,7 @@
 <script src="js/app/table.js"></script>
 <script src="js/app/order-form.js"></script>
 <script src="js/app/sms.js"></script>
+<script src="js/app/backups.js"></script>
 <script src="js/app/quick-edit.js"></script>
 <script src="js/app/print.js"></script>
 <script src="js/app/main.js"></script>

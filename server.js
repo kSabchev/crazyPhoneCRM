@@ -42,6 +42,16 @@ function runMaintenance() {
 runMaintenance();
 setInterval(runMaintenance, 60 * 60 * 1000).unref();
 
+// Every minute (BACKUP_LOG_CHECK_MS overrides, for tests): tell open screens
+// when a backup has run, so admins hear about a failed one straight away.
+setInterval(() => {
+  try {
+    app.checkBackupLog();
+  } catch (err) {
+    console.error(`[${new Date().toISOString()}] Backup log check failed:`, err);
+  }
+}, Number(process.env.BACKUP_LOG_CHECK_MS) || 60 * 1000).unref();
+
 // Every minute: ask the SMS phone how recently sent messages are doing.
 setInterval(() => {
   app.pollSmsStates().catch(err =>

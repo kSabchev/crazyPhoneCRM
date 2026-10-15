@@ -72,7 +72,9 @@ function showLogin(){
   document.getElementById('appScreen').style.display = 'none';
 }
 
-async function showApp(username, role){
+// `justLoggedIn`: from the login form (rather than reopening the page),
+// when admins are told about any failed backup straight away.
+async function showApp(username, role, { justLoggedIn = false } = {}){
   currentUsername = username;
   currentRole = role || 'staff';
   applyRole();
@@ -82,6 +84,7 @@ async function showApp(username, role){
   await loadDevices();
   loadSmsConfig();
   loadTickets();
+  refreshBackups(justLoggedIn ? 'all' : 'quiet');
   connectLiveUpdates();
 }
 
@@ -98,6 +101,8 @@ function connectLiveUpdates(){
       if(editingTicket && smsEnabled) loadTicketSms(editingTicket.id);
     } else if(e.data === 'settings'){
       loadSettings().then(()=>{ loadDevices(); render(); });
+    } else if(e.data === 'backups'){
+      refreshBackups('new'); // a backup has run (backups.js)
     }
   };
   // EventSource retries on its own. Changes made while the stream wasn't
@@ -106,6 +111,7 @@ function connectLiveUpdates(){
   // everything each time it (re)connects to catch up.
   liveEvents.onopen = ()=>{
     loadSettings().then(()=>{ loadDevices(); loadTickets(); });
+    refreshBackups('new'); // a backup may have failed while disconnected
   };
 }
 
@@ -132,41 +138,16 @@ document.getElementById('loginForm').addEventListener('submit', async (e)=>{
   if(res.ok){
     const data = await res.json();
     document.getElementById('loginPass').value = '';
-    showApp(data.username, data.role);
-    if(data.role === 'admin') checkBackupsAfterLogin(); // only right after logging in
+    showApp(data.username, data.role, { justLoggedIn: true });
   } else {
     const data = await res.json().catch(()=>({}));
     errEl.textContent = data.error || 'Неуспешен вход.';
   }
 });
 
-// ---------- Failed backups notice ----------
-// Right after an admin logs in: if any of the latest backups failed, say so.
-// The full list (green / red) is at the bottom of Справки.
-async function checkBackupsAfterLogin(){
-  try {
-    const res = await fetch('/api/backups');
-    if(!res.ok) return;
-    const { runs } = await res.json();
-    const failed = runs.filter(r => !r.ok);
-    if(!failed.length) return;
-    document.getElementById('backupAlertSub').textContent = failed.length === 1
-      ? `1 от последните ${runs.length} резервни копия е неуспешно:`
-      : `${failed.length} от последните ${runs.length} резервни копия са неуспешни:`;
-    document.getElementById('backupAlertList').innerHTML = failed.map(r =>
-      `<li><strong>${escapeHtml(fmtIsoTime(r.startedAt))}</strong> — ${escapeHtml(r.error || 'неизвестна грешка')}</li>`).join('');
-    document.getElementById('backupAlertOverlay').classList.add('open');
-    document.getElementById('backupAlertDoneBtn').focus();
-  } catch(_) { /* the notice is a convenience: never block logging in */ }
-}
-function closeBackupAlert(){
-  document.getElementById('backupAlertOverlay').classList.remove('open');
-}
-document.getElementById('backupAlertDoneBtn').addEventListener('click', closeBackupAlert);
-document.getElementById('backupAlertOverlay').addEventListener('keydown', (e)=>{ if(e.key === 'Escape') closeBackupAlert(); });
-
 document.getElementById('logoutBtn').addEventListener('click', async ()=>{
   disconnectLiveUpdates();
+  resetBackups();
   await fetch('/api/auth/logout', { method:'POST' });
   showLogin();
 });

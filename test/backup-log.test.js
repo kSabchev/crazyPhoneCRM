@@ -104,3 +104,20 @@ test('admins see the backup log; staff and visitors do not', async () => {
   await staff.get('/api/backups').expect(403);
   await request(app).get('/api/backups').expect(401);
 });
+
+test('when a backup runs, the server tells open screens (checked every minute)', () => {
+  const live = require('../lib/live');
+  app.checkBackupLog(); // settle on the log as it is now (earlier tests changed it)
+  const sent = [];
+  const original = live.broadcastChange;
+  live.broadcastChange = type => sent.push(type);
+  try {
+    assert.equal(app.checkBackupLog(), false, 'no change, no message');
+    recordBackupRun({ startedAt: new Date().toISOString(), ok: false, error: 'нов' });
+    assert.equal(app.checkBackupLog(), true);
+    assert.equal(app.checkBackupLog(), false, 'told once per change');
+    assert.deepEqual(sent, ['backups']);
+  } finally {
+    live.broadcastChange = original;
+  }
+});

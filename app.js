@@ -11,6 +11,7 @@ const session = require('express-session');
 const SqliteStore = require('better-sqlite3-session-store')(session);
 const db = require('./db');
 const { forgetStaleWaiting } = require('./auto-status');
+const { backupLogStamp } = require('./lib/backup-log');
 const live = require('./lib/live');
 require('./lib/ticket-listeners'); // history + live updates after every order change
 const smsRoutes = require('./routes/sms');
@@ -91,6 +92,19 @@ app.use(smsRoutes.router);               // SMS to customers
 // ---- Scheduled jobs (started by server.js) ----
 // Every minute: SMS delivery states.
 app.pollSmsStates = smsRoutes.pollSmsStates;
+
+// Every minute: has a backup run since the last check? Backups run in their
+// own process (backup.js, from Task Scheduler), so the server can't be told
+// directly; when the log changes, open screens are told ("backups") and
+// admins' screens fetch it — and announce a new failed run.
+let lastBackupStamp = backupLogStamp();
+app.checkBackupLog = () => {
+  const stamp = backupLogStamp();
+  if (stamp === lastBackupStamp) return false;
+  lastBackupStamp = stamp;
+  live.broadcastChange('backups');
+  return true;
+};
 
 // On start and hourly: orders waiting for the customer for over 30 days
 // become "забравен" (history and live updates via the order events).

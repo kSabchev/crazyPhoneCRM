@@ -392,7 +392,10 @@ Both do the same two things each time they run:
 **Backup log (Windows, `backup.js`).** Every run, successful or not, is
 recorded in `backups/backup-log.json`, which keeps the latest 5. They're listed
 at the bottom of **Справки** (green: successful, red: failed, with the reason).
-If any of them failed, an admin sees a notice right after logging in. A run
+If any of them failed, admins see a red ⚠ sign left of the counters on
+the main page (click it for the details), and a notice right after logging
+in. A backup that fails while an admin is logged in is announced straight
+away: the server checks the log every minute and tells open screens. A run
 counts as failed if no backup could be made, or if the copy to the NAS
 failed (the local copy is then still saved, and the scheduled task itself
 still reports success, as before). `backup.sh` doesn't record runs.
