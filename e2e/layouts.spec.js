@@ -15,8 +15,16 @@ test.describe('compact view', () => {
     const t = await createTicketViaApi(page, { description: longText });
     await page.reload();
     const r = row(page, t.customer_name);
-    // Measured in one step (a live refresh can redraw the row at any moment).
-    const height = async () => { await expect(r).toBeVisible(); return r.evaluate(el => el.getBoundingClientRect().height); };
+    // A live refresh can redraw the table at any moment, and a row caught as
+    // it's replaced measures 0: look it up fresh each time and wait until it
+    // has a real size.
+    const height = async () => {
+      let h = 0;
+      await expect.poll(async () => (h = await page.evaluate(name =>
+        [...document.querySelectorAll('#tableBody tr')].find(tr => tr.textContent.includes(name))
+          ?.getBoundingClientRect().height ?? 0, t.customer_name))).toBeGreaterThan(0);
+      return h;
+    };
 
     const normal = await height();
     await page.click('#compactToggle');

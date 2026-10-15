@@ -827,6 +827,14 @@ test('the counters work from the keyboard', async ({ page }) => {
   await expect(page.locator('#statusFilter')).toHaveValue('забравен');
 });
 
+test("a redraw (e.g. a colleague's change arriving live) keeps keyboard focus on the counter", async ({ page }) => {
+  await page.locator('#stats .stat', { hasText: 'отказани' }).focus();
+  await page.evaluate(() => render()); // what every live update does
+  await expect(page.locator('#stats .stat', { hasText: 'отказани' })).toBeFocused();
+  await page.keyboard.press('Enter');
+  await expect(page.locator('#statusFilter')).toHaveValue('отказан');
+});
+
 test('quick-changing the status to "отказан" sets Капаро and both prices to 0', async ({ page }) => {
   const t = await createTicketViaApi(page, { kaparo: '20', servicePrice: '35', customerPrice: '90' });
   await page.reload();
