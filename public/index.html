@@ -60,8 +60,10 @@
     <div class="search-box">
       <input type="text" id="searchInput" placeholder="Търсене по име, телефон, модел или номер на поръчка">
     </div>
+    <!-- Opens on "В процес": the work still to do. loadSettings() fills in
+         the other options and keeps whatever is selected. -->
     <select class="status-filter" id="statusFilter">
-      <option value="">Всички статуси</option>
+      <option value="__active__" selected>В процес (без завършени)</option>
     </select>
     <button class="btn secondary view-toggle" id="compactToggle" aria-pressed="false" title="По един ред на поръчка — дългите текстове се съкращават (целият текст при посочване)">Компактен изглед</button>
     <button class="btn" id="newTicketBtn">+ Нова сервизна поръчка</button>

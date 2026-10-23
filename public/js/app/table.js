@@ -8,6 +8,7 @@ async function loadSettings(){
   settings = await res.json();
 
   // Status filter dropdown: All, then "in progress" (everything not completed), then each status individually.
+  // The page opens on "in progress" (the option in index.html).
   const filterSel = document.getElementById('statusFilter');
   // Rebuilding the options resets the selection, and this runs again on every
   // live-update (re)connect and settings change: keep what the user chose.

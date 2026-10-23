@@ -1,7 +1,7 @@
 // SMS to the customer when an order moves to "чака клиент". The test server
 // sends SMS to a fake phone gateway on port 3199 (see e2e/server.js).
 const { test, expect } = require('@playwright/test');
-const { login, createTicketViaApi, row, expectModalClosed } = require('./helpers');
+const { login, createTicketViaApi, row, expectModalClosed, showAllStatuses } = require('./helpers');
 
 const GATEWAY = 'http://127.0.0.1:3199';
 const smsWindow = page => page.locator('#smsOverlay');
@@ -77,6 +77,7 @@ test('saving the order form with "чака клиент" also asks, and the text
 test('no question for other status changes, or when it was already "чака клиент"', async ({ page }) => {
   const t = await createTicketViaApi(page, { status: 'чака клиент' });
   await page.reload();
+  await showAllStatuses(page);
   await row(page, t.customer_name).locator('.ticket-no').click();
   await page.fill('#f_comment', 'само коментар');
   await page.click('#saveBtn');
