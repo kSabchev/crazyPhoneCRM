@@ -1,6 +1,6 @@
 const { test, expect } = require('@playwright/test');
 const {
-  uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed, dismissPrintOffer
+  uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed, dismissPrintOffer, showAllStatuses
 } = require('./helpers');
 
 test.beforeEach(async ({ page }) => {
@@ -113,6 +113,7 @@ test('choosing "издаден" fills in today as the return date', async ({ pag
   await page.clock.setFixedTime(new Date('2026-10-02T12:00:00+03:00'));
   const t = await createTicketViaApi(page);
   await page.reload();
+  await showAllStatuses(page);
 
   await row(page, t.customer_name).locator('.ticket-no').click();
   await expect(page.locator('#f_date_returned')).toHaveValue('');
@@ -165,6 +166,7 @@ test('clicking a status opens a dropdown that saves without opening the ticket',
 test('quick-changing the status to "издаден" sets today as the return date', async ({ page }) => {
   const t = await createTicketViaApi(page);
   await page.reload();
+  await showAllStatuses(page);
   const r = row(page, t.customer_name);
 
   await r.locator('.status-cell .badge').click();
@@ -176,6 +178,7 @@ test('quick-changing the status to "издаден" sets today as the return dat
 test('quick status keeps a return date that is already set', async ({ page }) => {
   const t = await createTicketViaApi(page, { dateReturned: '2026-08-15' });
   await page.reload();
+  await showAllStatuses(page);
   const r = row(page, t.customer_name);
 
   await r.locator('.status-cell .badge').click();
@@ -291,6 +294,26 @@ test('the call column dials the customer and does not open the ticket', async ({
   await expectModalClosed(page);
 });
 
+test('the table opens on "В процес": a handed-back order leaves the list, and is under "Всички статуси"', async ({ page }) => {
+  const t = await createTicketViaApi(page, { status: 'чака клиент' });
+  await page.reload();
+  await expect(page.locator('#statusFilter')).toHaveValue('__active__');
+  await expect(page.locator('#statusFilter option:checked')).toHaveText('В процес (без завършени)');
+  await expect(row(page, t.customer_name)).toHaveCount(1);
+
+  await row(page, t.customer_name).locator('.status-cell .badge').click();
+  await row(page, t.customer_name).locator('.status-select').selectOption('издаден');
+  await expect(row(page, t.customer_name)).toHaveCount(0);
+
+  await page.selectOption('#statusFilter', '');
+  await expect(row(page, t.customer_name).locator('.badge')).toHaveText('издаден');
+
+  // Every time the page opens, it's "В процес" again.
+  await page.reload();
+  await expect(page.locator('#statusFilter')).toHaveValue('__active__');
+  await expect(row(page, t.customer_name)).toHaveCount(0);
+});
+
 test('search and the "in progress" filter narrow the table', async ({ page }) => {
   const tag = uniqueName('Търсене');
   const open = await createTicketViaApi(page, { customerName: `${tag} отворена` });
@@ -298,11 +321,14 @@ test('search and the "in progress" filter narrow the table', async ({ page }) =>
   await page.reload();
 
   await page.fill('#searchInput', tag);
-  await expect(page.locator('#tableBody tr')).toHaveCount(2);
-
-  await page.selectOption('#statusFilter', '__active__');
+  // The page opens on "В процес": the handed-back order isn't listed...
+  await expect(page.locator('#statusFilter')).toHaveValue('__active__');
   await expect(row(page, open.customer_name)).toHaveCount(1);
   await expect(row(page, done.customer_name)).toHaveCount(0);
+
+  // ...until "Всички статуси" is chosen.
+  await page.selectOption('#statusFilter', '');
+  await expect(page.locator('#tableBody tr')).toHaveCount(2);
 
   await page.fill('#searchInput', 'няма-такъв-клиент-xyz');
   await expect(page.locator('#emptyState')).toContainText('Няма намерени поръчки');
@@ -367,6 +393,7 @@ test('the history says the password changed without showing it', async ({ page }
 test('saving an order as "издаден" keeps its password', async ({ page }) => {
   const t = await createTicketViaApi(page, { phonePassword: '4321' });
   await page.reload();
+  await showAllStatuses(page);
   await row(page, t.customer_name).locator('.ticket-no').click();
   await page.selectOption('#f_status', 'издаден');
   await page.click('#saveBtn');
@@ -377,6 +404,7 @@ test('saving an order as "издаден" keeps its password', async ({ page }) 
 test('the quick status change to "издаден" keeps the password', async ({ page }) => {
   const t = await createTicketViaApi(page, { phonePassword: '4321' });
   await page.reload();
+  await showAllStatuses(page);
   const r = row(page, t.customer_name);
   await r.locator('.status-cell .badge').click();
   await r.locator('.status-select').selectOption('издаден');
@@ -465,6 +493,7 @@ test('"отказан" and "забравен" are finished: hidden by the "в п
   const refused = await createTicketViaApi(page, { customerName: `${tag} отказана`, status: 'отказан' });
   const forgotten = await createTicketViaApi(page, { customerName: `${tag} забравена`, status: 'забравен' });
   await page.reload();
+  await showAllStatuses(page);
 
   await expect(row(page, refused.customer_name).locator('.badge')).toHaveCSS('background-color', 'rgb(71, 85, 105)');
   await expect(row(page, forgotten.customer_name).locator('.badge')).toHaveCSS('background-color', 'rgb(154, 52, 18)');
@@ -564,6 +593,7 @@ test('the header counts "отказани" and "забравени", and the for
 
   const t = await createTicketViaApi(page);
   await page.reload();
+  await showAllStatuses(page);
   await row(page, t.customer_name).locator('.ticket-no').click();
   await expect(page.locator('#f_status option')).toHaveText(['за сервиз', 'в сервиз', 'чака клиент', 'издаден', 'отказан', 'забравен']);
   await page.selectOption('#f_status', 'отказан');
@@ -838,6 +868,7 @@ test("a redraw (e.g. a colleague's change arriving live) keeps keyboard focus on
 test('quick-changing the status to "отказан" sets Капаро and both prices to 0', async ({ page }) => {
   const t = await createTicketViaApi(page, { kaparo: '20', servicePrice: '35', customerPrice: '90' });
   await page.reload();
+  await showAllStatuses(page);
   const r = row(page, t.customer_name);
 
   await r.locator('.status-cell .badge').click();
@@ -853,6 +884,7 @@ test('quick-changing the status to "отказан" sets Капаро and both p
 test('choosing "отказан" in the order form shows the zeros before saving', async ({ page }) => {
   const t = await createTicketViaApi(page, { kaparo: '20', servicePrice: '35', customerPrice: '90' });
   await page.reload();
+  await showAllStatuses(page);
   await row(page, t.customer_name).locator('.ticket-no').click();
   await expect(page.locator('#f_customer_price')).toHaveValue('90');
 

@@ -57,6 +57,12 @@ async function dismissPrintOffer(page) {
   await expect(offer).not.toHaveClass(new RegExp("(^| )open( |$)"));
 }
 
+// The table opens on "В процес"; tests that follow an order into a finished
+// status (издаден, отказан, забравен) switch to all statuses first.
+async function showAllStatuses(page) {
+  await page.selectOption('#statusFilter', '');
+}
+
 // Replaces the test server's backup log (newest first), as backup.js
 // would leave it. [] = no backups recorded.
 function setBackupLog(runs) {
@@ -67,5 +73,5 @@ function setBackupLog(runs) {
 
 module.exports = {
   PASSWORD, uniqueName, login, createTicketViaApi, row, expectModalOpen, expectModalClosed, dismissPrintOffer,
-  setBackupLog
+  setBackupLog, showAllStatuses
 };
