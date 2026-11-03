@@ -10,7 +10,7 @@ const { loadApp } = require('./helpers');
 
 const OLD_COLUMNS = ['customer', 'model', 'issue', 'comment', 'loanerPhone', 'status'];
 
-const { db } = loadApp({
+const { db, dataRoot } = loadApp({
   beforeLoad(dataRoot) {
     fs.mkdirSync(path.join(dataRoot, 'data'));
     const old = new Database(path.join(dataRoot, 'data', 'repair-log.db'));
@@ -85,8 +85,9 @@ test('the new Парола column is added to the saved visible columns, others 
 
 test('running the migration again changes nothing', () => {
   const before = db.prepare('SELECT id, loaner_phone, comment FROM tickets ORDER BY id').all();
-  delete require.cache[require.resolve('../db')];
-  const again = require('../db');
+  // A fresh copy of the setup code: opens the file again and repeats it all.
+  delete require.cache[require.resolve('../lib/shop-db')];
+  const again = require('../lib/shop-db').openShopDb(path.join(dataRoot, 'data', 'repair-log.db'));
   const after = again.prepare('SELECT id, loaner_phone, comment FROM tickets ORDER BY id').all();
   assert.deepEqual(after, before);
   const s = JSON.parse(again.prepare('SELECT data FROM settings WHERE id = 1').get().data);

@@ -7,7 +7,7 @@ const { spawnSync } = require('child_process');
 const request = require('supertest');
 const { ROOT, loadApp, login, validTicket } = require('./helpers');
 
-const { app, db, dataRoot } = loadApp(); // seeds "tester" (admin)
+const { app, systemDb, dataRoot } = loadApp(); // seeds "tester" (admin)
 let admin, staff;
 
 test.before(async () => {
@@ -17,7 +17,7 @@ test.before(async () => {
 });
 
 test('existing accounts are admins; login and /me report the role', async () => {
-  assert.equal(db.prepare("SELECT role FROM users WHERE username = 'tester'").get().role, 'admin');
+  assert.equal(systemDb.prepare("SELECT role FROM users WHERE username = 'tester'").get().role, 'admin');
   const res = await request(app).post('/api/auth/login').send({ username: 'ivan', password: 'staffpass1' }).expect(200);
   assert.deepEqual(res.body, { username: 'ivan', role: 'staff' });
   assert.deepEqual((await staff.get('/api/auth/me').expect(200)).body, { username: 'ivan', role: 'staff' });
@@ -80,7 +80,7 @@ test('admins list, add and validate accounts', async () => {
 });
 
 test('a role change applies immediately, even to an open session', async () => {
-  const id = db.prepare("SELECT id FROM users WHERE username = 'ivan'").get().id;
+  const id = systemDb.prepare("SELECT id FROM users WHERE username = 'ivan'").get().id;
   await admin.put(`/api/users/${id}`).send({ role: 'admin' }).expect(200);
   await staff.get('/api/reports').expect(200);
   await admin.put(`/api/users/${id}`).send({ role: 'staff' }).expect(200);
@@ -88,7 +88,7 @@ test('a role change applies immediately, even to an open session', async () => {
 });
 
 test('an admin can set a new password for someone', async () => {
-  const id = db.prepare("SELECT id FROM users WHERE username = 'ivan'").get().id;
+  const id = systemDb.prepare("SELECT id FROM users WHERE username = 'ivan'").get().id;
   await admin.put(`/api/users/${id}`).send({ password: 'short' }).expect(400);
   await admin.put(`/api/users/${id}`).send({ password: 'brandnewpass' }).expect(200);
   await request(app).post('/api/auth/login').send({ username: 'ivan', password: 'staffpass1' }).expect(401);
@@ -96,7 +96,7 @@ test('an admin can set a new password for someone', async () => {
 });
 
 test('an admin can\'t demote or remove themselves, and one admin always remains', async () => {
-  const me = db.prepare("SELECT id FROM users WHERE username = 'tester'").get().id;
+  const me = systemDb.prepare("SELECT id FROM users WHERE username = 'tester'").get().id;
   let res = await admin.put(`/api/users/${me}`).send({ role: 'staff' }).expect(400);
   assert.match(res.body.error, /собствените си администраторски права/);
   res = await admin.delete(`/api/users/${me}`).expect(400);
@@ -104,19 +104,19 @@ test('an admin can\'t demote or remove themselves, and one admin always remains'
 
   // With "Мария.П" as the only other admin, she can be demoted once —
   // after that "tester" is the last admin and is protected anyway.
-  const maria = db.prepare("SELECT id FROM users WHERE username = 'Мария.П'").get().id;
+  const maria = systemDb.prepare("SELECT id FROM users WHERE username = 'Мария.П'").get().id;
   await admin.put(`/api/users/${maria}`).send({ role: 'staff' }).expect(200);
-  assert.equal(db.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin'").get().n, 1);
+  assert.equal(systemDb.prepare("SELECT COUNT(*) n FROM users WHERE role = 'admin'").get().n, 1);
 });
 
 test('admins can demote each other, and the remaining one still can\'t demote themselves', async () => {
   // Make a second admin, demote the first through them... down to one.
   await admin.post('/api/users').send({ username: 'boss2', password: 'longenough', role: 'admin' }).expect(201);
   const boss2 = await login(request.agent(app), 'boss2', 'longenough');
-  const tester = db.prepare("SELECT id FROM users WHERE username = 'tester'").get().id;
+  const tester = systemDb.prepare("SELECT id FROM users WHERE username = 'tester'").get().id;
   await boss2.put(`/api/users/${tester}`).send({ role: 'staff' }).expect(200);
   // boss2 is now the only admin: can't demote/remove itself, nobody else can act.
-  const me = db.prepare("SELECT id FROM users WHERE username = 'boss2'").get().id;
+  const me = systemDb.prepare("SELECT id FROM users WHERE username = 'boss2'").get().id;
   await boss2.put(`/api/users/${me}`).send({ role: 'staff' }).expect(400);
   // Restore tester as admin for the remaining tests.
   await boss2.put(`/api/users/${tester}`).send({ role: 'admin' }).expect(200);
@@ -127,7 +127,7 @@ test('a removed account is logged out on its next request', async () => {
   await admin.post('/api/users').send({ username: 'temp', password: 'longenough', role: 'staff' }).expect(201);
   const temp = await login(request.agent(app), 'temp', 'longenough');
   await temp.get('/api/tickets').expect(200);
-  const id = db.prepare("SELECT id FROM users WHERE username = 'temp'").get().id;
+  const id = systemDb.prepare("SELECT id FROM users WHERE username = 'temp'").get().id;
   await admin.delete(`/api/users/${id}`).expect(200);
   await temp.get('/api/tickets').expect(401);
   await request(app).post('/api/auth/login').send({ username: 'temp', password: 'longenough' }).expect(401);
@@ -157,6 +157,6 @@ test('create-admin.js makes admins by default, staff with --staff, and keeps rol
   assert.match(run('cli-staff', 'password2').stdout, /updated .*\(staff\)/);
   assert.match(run('cli-staff', 'password2', '--admin').stdout, /updated .*\(admin\)/);
   assert.equal(run('x', 'password1', '--owner').status, 1);
-  const roles = Object.fromEntries(db.prepare("SELECT username, role FROM users WHERE username LIKE 'cli-%'").all().map(r => [r.username, r.role]));
+  const roles = Object.fromEntries(systemDb.prepare("SELECT username, role FROM users WHERE username LIKE 'cli-%'").all().map(r => [r.username, r.role]));
   assert.deepEqual(roles, { 'cli-admin': 'admin', 'cli-staff': 'admin' });
 });

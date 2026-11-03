@@ -9,7 +9,8 @@ const path = require('path');
 const express = require('express');
 const session = require('express-session');
 const SqliteStore = require('better-sqlite3-session-store')(session);
-const db = require('./db');
+const systemDb = require('./lib/system-db'); // accounts, shops, sessions
+const stores = require('./lib/stores');      // each shop's database
 const { forgetStaleWaiting } = require('./auto-status');
 const { backupLogStamp } = require('./lib/backup-log');
 const live = require('./lib/live');
@@ -43,11 +44,12 @@ app.get('/api/demo', (req, res) => {
 
 // ---- Health check ----
 // For uptime monitoring / NSSM checks: confirms the process is serving
-// requests AND the database is readable, not just that node.exe exists.
+// requests AND the databases are readable, not just that node.exe exists.
 // No login required and reveals nothing beyond "ok".
 app.get('/health', (req, res) => {
   try {
-    db.prepare('SELECT 1').get();
+    systemDb.prepare('SELECT 1').get();
+    for (const store of stores.all()) store.db.prepare('SELECT 1').get();
     res.json({ status: 'ok' });
   } catch (err) {
     console.error(`[${new Date().toISOString()}] Health check failed:`, err);
@@ -65,7 +67,7 @@ if (!process.env.SESSION_SECRET) {
 app.use(express.json());
 app.use(
   session({
-    store: new SqliteStore({ client: db, expired: { clear: true, intervalMs: 15 * 60 * 1000 } }),
+    store: new SqliteStore({ client: systemDb, expired: { clear: true, intervalMs: 15 * 60 * 1000 } }),
     secret: process.env.SESSION_SECRET || 'dev-only-change-this-secret',
     resave: false,
     saveUninitialized: false,
@@ -106,15 +108,20 @@ app.checkBackupLog = () => {
   return true;
 };
 
-// On start and hourly: orders waiting for the customer for over 30 days
-// become "забравен" (history and live updates via the order events).
+// On start and hourly, in every shop: orders waiting for the customer for
+// over 30 days become "забравен" (history and live updates via the order
+// events). Returns all the orders changed.
 app.runMaintenance = () => {
-  const forgotten = forgetStaleWaiting(db);
-  if (forgotten.length) {
-    console.log(`[${new Date().toISOString()}] Marked ${forgotten.length} order(s) as "забравен" after 30+ days waiting: ` +
-      forgotten.map(t => `#${t.ticketNo}`).join(', '));
+  const all = [];
+  for (const store of stores.all()) {
+    const forgotten = forgetStaleWaiting(store.db, { store });
+    if (forgotten.length) {
+      console.log(`[${new Date().toISOString()}] Marked ${forgotten.length} order(s) as "забравен" in ${store.name} after 30+ days waiting: ` +
+        forgotten.map(t => `#${t.ticketNo}`).join(', '));
+    }
+    all.push(...forgotten);
   }
-  return forgotten;
+  return all;
 };
 
 // ---- Static frontend ----

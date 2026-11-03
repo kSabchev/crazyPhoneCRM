@@ -1,7 +1,6 @@
 // @ts-check
 // Orders: list, create, edit, delete, the service label, and the history.
 const express = require('express');
-const db = require('../db');
 const STATUSES = require('../public/statuses');
 const { buildServiceLabel } = require('../lbx');
 const { requireAuth, requireAdmin } = require('../lib/auth');
@@ -11,14 +10,12 @@ const { applyTransition } = require('../public/status-rules');
 const { getSettings } = require('../lib/settings-store');
 const { localToday, toPrice } = require('../lib/util');
 const { validateTicketInput, normalizePravim, normalizeLoaner, normalizePassword } = require('../lib/ticket-input');
-const { ticketsRepo } = require('../lib/tickets-repo');
 
 const router = express.Router();
-const tickets = ticketsRepo(db);
 
 router.get('/api/tickets', requireAuth, (req, res) => {
   // With who's viewing each order right now ("👁 name" in the table).
-  res.json(tickets.list().map(row => ({ ...row, editing_by: getEditingBy(row.id) })));
+  res.json(req.store.tickets.list().map(row => ({ ...row, editing_by: getEditingBy(row.id) })));
 });
 
 router.post('/api/tickets', requireAuth, (req, res) => {
@@ -46,14 +43,14 @@ router.post('/api/tickets', requireAuth, (req, res) => {
     customer_price: toPrice(t.customerPrice)
   }, { today: localToday() });
 
-  const created = tickets.create(fields);
+  const created = req.store.tickets.create(fields);
   // History and live updates: lib/ticket-listeners.js.
-  ticketEvents.emit('created', { after: created, user: req.session.username });
+  ticketEvents.emit('created', { store: req.store, after: created, user: req.session.username });
   res.status(201).json(created);
 });
 
 router.put('/api/tickets/:id', requireAuth, (req, res) => {
-  const existing = tickets.get(req.params.id);
+  const existing = req.store.tickets.get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
 
   const t = req.body || {};
@@ -86,17 +83,17 @@ router.put('/api/tickets/:id', requireAuth, (req, res) => {
   // amounts — see public/status-rules.js.
   next = applyTransition(existing, next, { today: localToday() });
 
-  const updated = tickets.update(existing.id, next);
-  ticketEvents.emit('updated', { before: existing, after: updated, user: req.session.username });
+  const updated = req.store.tickets.update(existing.id, next);
+  ticketEvents.emit('updated', { store: req.store, before: existing, after: updated, user: req.session.username });
   res.json(updated);
 });
 
 router.delete('/api/tickets/:id', requireAdmin, (req, res) => {
-  const existing = tickets.get(req.params.id);
+  const existing = req.store.tickets.get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
 
-  tickets.remove(existing.id);
-  ticketEvents.emit('deleted', { before: existing, user: req.session.username });
+  req.store.tickets.remove(existing.id);
+  ticketEvents.emit('deleted', { store: req.store, before: existing, user: req.session.username });
   res.json({ ok: true });
 });
 
@@ -104,9 +101,9 @@ router.delete('/api/tickets/:id', requireAdmin, (req, res) => {
 // in from print-templates/service-label.lbx. Opening it starts P-touch
 // Editor, which prints it.
 router.get('/api/tickets/:id/service-label.lbx', requireAuth, (req, res) => {
-  const ticket = tickets.get(req.params.id);
+  const ticket = req.store.tickets.get(req.params.id);
   if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
-  const file = buildServiceLabel(ticket, getSettings().shopName);
+  const file = buildServiceLabel(ticket, getSettings(req.store.db).shopName);
   res.set('Content-Type', 'application/octet-stream');
   res.attachment(`poruchka-${ticket.ticket_no}.lbx`);
   res.send(file);
@@ -114,16 +111,16 @@ router.get('/api/tickets/:id/service-label.lbx', requireAuth, (req, res) => {
 
 // ---- History ----
 router.get('/api/tickets/:id/history', requireAuth, (req, res) => {
-  const existing = tickets.get(req.params.id);
+  const existing = req.store.tickets.get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
-  const rows = /** @type {import('../types/app').AuditRow[]} */ (db
+  const rows = /** @type {import('../types/app').AuditRow[]} */ (req.store.db
     .prepare('SELECT * FROM audit_log WHERE ticket_id = ? ORDER BY performed_at DESC, id DESC')
     .all(req.params.id));
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
 
 router.get('/api/audit', requireAuth, (req, res) => {
-  const rows = /** @type {import('../types/app').AuditRow[]} */ (db
+  const rows = /** @type {import('../types/app').AuditRow[]} */ (req.store.db
     .prepare('SELECT * FROM audit_log ORDER BY performed_at DESC, id DESC LIMIT 200')
     .all());
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));

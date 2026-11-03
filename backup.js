@@ -14,12 +14,14 @@ const fs = require('fs');
 const Database = require('better-sqlite3');
 const { recordBackupRun } = require('./lib/backup-log');
 
-// Same DATA_ROOT override as db.js — see the comment there. Keeping the
+// Same DATA_ROOT rule as the app (lib/data-dir.js). Keeping the
 // logic identical across files means the database, backups, and
 // pre-restore safety copies all move together if you ever set it.
 const BASE_DIR = process.env.DATA_ROOT ? path.resolve(process.env.DATA_ROOT) : __dirname;
 
 const DB_PATH = path.join(BASE_DIR, 'data', 'repair-log.db');
+// Accounts and the list of shops (lib/system-db.js), backed up alongside.
+const SYSTEM_PATH = path.join(BASE_DIR, 'data', 'system.db');
 const LOCAL_BACKUP_DIR = path.join(BASE_DIR, 'backups');
 
 // Set NAS_BACKUP_DIR in .env (not here) so it survives every future code
@@ -58,15 +60,36 @@ async function backUp(run) {
   run.sizeBytes = fs.statSync(localPath).size;
   console.log(`Local backup saved: ${localPath}`);
 
+  // The accounts and shops (system.db), with the same time stamp. Missing
+  // only before the app has first started on this version.
+  const files = [filename];
+  if (fs.existsSync(SYSTEM_PATH)) {
+    const systemFile = `system_${timestamp}.db`;
+    const systemDb = new Database(SYSTEM_PATH, { readonly: true });
+    try {
+      await systemDb.backup(path.join(LOCAL_BACKUP_DIR, systemFile));
+    } catch (err) {
+      console.error('Backup of system.db failed:', err);
+      throw new Error(`Резервното копие на акаунтите (system.db) не можа да бъде създадено: ${err.message}`);
+    } finally {
+      systemDb.close();
+    }
+    run.systemFile = systemFile;
+    files.push(systemFile);
+    console.log(`Local backup saved: ${path.join(LOCAL_BACKUP_DIR, systemFile)}`);
+  }
+
   // Copy to the NAS if configured. This must not crash the whole backup if
   // the NAS happens to be unreachable that night — log a warning instead,
   // and mark the run as failed so it shows in Справки.
   if (NAS_BACKUP_DIR) {
     try {
       fs.mkdirSync(NAS_BACKUP_DIR, { recursive: true });
-      fs.copyFileSync(localPath, path.join(NAS_BACKUP_DIR, filename));
+      for (const f of files) {
+        fs.copyFileSync(path.join(LOCAL_BACKUP_DIR, f), path.join(NAS_BACKUP_DIR, f));
+        console.log(`Copied to NAS: ${path.join(NAS_BACKUP_DIR, f)}`);
+      }
       run.nas = 'ok';
-      console.log(`Copied to NAS: ${path.join(NAS_BACKUP_DIR, filename)}`);
     } catch (err) {
       run.nas = 'failed';
       run.error = `Локалното копие е запазено, но копирането към NAS не успя: ${err.message}`;
@@ -78,7 +101,7 @@ async function backUp(run) {
 async function main() {
   const run = {
     startedAt: new Date().toISOString(), finishedAt: null, ok: false,
-    file: null, sizeBytes: null, nas: NAS_BACKUP_DIR ? 'failed' : 'off', error: null
+    file: null, systemFile: null, sizeBytes: null, nas: NAS_BACKUP_DIR ? 'failed' : 'off', error: null
   };
   try {
     await backUp(run);

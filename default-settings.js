@@ -1,6 +1,6 @@
 // Default shop settings: statuses, visible table columns, the customer
 // print template and the phone-model suggestion list. Used to seed a new
-// database (db.js) and to reset the demo (demo.js).
+// shop database (lib/shop-db.js) and to reset the demo (demo.js).
 const STATUSES = require('./public/statuses');
 
 const DEFAULT_SETTINGS = {

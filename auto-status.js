@@ -18,7 +18,10 @@ const parseAuditTime = s => Date.parse(s.replace(' ', 'T') + 'Z');
 const toAuditTime = ms => new Date(ms).toISOString().slice(0, 19).replace('T', ' ');
 
 // Returns the orders it changed ({ id, ticketNo, waitingSince }).
-function forgetStaleWaiting(db, { now = Date.now() } = {}) {
+// `db` is a shop's database; `store` the shop (for the change history),
+// or just { db } when called on its own (tests).
+/** @param {import('better-sqlite3').Database} db @param {{ now?: number, store?: import('./types/app').EventStore }} [options] */
+function forgetStaleWaiting(db, { now = Date.now(), store = { db } } = {}) {
   const tickets = ticketsRepo(db);
   // When each waiting order most recently entered "чака клиент", from the
   // history. Orders without such an entry fall back to their received date.
@@ -42,7 +45,7 @@ function forgetStaleWaiting(db, { now = Date.now() } = {}) {
       const after = applyTransition(before, { ...before, status: FORGOTTEN_STATUS }, { today });
       const saved = tickets.update(t.id, after);
       // History and live updates: lib/ticket-listeners.js.
-      ticketEvents.emit('updated', { before, after: saved, user: AUTO_USER, at: toAuditTime(now) });
+      ticketEvents.emit('updated', { store, before, after: saved, user: AUTO_USER, at: toAuditTime(now) });
       changed.push(t);
     }
   })();

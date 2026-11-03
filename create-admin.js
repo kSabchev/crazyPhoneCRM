@@ -7,7 +7,7 @@
 //   For an existing account the password is reset; its role only changes
 //   if --staff or --admin is given.
 const bcrypt = require('bcrypt');
-const db = require('./db');
+const db = require('./lib/system-db'); // accounts (all shops)
 
 const args = process.argv.slice(2);
 const flags = args.filter(a => a.startsWith('--'));

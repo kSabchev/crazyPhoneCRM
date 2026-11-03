@@ -10,27 +10,31 @@
 // Usage:
 //   node restore.js                          List available backups
 //   node restore.js <filename>                Restore that specific backup
-//   node restore.js latest                    Restore the most recent backup
+//   node restore.js latest                    Restore the most recent shop backup
+//
+// Backups named system_… are of system.db (accounts and shops); restoring
+// one replaces system.db. "latest" never picks one of those.
 
 require('./env');
 const path = require('path');
 const fs = require('fs');
 const Database = require('better-sqlite3');
 
-// Same DATA_ROOT override as db.js/backup.js — see the comment in db.js.
+// Same DATA_ROOT rule as the app (lib/data-dir.js).
 const BASE_DIR = process.env.DATA_ROOT ? path.resolve(process.env.DATA_ROOT) : __dirname;
 
 const DB_PATH = path.join(BASE_DIR, 'data', 'repair-log.db');
+const SYSTEM_PATH = path.join(BASE_DIR, 'data', 'system.db');
 const BACKUP_DIR = path.join(BASE_DIR, 'backups');
 const PRE_RESTORE_DIR = path.join(BASE_DIR, 'data', 'pre-restore');
 
 // Tests: only temp folders, never the real database.
 require('./lib/test-guard').assertTestFolder(process.env.DATA_ROOT, 'DATA_ROOT');
 
-function listBackups() {
+function listBackups(prefix = 'repair-log_') {
   if (!fs.existsSync(BACKUP_DIR)) return [];
   return fs.readdirSync(BACKUP_DIR)
-    .filter(f => f.startsWith('repair-log_') && f.endsWith('.db'))
+    .filter(f => f.startsWith(prefix) && f.endsWith('.db'))
     .sort() // filenames are ISO timestamps, so this sorts chronologically
     .reverse();
 }
@@ -60,7 +64,7 @@ function unlinkWithRetry(filePath, attempts = 5, delayMs = 1000) {
           `  - If running "node server.js" directly: make sure that window was actually closed\n` +
           `    or Ctrl+C'd, not just minimized.\n` +
           `  - Check Task Manager for a lingering node.exe process and end it if one remains.\n\n` +
-          `Nothing has been lost — your original database at ${DB_PATH} is untouched.\n` +
+          `Nothing has been lost — your original database at ${filePath} is untouched.\n` +
           `Stop the app fully, then run this restore command again.`
         );
         lockedErr.code = err.code;
@@ -83,6 +87,11 @@ async function main() {
     }
     console.log(`Available backups (newest first), in ${BACKUP_DIR}:\n`);
     backups.forEach(f => console.log('  ' + f));
+    const systemBackups = listBackups('system_');
+    if (systemBackups.length) {
+      console.log(`\nAccounts and shops (system.db) — restore only if accounts were lost:\n`);
+      systemBackups.forEach(f => console.log('  ' + f));
+    }
     console.log(`\nRestore one with:  node restore.js <filename>`);
     console.log(`Or the newest with: node restore.js latest`);
     return;
@@ -109,12 +118,17 @@ async function main() {
   // file operation on the main file alone (or deleting the sidecar
   // files) can silently discard real, uncommitted data. Going through
   // db.backup() always captures the true, complete, current state.
-  if (fs.existsSync(DB_PATH)) {
+  // system_… backups replace system.db; everything else the shop database.
+  const isSystem = filename.startsWith('system_');
+  const targetPath = isSystem ? SYSTEM_PATH : DB_PATH;
+  const label = isSystem ? 'system' : 'repair-log';
+
+  if (fs.existsSync(targetPath)) {
     fs.mkdirSync(PRE_RESTORE_DIR, { recursive: true });
     const stamp = new Date().toISOString().replace(/[:.]/g, '-').slice(0, 19);
-    const savedPath = path.join(PRE_RESTORE_DIR, `repair-log_before-restore_${stamp}.db`);
+    const savedPath = path.join(PRE_RESTORE_DIR, `${label}_before-restore_${stamp}.db`);
 
-    const currentDb = new Database(DB_PATH, { readonly: true });
+    const currentDb = new Database(targetPath, { readonly: true });
     try {
       await currentDb.backup(savedPath);
     } finally {
@@ -127,14 +141,14 @@ async function main() {
     // (Reads succeed even while the app has the file open, per SQLite's
     // WAL design — it's specifically deleting/overwriting that Windows
     // blocks while another process holds the file open, hence the retry.)
-    unlinkWithRetry(DB_PATH);
+    unlinkWithRetry(targetPath);
     for (const suffix of ['-wal', '-shm']) {
-      const sidecar = DB_PATH + suffix;
+      const sidecar = targetPath + suffix;
       if (fs.existsSync(sidecar)) unlinkWithRetry(sidecar);
     }
   }
 
-  fs.copyFileSync(sourcePath, DB_PATH);
+  fs.copyFileSync(sourcePath, targetPath);
   console.log(`Restored "${filename}" as the live database.`);
   console.log(`Restart the app (or the RepairLog service) now.`);
 }

@@ -17,9 +17,10 @@ function makeDataRoot() {
   return fs.mkdtempSync(path.join(os.tmpdir(), 'crazyphone-test-'));
 }
 
-// Loads the app against a fresh temp database and seeds one login.
+// Loads the app against a fresh temp data folder and seeds one login.
 // `beforeLoad(dataRoot)` can prepare the data folder first (e.g. an old
-// schema, to exercise the migrations in db.js).
+// schema, to exercise the migrations). Returns the first shop's database
+// as `db` and the accounts database as `systemDb`.
 function loadApp({ beforeLoad } = {}) {
   const dataRoot = makeDataRoot();
   process.env.DATA_ROOT = dataRoot;
@@ -27,11 +28,12 @@ function loadApp({ beforeLoad } = {}) {
   if (beforeLoad) beforeLoad(dataRoot);
 
   const bcrypt = require('bcrypt');
-  const db = require('../db');
+  const systemDb = require('../lib/system-db');
+  const db = require('../lib/stores').defaultStore().db;
   const app = require('../app');
-  db.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+  systemDb.prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
     .run('tester', bcrypt.hashSync('secret123', 4));
-  return { app, db, dataRoot };
+  return { app, db, systemDb, dataRoot };
 }
 
 async function login(agent, username = 'tester', password = 'secret123') {

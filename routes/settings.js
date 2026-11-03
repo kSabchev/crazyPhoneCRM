@@ -1,22 +1,19 @@
 // @ts-check
 // The shop's settings (Настройки) and the phone-model suggestion list.
 const express = require('express');
-const db = require('../db');
 const STATUSES = require('../public/statuses');
 const { requireAuth, requireAdmin } = require('../lib/auth');
 const { broadcastChange } = require('../lib/live');
 const { COLUMN_KEYS, HEX_COLOR, getSettings, withStatusColors, withShopPhone } = require('../lib/settings-store');
-const { ticketsRepo } = require('../lib/tickets-repo');
 
 const router = express.Router();
-const tickets = ticketsRepo(db);
 
 router.get('/api/settings', requireAuth, (req, res) => {
-  res.json(withShopPhone(getSettings()));
+  res.json(withShopPhone(getSettings(req.store.db)));
 });
 
 router.put('/api/settings', requireAdmin, (req, res) => {
-  const current = getSettings();
+  const current = getSettings(req.store.db);
   const body = req.body || {};
   const next = { ...current };
 
@@ -91,7 +88,7 @@ router.put('/api/settings', requireAdmin, (req, res) => {
   // The service copy is a fixed small label (shop name, order number,
   // problem description) — nothing about it is configurable.
 
-  db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
+  req.store.db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
     .run(JSON.stringify(next));
 
   broadcastChange('settings');
@@ -101,8 +98,8 @@ router.put('/api/settings', requireAdmin, (req, res) => {
 // Merges the admin-curated device list with phone models actually used on
 // tickets, so the dropdown "learns" new models as they're typed in.
 router.get('/api/devices', requireAuth, (req, res) => {
-  const settings = getSettings();
-  const used = tickets.usedPhoneModels();
+  const settings = getSettings(req.store.db);
+  const used = req.store.tickets.usedPhoneModels();
 
   const seen = new Map(); // lowercase -> original casing
   for (const d of [...settings.devices, ...used]) {

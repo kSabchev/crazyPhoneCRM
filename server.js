@@ -19,7 +19,7 @@ process.on('unhandledRejection', reason => {
 // Public demo (e.g. on Render): start from fresh demo data every time.
 if (process.env.DEMO_MODE === 'true') {
   try {
-    require('./demo').prepareDemo(require('./db'));
+    require('./demo').prepareDemo(require('./lib/stores').defaultStore().db, { systemDb: require('./lib/system-db') });
   } catch (err) {
     console.error(err.message);
     process.exit(1);

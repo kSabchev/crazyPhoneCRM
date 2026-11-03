@@ -1,7 +1,6 @@
 // @ts-check
 // Справки (admins): revenue, turnaround, workload, SMS — see ../reports.js.
 const express = require('express');
-const db = require('../db');
 const { buildReport } = require('../reports');
 const { requireAdmin } = require('../lib/auth');
 const { localToday, isValidDate, daysBetweenDates } = require('../lib/util');
@@ -22,7 +21,7 @@ router.get('/api/reports', requireAdmin, (req, res) => {
   if (daysBetweenDates(from, to) > 10 * 366) {
     return res.status(400).json({ error: 'Периодът е твърде дълъг (най-много 10 години)' });
   }
-  res.json(buildReport(db, { from, to, today }));
+  res.json(buildReport(req.store.db, { from, to, today }));
 });
 
 // The latest backup runs (newest first), recorded by backup.js: shown at

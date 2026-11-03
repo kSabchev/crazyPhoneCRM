@@ -3,7 +3,7 @@
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { rateLimit } = require('express-rate-limit');
-const db = require('../db');
+const db = require('../lib/system-db'); // accounts
 const { requireAuth, requireAdmin } = require('../lib/auth');
 
 const router = express.Router();
