@@ -31,7 +31,7 @@ router.post('/api/tickets', requireAuth, (req, res) => {
   if (invalid) return res.status(400).json({ error: invalid });
   // In the all-shops view the new order's shop is chosen in the form.
   const store = req.allShops ? stores.get(t.storeId) : req.store;
-  if (!store) return res.status(400).json({ error: 'Изберете магазин за поръчката' });
+  if (!store || store.archived) return res.status(400).json({ error: 'Изберете магазин за поръчката' });
 
   // New orders get the status rules too (e.g. created already refused:
   // nothing to charge) — see public/status-rules.js.

@@ -104,6 +104,8 @@ export interface Store {
   name: string;
   /** Shown before the shop's order numbers (e.g. "Л"); '' for none. */
   prefix: string;
+  /** Out of everyday use, data kept (lib/stores.js). */
+  archived: boolean;
   /** The shop's SMS settings: { mode: 'env' | 'own' | 'off', ...its own keys } (sms.js). */
   sms: Record<string, any>;
   db: import('better-sqlite3').Database;

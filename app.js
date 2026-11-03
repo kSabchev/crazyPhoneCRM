@@ -49,7 +49,7 @@ app.get('/api/demo', (req, res) => {
 app.get('/health', (req, res) => {
   try {
     systemDb.prepare('SELECT 1').get();
-    for (const store of stores.all()) store.db.prepare('SELECT 1').get();
+    for (const store of stores.all({ archived: true })) store.db.prepare('SELECT 1').get();
     res.json({ status: 'ok' });
   } catch (err) {
     console.error(`[${new Date().toISOString()}] Health check failed:`, err);

@@ -419,6 +419,8 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
 .report-table{border-radius:3px;}
 .shop-picks{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin:-6px 0 16px;font-size:14px;}
 .shop-picks-label{color:var(--ink-soft);}
+.shop-pick-archived{color:var(--ink-soft);}
+.shop-row.shop-archived input{color:var(--ink-soft);background:transparent;}
 .shop-pick{display:inline-flex;gap:5px;align-items:center;cursor:pointer;white-space:nowrap;}
 .report-table tbody tr{cursor:default;}
 .report-table tbody tr:hover{background:none;}

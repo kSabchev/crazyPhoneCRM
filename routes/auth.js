@@ -59,7 +59,8 @@ function sessionInfo(user, store, allShops = false) {
     username: user.username,
     role: user.role,
     store: shop(store),
-    ...(user.role === 'admin' ? { stores: stores.all().map(shop), allShops } : {})
+    // Archived shops: only for picking in Справки.
+    ...(user.role === 'admin' ? { stores: stores.all().map(shop), archivedStores: stores.all({ archived: true }).filter(s => s.archived).map(shop), allShops } : {})
   };
 }
 
@@ -72,7 +73,7 @@ router.post('/api/auth/store', requireAdmin, (req, res) => {
     return res.json(sessionInfo(req.user, req.store, true));
   }
   const store = stores.get(storeId);
-  if (!store) return res.status(400).json({ error: 'Невалиден магазин' });
+  if (!store || store.archived) return res.status(400).json({ error: 'Невалиден магазин' });
   req.session.storeId = store.id;
   req.session.allShops = false;
   res.json(sessionInfo(req.user, store, false));
@@ -115,6 +116,7 @@ function shopForRole(role, storeId, fallback) {
   if (role === 'admin') return { storeId: null };
   if (storeId === undefined || storeId === null || storeId === '') return { storeId: fallback };
   const store = stores.get(storeId);
+  if (store && store.archived) return { error: `Магазин „${store.name}“ е архивиран` };
   return store ? { storeId: store.id } : { error: 'Невалиден магазин' };
 }
 

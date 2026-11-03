@@ -1,7 +1,8 @@
 // @ts-check
 // The shops (admins, Настройки → Магазини): list, add, rename, change the
-// order-number prefix. Shops aren't removed here: their orders and history
-// would go with them.
+// order-number prefix, archive and restore. Shops aren't deleted: their
+// orders and history would go with them. An archived shop is out of
+// everyday use but keeps its data (lib/stores.js).
 const express = require('express');
 const systemDb = require('../lib/system-db');
 const stores = require('../lib/stores');
@@ -11,8 +12,8 @@ const { broadcastChange } = require('../lib/live');
 
 const router = express.Router();
 
-// The all-shops reports attach every shop's database, and SQLite attaches
-// at most 10 (lib/combined-db.js).
+// Shops in use: the all-shops reports attach every one's database, and
+// SQLite attaches at most 10 (lib/combined-db.js).
 const MAX_SHOPS = 10;
 const MAX_NAME = 60;
 // Shown before order numbers ("Л-123"): letters and digits, up to 5.
@@ -24,6 +25,7 @@ function view(store) {
     id: store.id,
     name: store.name,
     prefix: store.prefix,
+    archived: store.archived,
     orders: /** @type {{ n: number }} */ (store.db.prepare('SELECT COUNT(*) AS n FROM tickets').get()).n
   };
 }
@@ -45,8 +47,9 @@ function checkShop(body, id = null) {
     if (prefix === null || !PREFIX.test(prefix)) {
       return { error: 'Префиксът може да съдържа само букви и цифри (най-много 5)' };
     }
-    // Two shops with the same prefix would have look-alike order numbers.
-    const clash = prefix && stores.all().find(s => s.prefix.toLowerCase() === prefix.toLowerCase() && s.id !== id);
+    // Two shops with the same prefix would have look-alike order numbers
+    // (archived ones too: their orders still show in Справки).
+    const clash = prefix && stores.all({ archived: true }).find(s => s.prefix.toLowerCase() === prefix.toLowerCase() && s.id !== id);
     if (clash) return { error: `Префиксът „${prefix}“ вече се използва от „${clash.name}“` };
     out.prefix = prefix;
   }
@@ -54,14 +57,14 @@ function checkShop(body, id = null) {
 }
 
 router.get('/api/stores', requireAdmin, (req, res) => {
-  res.json(stores.all().map(view));
+  res.json(stores.all({ archived: true }).map(view));
 });
 
 router.post('/api/stores', requireAdmin, (req, res) => {
   const body = req.body || {};
   if (body.name === undefined) body.name = '';
   if (stores.all().length >= MAX_SHOPS) {
-    return res.status(400).json({ error: `Може да има най-много ${MAX_SHOPS} магазина` });
+    return res.status(400).json({ error: `Може да има най-много ${MAX_SHOPS} магазина в употреба` });
   }
   const shop = checkShop(body);
   if (shop.error) return res.status(400).json({ error: shop.error });
@@ -87,6 +90,38 @@ router.put('/api/stores/:id', requireAdmin, (req, res) => {
 
   broadcastChange('settings', store.id); // its screens show the new name
   res.json(view(/** @type {import('../types/app').Store} */ (stores.get(store.id))));
+});
+
+// Archiving: refused for the last shop in use, and while accounts still
+// belong to the shop (they'd be locked out: move or remove them first).
+router.post('/api/stores/:id/archive', requireAdmin, (req, res) => {
+  const store = stores.get(req.params.id);
+  if (!store) return res.status(404).json({ error: 'Магазинът не е намерен' });
+  if (store.archived) return res.status(400).json({ error: 'Магазинът вече е архивиран' });
+  if (stores.all().length <= 1) return res.status(400).json({ error: 'Трябва да остане поне един магазин в употреба' });
+  const accounts = /** @type {{ username: string }[]} */ (systemDb.prepare('SELECT username FROM users WHERE store_id = ? ORDER BY username').all(store.id));
+  if (accounts.length) {
+    return res.status(400).json({
+      error: `Първо преместете в друг магазин или премахнете профилите му: ${accounts.map(a => a.username).join(', ')}`
+    });
+  }
+  const archived = /** @type {import('../types/app').Store} */ (stores.setArchived(store.id, true));
+  console.log(`[${new Date().toISOString()}] Shop "${store.name}" archived by ${req.user.username}.`);
+  broadcastChange('settings'); // every screen: the picker changes
+  res.json(view(archived));
+});
+
+router.post('/api/stores/:id/restore', requireAdmin, (req, res) => {
+  const store = stores.get(req.params.id);
+  if (!store) return res.status(404).json({ error: 'Магазинът не е намерен' });
+  if (!store.archived) return res.status(400).json({ error: 'Магазинът не е архивиран' });
+  if (stores.all().length >= MAX_SHOPS) {
+    return res.status(400).json({ error: `Може да има най-много ${MAX_SHOPS} магазина в употреба` });
+  }
+  const restored = /** @type {import('../types/app').Store} */ (stores.setArchived(store.id, false));
+  console.log(`[${new Date().toISOString()}] Shop "${store.name}" restored by ${req.user.username}.`);
+  broadcastChange('settings');
+  res.json(view(restored));
 });
 
 module.exports = router;
