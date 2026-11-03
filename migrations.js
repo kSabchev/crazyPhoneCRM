@@ -23,6 +23,9 @@ const MIGRATIONS = [
     // Every existing account becomes an admin, so nobody loses access.
     name: 'users: role',
     up(db) {
+      // Shop databases made since accounts moved to system.db have no
+      // users table: nothing to do there.
+      if (!db.prepare("SELECT 1 FROM sqlite_master WHERE type = 'table' AND name = 'users'").get()) return;
       if (!hasColumn(db, 'users', 'role')) db.exec("ALTER TABLE users ADD COLUMN role TEXT NOT NULL DEFAULT 'admin'");
     }
   },

@@ -51,14 +51,14 @@ test('creating, editing and deleting an order each announce it, with who did it'
 
 test('the history follows from the events, not from each route', () => {
   const before = { id: 777, ticket_no: 777, comment: 'а' };
-  ticketEvents.emit('updated', { before, after: { ...before, comment: 'б' }, user: 'някой', at: '2026-01-02 03:04:05' });
+  ticketEvents.emit('updated', { store: { db }, before, after: { ...before, comment: 'б' }, user: 'някой', at: '2026-01-02 03:04:05' });
   const row = db.prepare("SELECT * FROM audit_log WHERE ticket_id = 777").get();
   assert.equal(row.performed_by, 'някой');
   assert.equal(row.performed_at, '2026-01-02 03:04:05');
   assert.deepEqual(JSON.parse(row.changes), { comment: { from: 'а', to: 'б' } });
 
   // An "edit" that changed nothing isn't recorded.
-  ticketEvents.emit('updated', { before, after: { ...before }, user: 'някой' });
+  ticketEvents.emit('updated', { store: { db }, before, after: { ...before }, user: 'някой' });
   assert.equal(db.prepare('SELECT COUNT(*) n FROM audit_log WHERE ticket_id = 777').get().n, 1);
 });
 

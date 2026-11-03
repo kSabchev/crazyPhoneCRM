@@ -101,10 +101,8 @@ test('the change shows up through the API like any other', async () => {
 test('server.js runs it on start', () => {
   const dataRoot = makeDataRoot();
   fs.mkdirSync(path.join(dataRoot, 'data'));
-  // Let db.js create the schema, then add an order waiting since 40 days.
-  process.env.DATA_ROOT = dataRoot;
-  delete require.cache[require.resolve('../db')];
-  const fresh = require('../db');
+  // Create the shop schema, then add an order waiting since 40 days.
+  const fresh = require('../lib/shop-db').openShopDb(path.join(dataRoot, 'data', 'repair-log.db'));
   const id = fresh.prepare(`INSERT INTO tickets (ticket_no, customer_name, phone_contact, date_received, phone_model, description, status)
     VALUES (1, 'x', '0888', '2020-01-01', 'm', 'd', 'чака клиент')`).run().lastInsertRowid;
   fresh.prepare(`INSERT INTO audit_log (ticket_id, ticket_no, action, changes, performed_by, performed_at)

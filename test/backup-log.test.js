@@ -11,7 +11,7 @@ const request = require('supertest');
 const { ROOT, loadApp, login, makeDataRoot } = require('./helpers');
 const { readBackupLog, recordBackupRun, KEEP } = require('../lib/backup-log');
 
-const { app, db } = loadApp();
+const { app, systemDb } = loadApp();
 
 function makeLiveDb(dataRoot) {
   fs.mkdirSync(path.join(dataRoot, 'data'), { recursive: true });
@@ -98,7 +98,7 @@ test('admins see the backup log; staff and visitors do not', async () => {
   assert.equal(body.keep, KEEP);
   assert.equal(body.runs[0].error, 'грешка');
 
-  db.prepare("INSERT INTO users (username, password_hash, role) VALUES ('staff1', ?, 'staff')")
+  systemDb.prepare("INSERT INTO users (username, password_hash, role) VALUES ('staff1', ?, 'staff')")
     .run(require('bcrypt').hashSync('secret123', 4));
   const staff = await login(request.agent(app), 'staff1');
   await staff.get('/api/backups').expect(403);

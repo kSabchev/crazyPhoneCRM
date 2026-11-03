@@ -88,14 +88,31 @@ export interface SmsProvider {
   serviceStatus(): Promise<ServiceStatus>;
 }
 
+// ---- Shops (lib/stores.js) ----
+
+/** A shop: its details from system.db, with its own database and order queries. */
+export interface Store {
+  id: number;
+  name: string;
+  /** Shown before the shop's order numbers (e.g. "Л"); '' for none. */
+  prefix: string;
+  /** The shop's SMS settings (per-shop SMS comes in a later step). */
+  sms: Record<string, unknown>;
+  db: import('better-sqlite3').Database;
+  tickets: ReturnType<typeof import('../lib/tickets-repo').ticketsRepo>;
+}
+
 // ---- Order events (lib/ticket-events.js) ----
 
+/** Where the change happened: at least the shop's database. */
+export type EventStore = Pick<Store, 'db'> & Partial<Store>;
+
 export interface TicketEventMap {
-  created: [{ after: Ticket; user: string }];
-  updated: [{ before: Ticket; after: Ticket; user: string; at?: string }];
-  deleted: [{ before: Ticket; user: string }];
-  sms: [{ ticket: Ticket; phone: string; ok: boolean; user: string }];
-  smsStates: [{ count: number }];
+  created: [{ store: EventStore; after: Ticket; user: string }];
+  updated: [{ store: EventStore; before: Ticket; after: Ticket; user: string; at?: string }];
+  deleted: [{ store: EventStore; before: Ticket; user: string }];
+  sms: [{ store: EventStore; ticket: Ticket; phone: string; ok: boolean; user: string }];
+  smsStates: [{ store: EventStore; count: number }];
 }
 
 // ---- Backups (lib/backup-log.js) ----
@@ -105,6 +122,8 @@ export interface BackupRun {
   finishedAt: string | null;  // ISO
   ok: boolean;
   file: string | null;
+  /** The backup of system.db (accounts, shops) made in the same run. */
+  systemFile?: string | null;
   sizeBytes: number | null;
   nas: 'ok' | 'failed' | 'off';
   error: string | null;
@@ -126,6 +145,8 @@ declare global {
     interface Request {
       /** The logged-in user, set by requireAuth / requireAdmin (lib/auth.js). */
       user?: { id: number; username: string; role: 'admin' | 'staff' };
+      /** The shop this request works on, set with req.user (lib/auth.js). */
+      store?: Store;
     }
   }
 }

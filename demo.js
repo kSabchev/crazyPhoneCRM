@@ -46,7 +46,9 @@ const isoDate = d => d.toISOString().slice(0, 10);
 const atTime = (d, hour) => `${isoDate(d)} ${String(hour).padStart(2, '0')}:15:00`;
 const addDays = (d, n) => new Date(d.getTime() + n * 24 * 60 * 60 * 1000);
 
-function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
+// `db` is the demo shop's database; `systemDb` holds the accounts and
+// sessions (lib/system-db.js).
+function prepareDemo(db, { systemDb, now = new Date(), count = 180 }) {
   const settingsRow = db.prepare('SELECT data FROM settings WHERE id = 1').get();
   const isDemoDb = settingsRow && JSON.parse(settingsRow.data).demoData === true;
   const hasTickets = db.prepare('SELECT COUNT(*) AS n FROM tickets').get().n > 0;
@@ -61,14 +63,11 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
   const pick = list => list[Math.floor(rnd() * list.length)];
 
   db.transaction(() => {
-    db.exec('DELETE FROM sms_messages; DELETE FROM audit_log; DELETE FROM tickets; DELETE FROM users;');
-    try { db.exec('DELETE FROM sessions'); } catch (_) { /* store not created yet */ }
+    db.exec('DELETE FROM sms_messages; DELETE FROM audit_log; DELETE FROM tickets;');
 
     db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
       .run(JSON.stringify({ ...DEFAULT_SETTINGS, demoData: true }));
 
-    const addUser = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)');
-    for (const u of DEMO_USERS) addUser.run(u.username, bcrypt.hashSync(u.password, 10), u.role);
 
     const insert = db.prepare(`
       INSERT INTO tickets (ticket_no, customer_name, phone_contact, date_received, date_returned, phone_model,
@@ -151,6 +150,15 @@ function prepareDemo(db, { now = new Date(), count = 180 } = {}) {
         }
       }
     }
+  })();
+
+  // Accounts and logins (system.db): only the demo accounts, everyone
+  // logged out.
+  systemDb.transaction(() => {
+    systemDb.exec('DELETE FROM users;');
+    try { systemDb.exec('DELETE FROM sessions'); } catch (_) { /* store not created yet */ }
+    const addUser = systemDb.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)');
+    for (const u of DEMO_USERS) addUser.run(u.username, bcrypt.hashSync(u.password, 10), u.role);
   })();
 
   console.log(`Demo mode: database reset with ${count} demo orders. Logins: ${DEMO_USERS.map(u => `${u.username} / ${u.password}`).join(', ')}`);

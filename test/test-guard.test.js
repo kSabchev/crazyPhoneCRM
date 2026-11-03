@@ -29,8 +29,8 @@ function assertRefused(res, pattern) {
 }
 
 test('the database refuses a non-temp DATA_ROOT, or none, during tests', () => {
-  assertRefused(run("require('./db')", { DATA_ROOT: PROBE }), /Test safety: DATA_ROOT/);
-  assertRefused(run("require('./db')", { DATA_ROOT: undefined }), /not set — the app folder/);
+  assertRefused(run("require('./lib/system-db')", { DATA_ROOT: PROBE }), /Test safety: DATA_ROOT/);
+  assertRefused(run("require('./lib/system-db')", { DATA_ROOT: undefined }), /not set — the app folder/);
 });
 
 test('backup and restore refuse a non-temp DATA_ROOT during tests', () => {

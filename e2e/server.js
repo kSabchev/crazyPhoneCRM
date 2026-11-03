@@ -21,7 +21,7 @@ const FAKE_SMS_PORT = 3199;
   process.env.SMS_GATEWAY_PASSWORD = 'secret';
 
   const bcrypt = require('bcrypt');
-  const db = require('../db');
+  const db = require('../lib/system-db'); // accounts
 
   // alice is an admin, bob a staff member — so both views are tested.
   for (const [username, role] of [['alice', 'admin'], ['bob', 'staff']]) {

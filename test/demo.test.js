@@ -8,26 +8,26 @@ const Database = require('better-sqlite3');
 const { ROOT, loadApp, login, makeDataRoot } = require('./helpers');
 const { prepareDemo, DEMO_USERS } = require('../demo');
 
-const { app, db } = loadApp();
+const { app, db, systemDb } = loadApp();
 const count = sql => db.prepare(sql).get().n;
 
 test('demo mode refuses to wipe a database with real orders', () => {
   db.prepare(`INSERT INTO tickets (ticket_no, customer_name, phone_contact, date_received, phone_model, description)
     VALUES (1, 'Истински клиент', '0888', '2026-01-01', 'iPhone', 'x')`).run();
-  assert.throws(() => prepareDemo(db), /contains real orders/);
+  assert.throws(() => prepareDemo(db, { systemDb }), /contains real orders/);
   assert.equal(count('SELECT COUNT(*) n FROM tickets'), 1);
   db.exec('DELETE FROM tickets');
 });
 
 test('demo mode fills the database with realistic fake orders and demo logins', async () => {
-  prepareDemo(db, { now: new Date('2026-09-30T12:00:00Z') });
+  prepareDemo(db, { systemDb, now: new Date('2026-09-30T12:00:00Z') });
 
   assert.equal(count('SELECT COUNT(*) n FROM tickets'), 180);
   assert.ok(count("SELECT COUNT(*) n FROM tickets WHERE status != 'издаден'") > 0, 'some orders still open');
   assert.ok(count("SELECT COUNT(*) n FROM tickets WHERE status = 'издаден' AND customer_price IS NOT NULL") > 100);
   assert.ok(count("SELECT COUNT(*) n FROM audit_log WHERE action = 'updated'") > 300, 'status history for reports');
   assert.ok(count("SELECT COUNT(*) n FROM tickets WHERE phone_password IS NOT NULL") > 0);
-  assert.deepEqual(db.prepare('SELECT username FROM users ORDER BY username').all().map(u => u.username), ['demo', 'demo2']);
+  assert.deepEqual(systemDb.prepare('SELECT username FROM users ORDER BY username').all().map(u => u.username), ['demo', 'demo2']);
 
   for (const u of DEMO_USERS) {
     await login(request.agent(app), u.username, u.password);
@@ -51,7 +51,7 @@ test('restarting demo mode throws away visitors\' changes', async () => {
   db.prepare(`INSERT INTO sms_messages (ticket_id, ticket_no, phone, text, state, sent_by)
     VALUES (1, 1, '+359888123456', 'от посетител', 'Delivered', 'demo')`).run();
 
-  prepareDemo(db);
+  prepareDemo(db, { systemDb });
   assert.equal(count("SELECT COUNT(*) n FROM sms_messages WHERE text = 'от посетител'"), 0);
   assert.equal(count('SELECT COUNT(*) n FROM tickets'), 180);
   assert.equal(count("SELECT COUNT(*) n FROM tickets WHERE customer_name = 'Посетител'"), 0);

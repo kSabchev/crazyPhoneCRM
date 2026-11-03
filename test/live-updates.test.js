@@ -12,7 +12,7 @@ let server, base, alice, bob;
 
 test.before(async () => {
   const bcrypt = require('bcrypt');
-  require('../db').prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
+  require('../lib/system-db').prepare('INSERT INTO users (username, password_hash) VALUES (?, ?)')
     .run('bob', bcrypt.hashSync('secret123', 4));
 
   server = app.listen(0);

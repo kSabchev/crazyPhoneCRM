@@ -9,7 +9,7 @@ const bcrypt = require('bcrypt');
 const request = require('supertest');
 const { loadApp } = require('./helpers');
 
-const { app, db } = loadApp({
+const { app, systemDb } = loadApp({
   beforeLoad(dataRoot) {
     fs.mkdirSync(path.join(dataRoot, 'data'));
     const old = new Database(path.join(dataRoot, 'data', 'repair-log.db'));
@@ -26,7 +26,8 @@ const { app, db } = loadApp({
 });
 
 test('existing accounts become admins and keep full access', async () => {
-  const roles = db.prepare("SELECT username, role FROM users WHERE username IN ('owner', 'helper') ORDER BY username").all();
+  // Moved to system.db with their role.
+  const roles = systemDb.prepare("SELECT username, role FROM users WHERE username IN ('owner', 'helper') ORDER BY username").all();
   assert.deepEqual(roles, [{ username: 'helper', role: 'admin' }, { username: 'owner', role: 'admin' }]);
 
   const agent = request.agent(app);

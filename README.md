@@ -508,6 +508,20 @@ crontab -e
 Check `backup.log` occasionally — if the NAS is ever unreachable at backup
 time, the script logs a warning there instead of failing silently.
 
+## Databases (preparing for several shops)
+
+The data lives in `data/` (in `DATA_ROOT` if set):
+
+- `system.db` — login accounts, the list of shops, login sessions.
+- `repair-log.db` — the first shop's orders, change history, SMS and
+  settings (the same file as before; further shops will get their own).
+
+**Upgrading from a version without `system.db`:** on first start the app
+registers `repair-log.db` as the first shop and copies its accounts into
+`system.db` (with the same passwords and roles; the old copy stays in
+`repair-log.db`, unused). Everyone has to log in once more, because login
+sessions moved too. Nothing else changes.
+
 ## Restoring from a backup
 
 `restore.js` restores a chosen backup as the live database. **Stop the app
@@ -525,9 +539,14 @@ is left untouched until the swap can actually succeed.
 
 ```
 node restore.js                 # lists available backups
-node restore.js latest          # restores the most recent one
+node restore.js latest          # restores the most recent shop backup
 node restore.js <filename>      # restores a specific one
 ```
+
+Each backup is two files with the same time stamp: `repair-log_….db` (the
+orders) and `system_….db` (accounts and the list of shops). Restoring a
+`system_…` file replaces `data/system.db`; do that only if accounts were
+lost. `latest` never picks one.
 
 It never destroys the current database outright: before restoring, it
 safely backs up whatever's currently live into `data/pre-restore/`, so a
@@ -738,11 +757,14 @@ repair-log/
     tickets-repo.js    All SQL for orders: get, list, create, update, remove
     ticket-events.js   Announces every change to an order
     ticket-listeners.js  After every change: history + live updates
+    system-db.js       system.db: accounts, the list of shops, login sessions
+    stores.js          The shops, each with its own database (req.store)
+    shop-db.js         A shop's database: schema and setup
+    data-dir.js        Where the databases live (DATA_ROOT or the app folder)
     audit.js           Writing the change history
     ticket-diff.js     What changed between two versions of an order (no database)
     ticket-input.js    Checking and cleaning order fields
     util.js            Dates, prices, async route wrapper
-  db.js              SQLite schema and setup
   migrations.js      Numbered changes for older databases (each runs once)
   env.js             Loads .env (skipped in tests, so they never use real settings)
   default-settings.js  Default statuses, colours, columns, print and SMS texts
