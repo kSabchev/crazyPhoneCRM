@@ -224,3 +224,79 @@ test('the combined reports database keeps ids unique across shops, so joins stay
     db.close();
   }
 });
+
+test('reports in the all-shops view break the figures down by shop, matching each shop\'s own', async () => {
+  const combined = (await all.get('/api/reports').expect(200)).body;
+  const { shops, total } = combined.byShop;
+  assert.deepEqual(shops.map(s => [s.id, s.name, s.prefix]), [[center.id, 'CrazyPhone', ''], [lozenets.id, 'Магазин Лозенец', 'Л']]);
+  const [c, l] = shops;
+  assert.deepEqual([c.revenue, c.profit, c.returned], [100, 60, 1]);
+  assert.deepEqual([l.revenue, l.profit, l.returned], [50, 40, 1]);
+  assert.deepEqual([total.revenue, total.profit, total.returned], [150, 100, 2]);
+  // The rows add up to the total.
+  for (const key of ['returned', 'priced', 'revenue', 'cost', 'profit', 'openCount', 'depositsHeld', 'smsSent', 'smsParts']) {
+    assert.equal(shops.reduce((sum, s) => sum + s[key], 0), total[key], key);
+  }
+  // Each row is what that shop's own Справки says.
+  const own = (await inCenter.get('/api/reports').expect(200)).body;
+  assert.equal(c.revenue, own.revenue.totals.revenue);
+  assert.equal(c.openCount, own.workload.openCount);
+  assert.equal(c.medianDays, own.turnaround.medianDays);
+  // A single shop's report has no breakdown.
+  assert.equal(own.byShop, undefined);
+});
+
+test('admins tick which shops a report covers: every section follows', async () => {
+  const report = async (agent, shops) => (await agent.get(`/api/reports?shops=${shops}`).expect(200)).body;
+
+  // One shop: its figures alone, as in its own Справки, no breakdown.
+  const onlyLozenets = await report(all, `${lozenets.id}`);
+  assert.deepEqual(onlyLozenets.shops, [lozenets.id]);
+  assert.equal(onlyLozenets.revenue.totals.revenue, 50);
+  assert.equal(onlyLozenets.byShop, undefined);
+  assert.equal(onlyLozenets.sms.total, 1, 'the SMS sent from Лозенец');
+  assert.ok(onlyLozenets.workload.oldest.every(t => !/Център/.test(t.customerName)));
+
+  const onlyCenter = await report(all, `${center.id}`);
+  assert.equal(onlyCenter.revenue.totals.revenue, 100);
+  assert.equal(onlyCenter.sms.total, 0);
+  assert.equal(onlyCenter.workload.openCount + onlyLozenets.workload.openCount,
+    (await report(all, `${center.id},${lozenets.id}`)).workload.openCount);
+
+  // Several: combined, with the breakdown of just those — also from a
+  // single shop's page (the admin isn't in the all-shops view there).
+  const both = await report(inCenter, `${lozenets.id},${center.id}`);
+  assert.deepEqual(both.shops, [center.id, lozenets.id]);
+  assert.equal(both.revenue.totals.revenue, 150);
+  assert.deepEqual(both.byShop.shops.map(s => s.name), ['CrazyPhone', 'Магазин Лозенец']);
+});
+
+test('a report needs at least one real shop, and managers can\'t widen theirs', async () => {
+  assert.match((await all.get('/api/reports?shops=').expect(400)).body.error, /поне един магазин/);
+  assert.match((await all.get('/api/reports?shops=1,99').expect(400)).body.error, /Невалиден магазин/);
+
+  systemDb.prepare("INSERT INTO users (username, password_hash, role, store_id) VALUES ('vera', ?, 'shop_manager', ?)")
+    .run(bcrypt.hashSync('secret123', 4), lozenets.id);
+  const vera = await login(request.agent(base), 'vera');
+  const own = (await vera.get(`/api/reports?shops=${center.id},${lozenets.id}`).expect(200)).body;
+  assert.deepEqual(own.shops, [lozenets.id], 'only her own shop');
+  assert.equal(own.revenue.totals.revenue, 50);
+  assert.equal(own.byShop, undefined);
+});
+
+test('ticking some shops leaves the others out of every figure and the breakdown', async () => {
+  const third = stores.create({ name: 'Трети', prefix: 'Т' });
+  third.tickets.create({ customer_name: 'Клиент Трети', phone_contact: '0888123456', date_received: '2026-01-05',
+    date_returned: new Date().toISOString().slice(0, 10), phone_model: 'Moto', status: STATUSES.COMPLETED, description: 'x',
+    comment: '', repair_performed: '', loaner_phone: 'не', phone_password: null, pravim: 'circle', kaparo: 'Не',
+    service_price: 0, customer_price: 1000 });
+
+  const two = (await all.get(`/api/reports?shops=${center.id},${lozenets.id}`).expect(200)).body;
+  assert.equal(two.revenue.totals.revenue, 150, 'not the third shop\'s 1000');
+  assert.deepEqual(two.byShop.shops.map(s => s.name), ['CrazyPhone', 'Магазин Лозенец']);
+  assert.ok(!JSON.stringify(two.workload).includes('Клиент Трети'));
+
+  const everything = (await all.get('/api/reports').expect(200)).body;
+  assert.equal(everything.revenue.totals.revenue, 1150);
+  assert.equal(everything.byShop.shops.length, 3);
+});

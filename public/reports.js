@@ -45,6 +45,9 @@ async function init(){
   // The all-shops view: every shop's figures together.
   const shopName = me.allShops ? 'всички магазини' : me.store.name;
   document.getElementById('whoAmI').textContent = manyShops ? `${me.username} · ${shopName}` : me.username;
+  // Admins with several shops tick which ones the figures cover: to start
+  // with, all of them in the all-shops view, otherwise the current shop.
+  if(me.role === 'admin' && manyShops) renderShopPicks(me.stores, me.allShops ? me.stores.map(s => s.id) : [me.store.id]);
   document.getElementById('backups').style.display = me.role === 'admin' ? '' : 'none';
   document.getElementById('reportsScreen').style.display = 'block';
 
@@ -64,7 +67,9 @@ async function load(){
   const errEl = document.getElementById('reportError');
   errEl.textContent = '';
 
-  const res = await fetch(`/api/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  const shops = pickedShops();
+  if(shops && !shops.length){ errEl.textContent = 'Изберете поне един магазин.'; return; }
+  const res = await fetch(`/api/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${shops ? `&shops=${shops.join(',')}` : ''}`);
   if(res.status === 401){ window.location.href = '/'; return; }
   if(!res.ok){
     const data = await res.json().catch(()=>({}));
@@ -77,6 +82,7 @@ async function load(){
 
 function render(r){
   renderKpis(r);
+  renderByShop(r.byShop);
   renderRevenueChart(r.revenue.months);
   renderRevenueTable(r.revenue);
   renderStatusTime(r.statusTime);
@@ -296,6 +302,48 @@ function renderRevenueTable(revenue){
       <td class="num">${escapeHtml(fmtMoney(t.cost))}</td>
       <td class="num">${escapeHtml(fmtMoney(t.profit))}</td>
     </tr>`;
+}
+
+// ---------- Which shops (admins with several) ----------
+// A ticked shop's data goes into every figure, chart and list below. The
+// report reloads on each change.
+function renderShopPicks(shops, checked){
+  document.getElementById('shopPicks').style.display = '';
+  document.getElementById('shopPickList').innerHTML = shops.map(s => `
+    <label class="shop-pick"><input type="checkbox" value="${s.id}"${checked.includes(s.id) ? ' checked' : ''}> ${escapeHtml(s.name)}</label>`).join('');
+}
+// The ticked shop ids, or null when there's no choice (one shop, managers).
+function pickedShops(){
+  if(document.getElementById('shopPicks').style.display === 'none') return null;
+  return [...document.querySelectorAll('#shopPickList input:checked')].map(i => Number(i.value));
+}
+document.getElementById('shopPickList').addEventListener('change', load);
+document.getElementById('pickAllShops').addEventListener('click', ()=>{
+  document.querySelectorAll('#shopPickList input').forEach(i => { i.checked = true; });
+  load();
+});
+
+// ---------- By shop (several shops) ----------
+// One row per shop and the total. A share of the total revenue is shown
+// under each shop's revenue.
+function renderByShop(byShop){
+  const section = document.getElementById('byShopSection');
+  section.style.display = byShop ? '' : 'none';
+  if(!byShop) return;
+  const total = byShop.total;
+  const cells = s => `
+      <td class="num">${s.returned}</td>
+      <td class="num">${escapeHtml(fmtMoney(s.revenue))}${s.share !== undefined ? `<div class="muted">${s.share}%</div>` : ''}</td>
+      <td class="num">${escapeHtml(fmtMoney(s.profit))}</td>
+      <td class="num">${s.averageTicket === null ? '—' : escapeHtml(fmtMoney(s.averageTicket))}</td>
+      <td class="num">${s.medianDays === null ? '—' : `${String(s.medianDays).replace('.', ',')} дни`}</td>
+      <td class="num">${s.openCount}</td>
+      <td class="num">${escapeHtml(fmtMoney(s.depositsHeld))}</td>
+      <td class="num">${s.smsSent}</td>`;
+  document.getElementById('byShopTable').innerHTML = byShop.shops.map(s => {
+    const share = total.revenue > 0 ? Math.round(s.revenue / total.revenue * 100) : undefined;
+    return `<tr data-shop="${s.id}"><td>${escapeHtml(s.name)}${s.prefix ? ` <span class="muted">(${escapeHtml(s.prefix)})</span>` : ''}</td>${cells({ ...s, share })}</tr>`;
+  }).join('') + `<tr class="total-row"><td>Общо</td>${cells(total)}</tr>`;
 }
 
 // ---------- Tables ----------

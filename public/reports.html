@@ -37,9 +37,31 @@
       <button class="btn" id="applyBtn">Покажи</button>
     </div>
   </div>
+  <!-- Admins with several shops: which shops the figures cover. -->
+  <div class="shop-picks" id="shopPicks" style="display:none;">
+    <span class="shop-picks-label">Магазини:</span>
+    <span id="shopPickList"></span>
+    <button type="button" class="link-btn" id="pickAllShops">всички</button>
+  </div>
   <div class="report-error" id="reportError"></div>
 
   <div class="kpi-grid" id="kpis"></div>
+
+  <!-- The all-shops view only: each shop's figures side by side. -->
+  <div class="settings-section report-section" id="byShopSection" style="display:none;">
+    <h2>По магазини</h2>
+    <div class="section-sub">Основните показатели на всеки избран магазин за периода, един до друг. Отворените поръчки и капарата са към момента.</div>
+    <div class="table-wrap report-table">
+      <table>
+        <thead><tr>
+          <th>Магазин</th><th class="num">Издадени</th><th class="num">Приходи</th><th class="num">Печалба</th>
+          <th class="num">Средна поръчка</th><th class="num">Медиана на ремонта</th><th class="num">Отворени</th>
+          <th class="num">Капаро</th><th class="num">SMS</th>
+        </tr></thead>
+        <tbody id="byShopTable"></tbody>
+      </table>
+    </div>
+  </div>
 
   <div class="settings-section report-section">
     <h2>Приходи и печалба по месеци</h2>

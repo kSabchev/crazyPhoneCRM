@@ -1,8 +1,9 @@
 // @ts-check
 // Справки (managers and admins): revenue, turnaround, workload, SMS — see
-// ../reports.js. The backup log is for admins only.
+// ../reports.js. Managers see their shop; admins one, several or all shops.
+// The backup log is for admins only.
 const express = require('express');
-const { buildReport } = require('../reports');
+const { buildReport, shopSummary } = require('../reports');
 const { requireAdmin, requireManager } = require('../lib/auth');
 const { localToday, isValidDate, daysBetweenDates } = require('../lib/util');
 const { readBackupLog, KEEP } = require('../lib/backup-log');
@@ -10,6 +11,20 @@ const { combinedDb } = require('../lib/combined-db');
 const stores = require('../lib/stores');
 
 const router = express.Router();
+
+// The shops a report covers. Admins can tick any of them (?shops=1,3);
+// otherwise every shop in the all-shops view, or the request's own shop.
+/** @returns {{ shops?: import('../types/app').Store[], error?: string }} */
+function reportShops(req) {
+  if (req.user.role !== 'admin' || req.query.shops === undefined) {
+    return { shops: req.allShops ? stores.all() : [req.store] };
+  }
+  const ids = [...new Set(String(req.query.shops).split(',').map(s => s.trim()).filter(Boolean))];
+  if (!ids.length) return { error: 'Изберете поне един магазин' };
+  const shops = ids.map(id => stores.get(id));
+  if (shops.some(s => !s)) return { error: 'Невалиден магазин' };
+  return { shops: /** @type {import('../types/app').Store[]} */ (shops).sort((a, b) => a.id - b.id) };
+}
 
 router.get('/api/reports', requireManager, (req, res) => {
   const today = localToday();
@@ -24,11 +39,26 @@ router.get('/api/reports', requireManager, (req, res) => {
   if (daysBetweenDates(from, to) > 10 * 366) {
     return res.status(400).json({ error: 'Периодът е твърде дълъг (най-много 10 години)' });
   }
-  if (!req.allShops) return res.json(buildReport(req.store.db, { from, to, today }));
-  // The all-shops view: every shop's data at once.
-  const db = combinedDb(stores.all());
+  const picked = reportShops(req);
+  if (picked.error) return res.status(400).json({ error: picked.error });
+  const shops = /** @type {import('../types/app').Store[]} */ (picked.shops);
+  const covers = shops.map(s => s.id);
+  if (shops.length === 1) return res.json({ ...buildReport(shops[0].db, { from, to, today }), shops: covers });
+
+  // Several shops: their data at once, plus each one's headline figures
+  // side by side (byShop; the total is the combined report's).
+  const db = combinedDb(shops);
   try {
-    res.json(buildReport(db, { from, to, today }));
+    /** @type {Record<string, any>} */
+    const report = { ...buildReport(db, { from, to, today }), shops: covers };
+    report.byShop = {
+      shops: shops.map(store => ({
+        id: store.id, name: store.name, prefix: store.prefix,
+        ...shopSummary(buildReport(store.db, { from, to, today }))
+      })),
+      total: shopSummary(report)
+    };
+    res.json(report);
   } finally {
     db.close();
   }
