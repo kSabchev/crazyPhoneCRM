@@ -92,6 +92,51 @@
     </div>
   </div>
 
+  <div class="settings-section" data-scope="shop" id="smsSendSection">
+    <h2>Изпращане на SMS</h2>
+    <div class="section-sub">
+      Откъде този магазин изпраща SMS. Всеки магазин може да има собствен телефон или собствено име на подателя в SMSAPI.
+      Запазва се с бутона в тази секция, отделно от останалите настройки.
+    </div>
+    <div class="field">
+      <label for="smsMode">SMS от този магазин</label>
+      <select id="smsMode">
+        <option value="env">Както е зададено в .env</option>
+        <option value="own">Собствени настройки</option>
+        <option value="off">Изключени</option>
+      </select>
+      <div class="muted" id="smsModeHint"></div>
+    </div>
+    <div id="smsOwnFields" style="display:none;">
+      <div class="section-sub">Попълнете едното: SMSAPI.bg (има предимство, ако са попълнени и двете) или телефон с приложението SMS Gateway for Android.</div>
+      <div class="field">
+        <label for="smsApiToken">SMSAPI ключ (OAuth token)</label>
+        <input type="password" id="smsApiToken" autocomplete="new-password">
+      </div>
+      <div class="field">
+        <label for="smsApiSender">Име на подателя в SMSAPI (до 11 знака, само одобрено)</label>
+        <input type="text" id="smsApiSender" maxlength="11">
+      </div>
+      <label class="checkbox-line"><input type="checkbox" id="smsApiTest"> Тестов режим — SMSAPI не доставя и не таксува</label>
+      <div class="field">
+        <label for="smsGatewayUrl">Адрес на телефона</label>
+        <input type="text" id="smsGatewayUrl" placeholder="напр. http://192.168.1.50:8080">
+      </div>
+      <div class="field">
+        <label for="smsGatewayUser">Потребител (от приложението)</label>
+        <input type="text" id="smsGatewayUser" autocomplete="off">
+      </div>
+      <div class="field">
+        <label for="smsGatewayPassword">Парола (от приложението)</label>
+        <input type="password" id="smsGatewayPassword" autocomplete="new-password">
+      </div>
+    </div>
+    <div class="add-row">
+      <button class="btn secondary" id="smsSaveBtn">Запази SMS настройките</button>
+      <span class="save-status" id="smsSaveStatus"></span>
+    </div>
+  </div>
+
   <div class="settings-section">
     <h2>Разпечатка за сервиза</h2>
     <div class="section-sub">

@@ -142,3 +142,35 @@ test('Настройки says which sections are shared and which are the shop\'
   await expect(tag('SMS до клиента')).toHaveText('само за CrazyPhone');
   await expect(page.locator('#shopPhoneInput')).toBeVisible();
 });
+
+test('admins set where a shop\'s SMS go from, in its Настройки', async ({ page }) => {
+  await login(page, 'alice');
+  // The second shop, so the SMS tests in the first shop are unaffected.
+  expect((await page.request.post('/api/auth/store', { data: { storeId: 2 } })).status()).toBe(200);
+  await page.goto('/settings.html');
+  const section = page.locator('#smsSendSection');
+  await expect(section.locator('h2 .scope-tag')).toHaveText('само за Магазин Лозенец');
+  await expect(page.locator('#smsMode')).toHaveValue('env');
+  await expect(page.locator('#smsModeHint')).toHaveText('В .env: телефон.');
+  await expect(page.locator('#smsOwnFields')).toBeHidden();
+
+  await page.selectOption('#smsMode', 'own');
+  await expect(page.locator('#smsOwnFields')).toBeVisible();
+  await page.click('#smsSaveBtn');
+  await expect(page.locator('#smsSaveStatus')).toContainText('SMSAPI ключ или адрес на телефона');
+
+  await page.fill('#smsGatewayUrl', 'http://127.0.0.1:3199');
+  await page.fill('#smsGatewayUser', 'sms');
+  await page.fill('#smsGatewayPassword', 'secret');
+  await page.click('#smsSaveBtn');
+  await expect(page.locator('#smsSaveStatus')).toHaveText('Запазено. SMS: телефон.');
+  // The password isn't shown again, only that one is saved.
+  await page.reload();
+  await expect(page.locator('#smsMode')).toHaveValue('own');
+  await expect(page.locator('#smsGatewayPassword')).toHaveValue('');
+  await expect(page.locator('#smsGatewayPassword')).toHaveAttribute('placeholder', /запазен/);
+
+  await page.selectOption('#smsMode', 'env');
+  await page.click('#smsSaveBtn');
+  await expect(page.locator('#smsSaveStatus')).toHaveText('Запазено. SMS: телефон.');
+});

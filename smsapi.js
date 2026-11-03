@@ -1,6 +1,7 @@
 // @ts-check
 // SMS through SMSAPI.bg (https://www.smsapi.bg) — a paid SMS service, no
-// phone needed. Configured in .env:
+// phone needed. Configured in .env, or per shop in Настройки (sms.js; the
+// address, SMSAPI_URL, only in .env):
 //
 //   SMSAPI_TOKEN   OAuth token from portal.smsapi.bg → OAuth tokens
 //   SMSAPI_SENDER  optional: an approved sender name (max 11 characters);
@@ -18,14 +19,15 @@ const TIMEOUT_MS = 15000;
 // Below this many credits the header shows a "top up soon" warning.
 const LOW_CREDIT = 5;
 
-function config() {
-  const token = (process.env.SMSAPI_TOKEN || '').trim();
-  if (!token || process.env.DEMO_MODE === 'true') return null;
+/** @param {import('./types/app').SmsEnv} [env] */
+function config(env = process.env) {
+  const token = (env.SMSAPI_TOKEN || '').trim();
+  if (!token || env.DEMO_MODE === 'true') return null;
   return {
     token,
-    url: (process.env.SMSAPI_URL || 'https://api.smsapi.bg').trim().replace(/\/+$/, ''),
-    sender: (process.env.SMSAPI_SENDER || '').trim(),
-    test: process.env.SMSAPI_TEST === 'true'
+    url: (env.SMSAPI_URL || 'https://api.smsapi.bg').trim().replace(/\/+$/, ''),
+    sender: (env.SMSAPI_SENDER || '').trim(),
+    test: env.SMSAPI_TEST === 'true'
   };
 }
 
@@ -89,9 +91,9 @@ async function call(cfg, path, { method = 'GET', form } = {}) {
 
 // Sends one SMS. `phone` is "+359…"; SMSAPI wants digits only.
 // Resolves to { gatewayId, state } or throws an Error for staff to read.
-/** @param {string} phone @param {string} [text] @returns {ReturnType<SmsProvider['send']>} */
-async function send(phone, text) {
-  const cfg = config();
+/** @param {string} phone @param {string} [text] @param {import('./types/app').SmsEnv} [env] @returns {ReturnType<SmsProvider['send']>} */
+async function send(phone, text, env) {
+  const cfg = config(env);
   if (!cfg) throw new Error('SMSAPI не е настроен');
   assertTestUrl(cfg.url, 'SMSAPI_URL'); // before the try below, so the reason shows
   const form = {
@@ -119,9 +121,9 @@ async function send(phone, text) {
 // Current state of a sent message: { state, error } or null if unknown.
 // NOTE: uses SMSAPI's sms.do?status=<id> lookup — confirm against a real
 // account; if SMSAPI answers differently the SMS simply stays "Pending".
-/** @param {string} id @returns {ReturnType<SmsProvider['state']>} */
-async function state(id) {
-  const cfg = config();
+/** @param {string} id @param {import('./types/app').SmsEnv} [env] @returns {ReturnType<SmsProvider['state']>} */
+async function state(id, env) {
+  const cfg = config(env);
   if (!cfg || !id) return null;
   const { res, body } = await call(cfg, `/sms.do?status=${encodeURIComponent(id)}&format=json`);
   if (!res.ok || body.error) return null;
@@ -133,9 +135,9 @@ async function state(id) {
 
 // Is SMSAPI reachable and the token valid? Also reports the credit left.
 // Returns { state, details } with state ready / warning / offline / auth.
-/** @returns {ReturnType<SmsProvider['serviceStatus']>} */
-async function serviceStatus() {
-  const cfg = config();
+/** @param {import('./types/app').SmsEnv} [env] @returns {ReturnType<SmsProvider['serviceStatus']>} */
+async function serviceStatus(env) {
+  const cfg = config(env);
   if (!cfg) return { state: 'off', details: {} };
   try {
     const { res, body } = await call(cfg, '/profile');

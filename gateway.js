@@ -1,7 +1,7 @@
 // @ts-check
 // SMS from the shop's Android phone, through "SMS Gateway for Android"
 // (https://sms-gate.app): the server asks the phone to send the SMS from
-// its own SIM. Configured in .env:
+// its own SIM. Configured in .env, or per shop in Настройки (sms.js):
 //
 //   SMS_GATEWAY_URL       Local server mode (phone on the shop Wi-Fi):
 //                           http://<phone-ip>:8080
@@ -19,13 +19,14 @@ const { assertTestUrl } = require('./lib/test-guard');
 const SEND_TIMEOUT_MS = 15000;
 const HEALTH_TIMEOUT_MS = 5000;
 
-function config() {
-  const url = (process.env.SMS_GATEWAY_URL || '').trim().replace(/\/+$/, '');
-  if (!url || process.env.DEMO_MODE === 'true') return null;
+/** @param {import('./types/app').SmsEnv} [env] */
+function config(env = process.env) {
+  const url = (env.SMS_GATEWAY_URL || '').trim().replace(/\/+$/, '');
+  if (!url || env.DEMO_MODE === 'true') return null;
   return {
     url,
-    user: process.env.SMS_GATEWAY_USER || '',
-    password: process.env.SMS_GATEWAY_PASSWORD || '',
+    user: env.SMS_GATEWAY_USER || '',
+    password: env.SMS_GATEWAY_PASSWORD || '',
     // The cloud API uses /messages, the phone's local server /message.
     path: url.includes('/3rdparty/') ? '/messages' : '/message'
   };
@@ -37,9 +38,9 @@ function authHeader(cfg) {
 
 // Sends one SMS. Resolves to { gatewayId, state }, or throws an Error
 // suitable for showing to staff.
-/** @param {string} phone @param {string} [text] @returns {ReturnType<SmsProvider['send']>} */
-async function send(phone, text) {
-  const cfg = config();
+/** @param {string} phone @param {string} [text] @param {import('./types/app').SmsEnv} [env] @returns {ReturnType<SmsProvider['send']>} */
+async function send(phone, text, env) {
+  const cfg = config(env);
   if (!cfg) throw new Error('SMS известията не са настроени');
   assertTestUrl(cfg.url, 'SMS_GATEWAY_URL'); // tests: only the fake phone
   let res;
@@ -60,9 +61,9 @@ async function send(phone, text) {
 }
 
 // Current state of a sent message: { state, error }, or null if unknown.
-/** @param {string} gatewayId @returns {ReturnType<SmsProvider['state']>} */
-async function state(gatewayId) {
-  const cfg = config();
+/** @param {string} gatewayId @param {import('./types/app').SmsEnv} [env] @returns {ReturnType<SmsProvider['state']>} */
+async function state(gatewayId, env) {
+  const cfg = config(env);
   if (!cfg || !gatewayId) return null;
   assertTestUrl(cfg.url, 'SMS_GATEWAY_URL');
   const res = await fetch(`${cfg.url}${cfg.path}/${encodeURIComponent(gatewayId)}`, {
@@ -95,9 +96,9 @@ function checkFailing(checks, key) {
 }
 
 // Returns { state, details } with state cloud / ready / warning / offline / auth.
-/** @returns {ReturnType<SmsProvider['serviceStatus']>} */
-async function serviceStatus() {
-  const cfg = config();
+/** @param {import('./types/app').SmsEnv} [env] @returns {ReturnType<SmsProvider['serviceStatus']>} */
+async function serviceStatus(env) {
+  const cfg = config(env);
   if (!cfg) return { state: 'off', details: {} };
   if (cfg.path === '/messages') return { state: 'cloud', details: {} };
   assertTestUrl(cfg.url, 'SMS_GATEWAY_URL');
