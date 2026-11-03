@@ -384,3 +384,17 @@ test('admins archive a shop in Магазини, and restore it', async ({ page 
   await temp.locator('[data-action="archive-shop"]').click(); // leave it archived for the tests after
   await expect(temp).toHaveClass(/shop-archived/);
 });
+
+// The pages are split into several scripts (js/settings, js/reports): a
+// script using another one's function before it has loaded fails silently
+// for the user, so check for script errors on every admin page.
+test('Настройки, Справки and the main page load without script errors', async ({ page }) => {
+  const errors = [];
+  page.on('pageerror', e => errors.push(e.message));
+  await login(page, 'alice');
+  for (const url of ['/settings.html', '/reports.html', '/']) {
+    await page.goto(url);
+    await page.waitForLoadState('networkidle');
+  }
+  expect(errors).toEqual([]);
+});

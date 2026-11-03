@@ -107,7 +107,8 @@ async function main() {
     console.log(`Available backups (newest first), in ${BACKUP_DIR}:\n`);
     console.log(`The first shop (data/repair-log.db):\n`);
     backups.forEach(f => console.log('  ' + f));
-    for (const [name, files] of Object.entries(otherShopBackups())) {
+    const byNumber = (a, b) => Number(a[0].slice(5)) - Number(b[0].slice(5)); // "shop-2" before "shop-10"
+    for (const [name, files] of Object.entries(otherShopBackups()).sort(byNumber)) {
       console.log(`\nShop ${name} (data/${name}.db):\n`);
       files.forEach(f => console.log('  ' + f));
     }

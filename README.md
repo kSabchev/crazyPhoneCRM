@@ -1,21 +1,25 @@
-# Repair Log
+# CrazyPhone CRM (Repair Log)
 
-See demo on https://crazyphone-demo.onrender.com/
+See the demo on https://crazyphone-demo.onrender.com/
 
-A self-hosted repair-ticket register for a phone repair shop: register phones
-brought in for repair, search and filter tickets, edit them, and print a
-customer copy or a service copy of any ticket. Login-protected.
+A self-hosted register of repair orders for phone repair shops: register
+phones brought in for repair, search and filter orders, print a customer
+card and a service label, send the customer an SMS when the phone is ready,
+and see revenue and turnaround in reports. One server runs one shop or
+several, each with its own orders. Login-protected, with roles.
 
 **Note:** the app's interface is in Bulgarian (labels, buttons, messages).
-This README and the code comments stay in English, for whoever
-administers/develops the app rather than for shop staff. The
-`create-admin.js` CLI and `backup.sh` script also stay in English for the
-same reason.
+This README and the code comments stay in English, for whoever administers
+or develops the app rather than for shop staff. The `create-admin.js` CLI
+and `backup.sh` script also stay in English for the same reason.
 
-**If you already have a `data/repair-log.db` from testing an earlier
-version:** the new Bulgarian default statuses only apply to a *fresh*
-database. Either delete `data/repair-log.db*` to start clean, or open
-Settings in the app and edit the statuses there — both work equally well.
+**Contents**
+
+- Setting up: [Stack](#stack) · [First-time setup](#first-time-setup) · [Running it](#running-it)
+- Using it: [How it works day-to-day](#how-it-works-day-to-day) · [Settings page](#settings-page) · [Reports page](#reports-page)
+- Running the shop(s): [Accounts and roles](#accounts-and-roles) · [Several shops](#several-shops) · [SMS to customers](#sms-to-customers)
+- Operating the server: [Deploying for real use](#deploying-for-real-use) · [Updating to a new version](#updating-to-a-new-version) · [Backups](#backups-including-nightly-to-a-nas) · [Restoring from a backup](#restoring-from-a-backup) · [Public demo on Render](#public-demo-on-render)
+- Developing: [Running the tests](#running-the-tests) · [Project structure](#project-structure)
 
 ## Stack
 
@@ -38,9 +42,11 @@ npm install
 cp .env.example .env
 ```
 
-Open `.env` and set `SESSION_SECRET` to a long random string, and
-`SHOP_PHONE` to the shop's phone number (printed on the customer card; each
-shop can also set its own in Настройки). You can generate the secret with:
+Open `.env` and set `SESSION_SECRET` to a long random string. Everything
+else is optional; `.env.example` explains each setting, grouped into what
+the whole server uses (port, data folder, NAS, HTTPS) and the defaults for
+the shops (phone number, SMS), which each shop can override in Настройки.
+Generate the secret with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -74,61 +80,308 @@ pm2 save
 pm2 startup
 ```
 
-## Running the tests
+## How it works day-to-day
+
+- **New Ticket** registers a phone: customer name, phone contact, date
+  received, date returned, phone model, status, description, and the two
+  price fields (service price = what it costs to get it repaired; customer
+  price = what the customer pays).
+- Click any row to **edit** it — update the status as the repair progresses,
+  set the date returned once it's handed back, fix a detail, or delete the
+  ticket. The Delete / Print / Cancel / Save buttons are at both the top
+  and the bottom of an open ticket.
+- **Парола** holds the customer's unlock code (PIN or pattern). It is shown in
+  its own column and printed on the service label (not the customer card).
+  The change history only notes "Паролата е променена", never the code.
+- **Об. тел** (loaner phone) is a да/не choice. Older free-text entries were
+  converted on upgrade: a model name became "да", with the text kept in the
+  order's comment.
+- **Phone numbers** that aren't in the usual form (0 or +359 followed by
+  9 digits; spaces and dashes are fine) get a light red background in the table and
+  the form, as a warning. They can still be saved.
+- Click **Парола, Коментар, Извършен ремонт, Изкупна цена or Продажна цена**
+  in the table to edit just that field in a small window, without opening the
+  whole order. Texts: Ctrl+Enter saves; password and prices: Enter saves (an
+  empty price means no price). Esc closes.
+- Click the **№, Статус, Дата на приемане or Дата на връщане** header to sort
+  by it (click again to reverse; an arrow shows the current sort). Default: by
+  number, newest first. Each browser remembers its last choice.
+- Besides "издаден", two more statuses close an order: **отказан** (repair
+  refused) and **забравен** (phone never collected). Closed orders are left out
+  of the "В процес" filter and the open-orders figures in reports. Only
+  "издаден" fills in the return date automatically. Moving an order to "отказан" sets
+  Капаро, Изкупна цена and Продажна цена to 0 (they can still be changed
+  afterwards, e.g. for a diagnostic fee).
+- An order left in **"чака клиент" for more than 30 days** becomes "забравен"
+  automatically (checked on start and every hour). The history shows it as
+  done by "автоматично", and the server log lists the order numbers. The 30
+  days count from when it was last put into "чака клиент"; putting it back
+  into "чака клиент" starts a new 30 days.
+- Click a **status** in the table to change it straight from a dropdown,
+  without opening the ticket. Changing it to "издаден" (here or in the
+  ticket form) fills in today as the return date, unless one is already set.
+- **Компактен изглед** (button next to the filters) shows one line per order,
+  with long texts cut short (full text on hover). Each browser remembers it.
+- **On a phone**, orders are shown as cards (number, status, customer with a
+  call button, model, problem, price, deposit, date). Tap a card to open the
+  order; less-needed fields are in the full order.
+- **After a new order is saved**, the app offers to print the customer card
+  and/or the service label straight away.
+- Editable cells show a ✎ when you point at them.
+- The **counters at the top** are shortcuts: click one (e.g. "чакат клиент") to
+  show only those orders; click it again, or "общо поръчки", to show all.
+- **Prices** can be typed with a comma or a point ("25,50" or "25.50").
+- **Search** filters across customer name, phone number, model, ticket
+  number, and description as you type. The status dropdown narrows further.
+- **Live updates**: when anyone creates, edits, or deletes a ticket (or an
+  admin changes Settings), every other open browser tab refreshes on its
+  own within a moment — no manual reload needed, even across different
+  computers. If someone has a ticket open for editing when this happens,
+  their in-progress changes aren't touched; only the underlying table
+  refreshes in the background.
+- **Presence indicator**: while someone has a ticket open, other staff see
+  a small badge on that row showing who's currently looking at it, and a
+  warning banner if they open the same ticket too. This is informational
+  only — it never blocks anyone from opening or saving a ticket, since two
+  people sometimes legitimately need to look at the same one.
+- **Customer phone numbers are click-to-call** (`tel:` links), in both the
+  table and the ticket modal. What actually happens when clicked depends on
+  what's installed on that computer to handle phone calls (a softphone, a
+  paired-phone integration, etc.) — the app just hands off to whatever's
+  registered for that.
+- From an open ticket, **Print for customer** generates a small service-card
+  PDF (100×95mm) matching the shop's paper card — client, model, damage
+  description, loaner phone, deposit, and intake date, with the shop's logo
+  and liability warning; it opens as a real PDF in a new tab — print from
+  there. **Print for service** downloads a label for the Brother QL-600
+  label printer (shop name, order number, unlock code if any, and the
+  problem description), meant to be stuck directly on the phone. It is a
+  P-touch Editor file (`poruchka-<number>.lbx`): open it and press Print in
+  P-touch Editor (installed on the shop PC, with the QL-600 driver).
+
+- Every order's **History** (inside the order) shows who created it and
+  who changed what, with a timestamp. The **Дневник на промените** button in
+  the header shows the same across all orders (all shops, in the all-shops
+  view).
+
+### Changing the service label
+
+The label's layout comes from `print-templates/service-label.lbx`, designed
+in P-touch Editor — the label roll and length, fonts, sizes and positions
+are all whatever is set there. The app only replaces text boxes containing
+exactly these placeholders (curly braces included, any letter case):
+`{shop}`, `{order}`, `{issue}`, `{password}` (a box whose value is empty,
+e.g. no unlock code, is left off). To change the look, open the template in
+P-touch Editor, edit it, keep the placeholder texts, and save it over the
+same file — no restart needed. A long problem description makes a longer
+label on continuous tape; to shrink it into its box instead, set that text
+box's text options in P-touch Editor (e.g. fit text to frame).
+
+## Settings page
+
+**Настройки** in the header (admins only). With several shops, each section
+is marked "общо за всички магазини" (shared) or "само за <shop>" (the shop
+being worked on); see [Several shops](#several-shops).
+
+Saved with **Запази промените** (unsaved changes are flagged before leaving):
+
+- **Име на сервиза** — the shop's name, tagline and phone number, printed on
+  the customer card. An empty phone falls back to `SHOP_PHONE` in `.env`.
+- **Статуси** (shared) — add your own, reorder, and pick each status's
+  colour. The six built-in statuses (🔒 за сервиз, в сервиз, чака клиент,
+  издаден, отказан, забравен) trigger automatic actions — SMS offer, return
+  date, zeroed prices, auto-"забравен" — so they can't be removed or
+  renamed; your own can. Their names are defined once, in `public/statuses.js`.
+- **Автоматични правила** — what the app does by itself on each status
+  change (read-only; from `public/status-rules.js`).
+- **Колони в таблицата** (shared) — which columns the order table shows.
+  The order number always shows.
+- **Разпечатка за клиента** — the warning text at the bottom of the
+  customer card. The card's fields are fixed.
+- **SMS до клиента** — the text offered when an order becomes "чака клиент".
+- **Предложения за модели телефони** (shared) — the starter list of models
+  suggested while typing. Models typed into real orders are added on top.
+
+Saved straight away, each with its own button or on change:
+
+- **Изпращане на SMS** — how this shop sends SMS ([per shop](#sms-settings-per-shop)).
+- **Магазини** — add, rename, set prefixes, archive and restore shops.
+- **Потребители** — accounts, roles and their shops ([Accounts and roles](#accounts-and-roles)).
+
+At the bottom, the **admin log** lists who changed what in these settings,
+the shops and the accounts.
+
+Changes apply for everyone straight away: open screens refresh on their own.
+
+## Reports page
+
+**Справки** in the header (managers and admins) opens reports for a chosen
+period (this month, the last 3 or 12 months, this year, or any dates). All
+amounts are in €.
+
+- **Revenue and profit by month.** An order counts in the month it was
+  *returned* to the customer (Дата на връщане), since that is when it is paid.
+  Profit = Продажна цена − Изкупна цена.
+- **Turnaround.** Median and average days from received to returned.
+- **Time in status.** How long orders sit in each status, worked out from
+  the change history. No extra data entry is needed.
+- **Open orders right now,** the ten waiting longest, and the deposits
+  (капаро) currently held.
+- **SMS sent** in the period, with their status and how many SMS parts they
+  used.
+- **Data check.** Lists orders that make the numbers less accurate, such as
+  returned without a price, or "издаден" with no return date, so they can be
+  fixed.
+- **Backups** (admins): the latest backup runs, green or red.
+
+**Several shops:** managers see their own shop. Admins tick which shops the
+figures cover (one, some or all, archived ones too); with more than one
+ticked, a **По магазини** table compares them side by side (revenue, profit,
+average order, repair time, open orders, deposits, SMS) with the total.
+
+## Accounts and roles
+
+Give each staff member their own login rather than sharing one account —
+that's what makes the history/activity log meaningful, since every change is
+attributed to whoever was signed in when they made it.
+
+There are three roles:
+
+| | Admin (администратор) | Shop manager (управител) | Staff (служител) |
+|---|---|---|---|
+| Shops | **all**: picks one in the header | one | one |
+| Create, edit, print orders; change status; send SMS | ✓ | ✓ | ✓ |
+| See and edit both prices | ✓ | ✓ | ✓ |
+| **Delete orders** | ✓ | ✓ | — |
+| **Справки** (revenue, profit, SMS usage) | ✓ | ✓ (own shop) | — |
+| **Настройки** (statuses, columns, texts, accounts) | ✓ | — | — |
+| Backup log and warnings | ✓ | — | — |
+
+The server enforces this; accounts simply don't see the links and buttons
+they can't use. A shop account only ever reaches its own shop's orders,
+history, reports and live updates.
+
+**Managing accounts:** admins use **Настройки → Потребители** to add an
+account (with a role, and a shop for managers and staff), change someone's
+role or shop, set a new password for them, or remove an account. Changes
+apply immediately, even to someone already logged in. An admin can't demote
+or remove themselves, so there's always at least one admin. Accounts that
+existed before roles were added are admins.
+
+**Admin log:** changes to shops, accounts and settings are recorded with who
+made them and when, and listed at the bottom of **Настройки** ("Дневник на
+администраторските промени", the latest 200). That covers adding, renaming,
+archiving and restoring shops, adding, changing and removing accounts,
+password resets and own password changes, settings (what changed, from what
+to what) and SMS settings. Passwords and SMS tokens are never written, only
+that they were set, changed or removed. `create-admin.js` logs as itself.
+The log is kept in `system.db`, so it's backed up with the accounts. Changes
+to orders stay in the activity log on the main page.
+
+**Your own password:** anyone can change it by clicking their **username** in
+the header (the current password is required).
+
+**From the command line** (first admin, or if no admin can log in):
 
 ```bash
-npm test
+node create-admin.js username password            # new admin, or reset a password
+node create-admin.js username password --staff    # new staff account
+node create-admin.js username password --manager  # new shop manager (first shop)
+node create-admin.js username password --admin    # also make an existing account admin
 ```
 
-Runs the API tests and the backup/restore tests using Node's built-in test
-runner. Every test file gets its own throwaway database in the system temp
-folder, so running tests never touches `data/` or `backups/`, and it's
-safe to run on the shop PC while the app is live.
+## Several shops
 
-Browser tests (Playwright) drive the real app in Chromium: login, the
-ticket form, two staff members seeing each other's changes live, the
-"being viewed by" indicator, printing (checks the PDF page sizes), and
-settings. First time only, download the browser:
+One server can run several shops. Staff and shop managers each work in
+their own shop; admins see all of them. With a single shop, none of this is
+visible.
 
-```bash
-npx playwright install chromium
-```
+### Where the data is
 
-Then:
+The data lives in `data/` (in `DATA_ROOT` if set):
 
-```bash
-npm run test:e2e
-```
+- `system.db` — login accounts, the list of shops, the settings every shop
+  shares (statuses and their colours, table columns, phone models), login
+  sessions.
+- `repair-log.db` — the first shop's orders, change history, SMS and own
+  settings (the same file as before).
+- `shop-<id>.db` — each further shop's, likewise.
 
-They start their own copy of the server on port 3100 with a throwaway
-database, so they are also safe to run next to the live app.
+### Accounts, the shop picker and the all-shops view
 
-This is enforced, not just intended: during tests (`CRAZYPHONE_TEST=1`)
-the app refuses to use a data, backup or NAS folder outside the system temp
-folder, and refuses to send SMS anywhere but the tests' fake services on
-this computer (`lib/test-guard.js`). The real `.env` is never read.
-Traces of failed browser tests also go to the temp folder
-(`crazyphone-test-results`; the path is printed on failure).
+**Upgrading from a version without `system.db`:** on first start the app
+registers `repair-log.db` as the first shop and copies its accounts into
+`system.db` (with the same passwords and roles; the old copy stays in
+`repair-log.db`, unused). Everyone has to log in once more, because login
+sessions moved too. Nothing else changes.
 
-### Type checking
+**Accounts and shops:** staff and shop managers each belong to one shop and
+only ever reach its orders; admins see every shop and pick the one they work
+on in the header (shown once there's more than one shop). Existing staff
+accounts belong to the first shop.
 
-```bash
-npm run typecheck
-```
+**All shops at once (admins):** "Всички магазини" in the header's shop
+picker lists every shop's orders together, each marked with its shop and
+numbered with the shop's prefix (e.g. "#Л-123"). They can be opened, edited,
+printed (with their own shop's name, phone and footer), sent SMS (from their
+own shop's SMS settings) and deleted as usual; a new order asks for its shop.
+The activity log and Справки then cover every shop; Справки also gets a
+**По магазини** table with each shop's revenue, profit, average order, repair
+time, open orders, deposits and SMS side by side, and the total.
 
-TypeScript checks the server code for mistakes such as a misspelled field
-name, a wrong event payload or an SMS provider that doesn't match the
-shared interface. Nothing is compiled — the app still runs the `.js`
-files as they are, so deployment doesn't change. Types are written in JSDoc
-comments; the shared ones (an order, the SMS provider interface, the order
-events, a backup run) are in `types/app.d.ts`. A file is checked once it
-starts with `// @ts-check` (see `tsconfig.json`) — so far `lib/`,
-`routes/` and the SMS, status and migration modules.
+**Choosing shops in Справки (admins):** with several shops, checkboxes under
+the period pick which shops every figure, chart and list covers: one, some
+or all ("всички"). They start with every shop in the all-shops view, and
+with the current shop otherwise. Managers always see their own shop. In the
+all-shops view Настройки shows only the shared settings; pick a shop for
+its own.
 
-Both suites and the type check run automatically on GitHub (API tests on
-Windows and Linux, Node 22 and 24; browser tests and the type check on Linux) for every pull request and every
-push to `main` — see
-`.github/workflows/test.yml`.
+### Settings, adding and archiving shops
+
+**Settings:** statuses, their colours, the table columns and the phone-model
+list are the same in every shop (on upgrade they start as the first shop's).
+The name, tagline, phone number, customer-print footer and SMS text are each
+shop's own. With several shops, Настройки marks which is which. Each shop
+can also send SMS its own way (below).
+
+**Adding a shop:** Настройки → **Магазини** (admins). Give it a name and,
+optionally, a prefix for its order numbers (letters and digits, up to 5,
+e.g. "Л" → "#Л-123"; each shop's must differ). It starts with an empty
+database (`data/shop-<id>.db`), the shared statuses and columns, and its own
+order numbers from 1. Then:
+
+1. pick it in the header and set its name, phone, print footer and SMS text
+   in Настройки, and how it sends SMS (Изпращане на SMS);
+2. in Потребители, give its staff and manager accounts this shop.
+
+It's in the nightly backup from then on. A shop's name and prefix can be
+changed in Магазини at any time (renaming it there also renames it on its
+prints). Up to 10 shops in use (the all-shops reports combine them).
+
+**Archiving a shop:** shops are never deleted, so their orders can't be lost,
+but a shop that closes can be **archived** in Магазини. It disappears from
+the picker, the all-shops lists, new orders and the account dropdowns; its
+database stays, is still backed up, and can still be ticked in Справки
+(marked "архивиран"). Its accounts must be moved to another shop or removed
+first, and the last shop in use can't be archived. **Възстанови** brings it
+back as it was. Archived shops don't count towards the 10.
+
+### SMS settings per shop
+
+The settings in `.env` apply to every shop unless a shop sets its own. In
+**Настройки → Изпращане на SMS** (admins, for the shop they're working on):
+
+- **Както е зададено в .env** (default): as above.
+- **Собствени настройки**: the shop's own SMSAPI token and sender name, or
+  its own phone (address, username, password). Nothing comes from `.env`
+  then, except the SMSAPI address. As in `.env`, SMSAPI wins if both are
+  filled in.
+- **Изключени**: no SMS from that shop; the app doesn't offer to send.
+
+Each shop's header pill shows its own phone or service. The token and the
+phone's password are never shown again once saved; leave the field empty to
+keep them. They're stored in `data/system.db`, so, like `.env`, its backups
+should be kept private.
 
 ## SMS to customers
 
@@ -159,22 +412,9 @@ There are two ways to send the SMS; set up **one** of them:
 
 If both are configured, SMSAPI.bg is used.
 
-### Several shops: SMS settings per shop
-
-The settings in `.env` apply to every shop unless a shop sets its own. In
-**Настройки → Изпращане на SMS** (admins, for the shop they're working on):
-
-- **Както е зададено в .env** (default): as above.
-- **Собствени настройки**: the shop's own SMSAPI token and sender name, or
-  its own phone (address, username, password). Nothing comes from `.env`
-  then, except the SMSAPI address. As in `.env`, SMSAPI wins if both are
-  filled in.
-- **Изключени**: no SMS from that shop; the app doesn't offer to send.
-
-Each shop's header pill shows its own phone or service. The token and the
-phone's password are never shown again once saved; leave the field empty to
-keep them. They're stored in `data/system.db`, so, like `.env`, its backups
-should be kept private.
+With several shops, `.env` gives every shop's default; each shop can use
+its own phone or SMSAPI sender instead, or no SMS
+([SMS settings per shop](#sms-settings-per-shop)).
 
 ### Option 1: SMSAPI.bg
 
@@ -283,40 +523,6 @@ approved, or an invalid number.
 The server checks with the phone every minute for status updates on SMS sent
 in the last 24 hours.
 
-## Public demo on Render
-
-A **demo** copy (fake data only, never the shop's real app) can run on
-[Render](https://render.com) using the `render.yaml` Blueprint in this repo.
-
-1. Sign in to Render with GitHub.
-2. **New → Blueprint**, give Render access to this repository, choose the
-   `main` branch, and apply. Render reads `render.yaml` and creates the
-   `crazyphone-demo` web service (free plan).
-3. Wait for the first deploy. The log should end with
-   `Demo mode: database reset with 180 demo orders` and
-   `Repair log running`.
-4. Open the `https://…onrender.com` address. A yellow **ДЕМО** banner shows
-   on every page and the login is pre-filled (`demo` / `demo1234`, an admin).
-   A second account, `demo2` (same password, staff), shows the staff view and
-   lets you try live updates in two browsers.
-
-How the demo behaves:
-
-- `DEMO_MODE=true` wipes the database and creates fresh demo data **on every
-  start**: after each deploy, and each time the free instance wakes up after
-  being idle. Visitors' changes never last. It refuses to start if the
-  database contains real (non-demo) orders.
-- SMS is simulated (`sms-demo.js`): visitors can send an SMS and watch it
-  become "доставено", but no SMS service or phone is contacted and nothing
-  is ever sent. A number ending in 000 shows a failed SMS. The demo data
-  includes the last 60 days of SMS history for Справки.
-- The free instance sleeps when idle, so the first visit after a while can
-  take up to a minute.
-- Every push to `main` redeploys the demo automatically. This can be turned
-  off in the service's settings.
-- `TRUST_PROXY=1` and `COOKIE_SECURE=true` are set for Render's HTTPS proxy,
-  and `SESSION_SECRET` is generated by Render.
-
 ## Deploying for real use
 
 This app is safe to expose to the internet as written, but you should:
@@ -338,9 +544,14 @@ This app is safe to expose to the internet as written, but you should:
 
 ## Updating to a new version
 
-When you get a new version of the app (a new zip), here's the safe procedure.
+When you get a new version of the app (a new zip, or `git pull`), here's
+the safe procedure. **The app must be restarted to use the new version:**
+pages pick up changes straight away, but the server keeps running the code
+it started with, so new features fail (e.g. "Промяната не можа да бъде
+запазена") until it restarts. With a `git pull` in the live folder, steps
+1, 2, 6 and 8 are all it takes.
 
-**Short answer on stopping the service first: yes, always.** Node doesn't
+**Stopping the service first: yes, always.** Node doesn't
 keep the `.js` files themselves locked open the way it locks the database
 file (so Windows won't throw an error if you overwrite them while the
 service is running) — but the *running* process keeps executing the old
@@ -354,6 +565,8 @@ first; it's a small planned few seconds of downtime either way.
    twice a day: `node backup.js`. Cheap insurance right before any change.
 2. **Stop the service**: `nssm stop RepairLog`, then confirm with
    `nssm status RepairLog` — wait for `SERVICE_STOPPED`.
+   (Database changes needed by the new version are applied automatically on
+   start; nothing to run by hand.)
 3. **Extract the new version to a fresh folder** (don't unzip on top of the
    live one) — e.g. `C:\crazyPhoneCRM\crazyPhoneCRM-<date>`. This keeps the
    old version around untouched until you're sure the new one works, and
@@ -392,8 +605,12 @@ first; it's a small planned few seconds of downtime either way.
 
 ## Backups (including nightly to a NAS)
 
-The entire database is one file: `data/repair-log.db`. Two equivalent backup
-scripts are included — use whichever matches how you're running the app.
+The data is a few SQLite files in `data/`: `repair-log.db` (the first
+shop), `system.db` (accounts, shops, shared settings) and `shop-<id>.db`
+for every further shop. Two backup scripts are included — use whichever
+matches how you're running the app; both back up every one of these files
+in each run, with the same time stamp, and `restore.js` can put any of them
+back.
 
 Both do the same two things each time they run:
 
@@ -424,7 +641,7 @@ Run manually with `node backup.js`. No extra tools needed — it reuses the
 
 **One-time setup — point it at your NAS.** Set `NAS_BACKUP_DIR` in `.env`
 (not in `backup.js` itself — keeping it out of the code means it survives
-every future update automatically, see "Updating to a new version" below).
+every future update automatically, see "Updating to a new version").
 A direct UNC path is most reliable, rather than a mapped drive letter,
 because a scheduled task often can't see drive letters that were mapped in
 an interactive login session. No quotes needed, and — unlike in a `.js`
@@ -434,9 +651,6 @@ Cyrillic characters and spaces need no special handling either:
 ```
 NAS_BACKUP_DIR=\\NAS-NAME\backups\repair-log
 ```
-
-This project's `.env` should already have this set to
-`\\crazyphone\MainStorage\CrazyPhone\БазаДанни Сервиз`.
 
 **Schedule it with Task Scheduler**, pointed at the stable wrapper rather
 than `node.exe` directly, so redeploying to a new folder never requires
@@ -525,71 +739,6 @@ crontab -e
 Check `backup.log` occasionally — if the NAS is ever unreachable at backup
 time, the script logs a warning there instead of failing silently.
 
-## Several shops
-
-The data lives in `data/` (in `DATA_ROOT` if set):
-
-- `system.db` — login accounts, the list of shops, the settings every shop
-  shares (statuses and their colours, table columns, phone models), login
-  sessions.
-- `repair-log.db` — the first shop's orders, change history, SMS and own
-  settings (the same file as before).
-- `shop-<id>.db` — each further shop's, likewise.
-
-**Upgrading from a version without `system.db`:** on first start the app
-registers `repair-log.db` as the first shop and copies its accounts into
-`system.db` (with the same passwords and roles; the old copy stays in
-`repair-log.db`, unused). Everyone has to log in once more, because login
-sessions moved too. Nothing else changes.
-
-**Accounts and shops:** staff and shop managers each belong to one shop and
-only ever reach its orders; admins see every shop and pick the one they work
-on in the header (shown once there's more than one shop). Existing staff
-accounts belong to the first shop.
-
-**All shops at once (admins):** "Всички магазини" in the header's shop
-picker lists every shop's orders together, each marked with its shop and
-numbered with the shop's prefix (e.g. "#Л-123"). They can be opened, edited,
-printed (with their own shop's name, phone and footer), sent SMS (from their
-own shop's SMS settings) and deleted as usual; a new order asks for its shop.
-The activity log and Справки then cover every shop; Справки also gets a
-**По магазини** table with each shop's revenue, profit, average order, repair
-time, open orders, deposits and SMS side by side, and the total.
-
-**Choosing shops in Справки (admins):** with several shops, checkboxes under
-the period pick which shops every figure, chart and list covers: one, some
-or all ("всички"). They start with every shop in the all-shops view, and
-with the current shop otherwise. Managers always see their own shop. Настройки shows only the
-shared settings there; pick a shop for its own.
-
-**Settings:** statuses, their colours, the table columns and the phone-model
-list are the same in every shop (on upgrade they start as the first shop's).
-The name, tagline, phone number, customer-print footer and SMS text are each
-shop's own. With several shops, Настройки marks which is which. Each shop
-can also send SMS its own way (see [SMS settings per shop](#several-shops-sms-settings-per-shop)).
-
-**Adding a shop:** Настройки → **Магазини** (admins). Give it a name and,
-optionally, a prefix for its order numbers (letters and digits, up to 5,
-e.g. "Л" → "#Л-123"; each shop's must differ). It starts with an empty
-database (`data/shop-<id>.db`), the shared statuses and columns, and its own
-order numbers from 1. Then:
-
-1. pick it in the header and set its name, phone, print footer and SMS text
-   in Настройки, and how it sends SMS (Изпращане на SMS);
-2. in Потребители, give its staff and manager accounts this shop.
-
-It's in the nightly backup from then on. A shop's name and prefix can be
-changed in Магазини at any time (renaming it there also renames it on its
-prints). Up to 10 shops in use (the all-shops reports combine them).
-
-**Archiving a shop:** shops are never deleted, so their orders can't be lost,
-but a shop that closes can be **archived** in Магазини. It disappears from
-the picker, the all-shops lists, new orders and the account dropdowns; its
-database stays, is still backed up, and can still be ticked in Справки
-(marked "архивиран"). Its accounts must be moved to another shop or removed
-first, and the last shop in use can't be archived. **Възстанови** brings it
-back as it was. Archived shops don't count towards the 10.
-
 ## Restoring from a backup
 
 `restore.js` restores a chosen backup as the live database. **Stop the app
@@ -632,197 +781,95 @@ After restoring, start the app back up and confirm the data looks right
 before trusting it — the restore doesn't verify the backup's contents for
 you.
 
-## Settings page
+## Public demo on Render
 
-Click **Settings** in the header to configure:
+A **demo** copy (fake data only, never the shop's real app) can run on
+[Render](https://render.com) using the `render.yaml` Blueprint in this repo.
 
-- **Shop name** — shown as the title on both printed copies.
-- **Statuses** — add your own, reorder, and pick each status's colour. The six
-  built-in statuses (🔒 за сервиз, в сервиз, чака клиент, издаден, отказан,
-  забравен) trigger automatic actions — SMS offer, return date, zeroed
-  prices, auto-"забравен" — so they can't be removed or renamed; your own
-  statuses can. Their names are defined once, in `public/statuses.js`.
-- **Table columns** — choose which columns appear in the main ticket table.
-  Ticket # always shows, for reference.
-- **Customer print copy** — the footer warning text (liability, the
-  1-month pickup limit, the 3-month warranty). The fields on the card are
-  fixed; the shop phone at the top is set under the shop's name (or else
-  comes from `SHOP_PHONE` in `.env`).
-- **Service print copy** — same, for the job sheet the repair technician
-  gets. Keep customer price off this one if you don't want the technician
-  seeing what the customer is charged.
-- **Phone model suggestions** — the curated baseline list of models
-  suggested while typing in the "Phone model" field. Models typed into real
-  tickets are automatically added to suggestions too, on top of this list —
-  this section only manages the starter list itself.
+1. Sign in to Render with GitHub.
+2. **New → Blueprint**, give Render access to this repository, choose the
+   `main` branch, and apply. Render reads `render.yaml` and creates the
+   `crazyphone-demo` web service (free plan).
+3. Wait for the first deploy. The log should end with
+   `Demo mode: database reset with 180 demo orders` and
+   `Repair log running`.
+4. Open the `https://…onrender.com` address. A yellow **ДЕМО** banner shows
+   on every page and the login is pre-filled (`demo` / `demo1234`, an admin).
+   A second account, `demo2` (same password, staff), shows the staff view and
+   lets you try live updates in two browsers.
 
-Changes apply for everyone immediately after saving. There's currently no
-separate "admin" role — every signed-in account can reach Settings and
-change these; if you want only certain staff to have that access, that
-would need a role system added on top of this.
+How the demo behaves:
 
-## Reports page
+- `DEMO_MODE=true` wipes the database and creates fresh demo data **on every
+  start**: after each deploy, and each time the free instance wakes up after
+  being idle. Visitors' changes never last. It refuses to start if the
+  database contains real (non-demo) orders.
+- SMS is simulated (`sms-demo.js`): visitors can send an SMS and watch it
+  become "доставено", but no SMS service or phone is contacted and nothing
+  is ever sent. A number ending in 000 shows a failed SMS. The demo data
+  includes the last 60 days of SMS history for Справки.
+- The free instance sleeps when idle, so the first visit after a while can
+  take up to a minute.
+- Every push to `main` redeploys the demo automatically. This can be turned
+  off in the service's settings.
+- `TRUST_PROXY=1` and `COOKIE_SECURE=true` are set for Render's HTTPS proxy,
+  and `SESSION_SECRET` is generated by Render.
 
-**Справки** in the header opens reports for a chosen period (this month, the
-last 3 or 12 months, this year, or any dates). All amounts are in €.
-
-- **Revenue and profit by month.** A ticket counts in the month it was
-  *returned* to the customer (Дата на връщане), since that is when it is paid.
-  Profit = Продажна цена − Изкупна цена.
-- **Turnaround.** Median and average days from received to returned.
-- **Time in status.** How long tickets sit in each status, worked out from
-  the change history. No extra data entry is needed.
-- **Open tickets right now,** the ten waiting longest, and the deposits
-  (капаро) currently held.
-- **Data check.** Lists tickets that make the numbers less accurate, such as
-  returned without a price, or "издаден" with no return date, so they can be
-  fixed.
-
-## How it works day-to-day
-
-- **New Ticket** registers a phone: customer name, phone contact, date
-  received, date returned, phone model, status, description, and the two
-  price fields (service price = what it costs to get it repaired; customer
-  price = what the customer pays).
-- Click any row to **edit** it — update the status as the repair progresses,
-  set the date returned once it's handed back, fix a detail, or delete the
-  ticket. The Delete / Print / Cancel / Save buttons are at both the top
-  and the bottom of an open ticket.
-- **Парола** holds the customer's unlock code (PIN or pattern). It is shown in
-  its own column and printed on the service label (not the customer card).
-  The change history only notes "Паролата е променена", never the code.
-- **Об. тел** (loaner phone) is a да/не choice. Older free-text entries were
-  converted on upgrade: a model name became "да", with the text kept in the
-  order's comment.
-- **Phone numbers** that aren't in the usual form (0 or +359 followed by
-  9 digits; spaces and dashes are fine) get a light red background in the table and
-  the form, as a warning. They can still be saved.
-- Click **Парола, Коментар, Извършен ремонт, Изкупна цена or Продажна цена**
-  in the table to edit just that field in a small window, without opening the
-  whole order. Texts: Ctrl+Enter saves; password and prices: Enter saves (an
-  empty price means no price). Esc closes.
-- Click the **№, Статус, Дата на приемане or Дата на връщане** header to sort
-  by it (click again to reverse; an arrow shows the current sort). Default: by
-  number, newest first. Each browser remembers its last choice.
-- Besides "издаден", two more statuses close an order: **отказан** (repair
-  refused) and **забравен** (phone never collected). Closed orders are left out
-  of the "В процес" filter and the open-orders figures in reports. Only
-  "издаден" fills in the return date automatically. Moving an order to "отказан" sets
-  Капаро, Изкупна цена and Продажна цена to 0 (they can still be changed
-  afterwards, e.g. for a diagnostic fee).
-- An order left in **"чака клиент" for more than 30 days** becomes "забравен"
-  automatically (checked on start and every hour). The history shows it as
-  done by "автоматично", and the server log lists the order numbers. The 30
-  days count from when it was last put into "чака клиент"; putting it back
-  into "чака клиент" starts a new 30 days.
-- Click a **status** in the table to change it straight from a dropdown,
-  without opening the ticket. Changing it to "издаден" (here or in the
-  ticket form) fills in today as the return date, unless one is already set.
-- **Компактен изглед** (button next to the filters) shows one line per order,
-  with long texts cut short (full text on hover). Each browser remembers it.
-- **On a phone**, orders are shown as cards (number, status, customer with a
-  call button, model, problem, price, deposit, date). Tap a card to open the
-  order; less-needed fields are in the full order.
-- **After a new order is saved**, the app offers to print the customer card
-  and/or the service label straight away.
-- Editable cells show a ✎ when you point at them.
-- The **counters at the top** are shortcuts: click one (e.g. "чакат клиент") to
-  show only those orders; click it again, or "общо поръчки", to show all.
-- **Prices** can be typed with a comma or a point ("25,50" or "25.50").
-- **Search** filters across customer name, phone number, model, ticket
-  number, and description as you type. The status dropdown narrows further.
-- **Live updates**: when anyone creates, edits, or deletes a ticket (or an
-  admin changes Settings), every other open browser tab refreshes on its
-  own within a moment — no manual reload needed, even across different
-  computers. If someone has a ticket open for editing when this happens,
-  their in-progress changes aren't touched; only the underlying table
-  refreshes in the background.
-- **Presence indicator**: while someone has a ticket open, other staff see
-  a small badge on that row showing who's currently looking at it, and a
-  warning banner if they open the same ticket too. This is informational
-  only — it never blocks anyone from opening or saving a ticket, since two
-  people sometimes legitimately need to look at the same one.
-- **Customer phone numbers are click-to-call** (`tel:` links), in both the
-  table and the ticket modal. What actually happens when clicked depends on
-  what's installed on that computer to handle phone calls (a softphone, a
-  paired-phone integration, etc.) — the app just hands off to whatever's
-  registered for that.
-- From an open ticket, **Print for customer** generates a small service-card
-  PDF (100×95mm) matching the shop's paper card — client, model, damage
-  description, loaner phone, deposit, and intake date, with the shop's logo
-  and liability warning; it opens as a real PDF in a new tab — print from
-  there. **Print for service** downloads a label for the Brother QL-600
-  label printer (shop name, order number, unlock code if any, and the
-  problem description), meant to be stuck directly on the phone. It is a
-  P-touch Editor file (`poruchka-<number>.lbx`): open it and press Print in
-  P-touch Editor (installed on the shop PC, with the QL-600 driver).
-
-### Changing the service label
-
-The label's layout comes from `print-templates/service-label.lbx`, designed
-in P-touch Editor — the label roll and length, fonts, sizes and positions
-are all whatever is set there. The app only replaces text boxes containing
-exactly these placeholders (curly braces included, any letter case):
-`{shop}`, `{order}`, `{issue}`, `{password}` (a box whose value is empty,
-e.g. no unlock code, is left off). To change the look, open the template in
-P-touch Editor, edit it, keep the placeholder texts, and save it over the
-same file — no restart needed. A long problem description makes a longer
-label on continuous tape; to shrink it into its box instead, set that text
-box's text options in P-touch Editor (e.g. fit text to frame).
-- Every ticket's **History** (inside the ticket) shows who created it and
-  who changed what, with a timestamp. The **Activity log** button in the
-  header shows the same thing across all tickets, for accountability across
-  the whole shop.
-
-## Accounts and roles
-
-Give each staff member their own login rather than sharing one account —
-that's what makes the history/activity log meaningful, since every change is
-attributed to whoever was signed in when they made it.
-
-There are three roles:
-
-| | Admin (администратор) | Shop manager (управител) | Staff (служител) |
-|---|---|---|---|
-| Shops | **all**: picks one in the header | one | one |
-| Create, edit, print orders; change status; send SMS | ✓ | ✓ | ✓ |
-| See and edit both prices | ✓ | ✓ | ✓ |
-| **Delete orders** | ✓ | ✓ | — |
-| **Справки** (revenue, profit, SMS usage) | ✓ | ✓ (own shop) | — |
-| **Настройки** (statuses, columns, texts, accounts) | ✓ | — | — |
-| Backup log and warnings | ✓ | — | — |
-
-The server enforces this; accounts simply don't see the links and buttons
-they can't use. A shop account only ever reaches its own shop's orders,
-history, reports and live updates.
-
-**Managing accounts:** admins use **Настройки → Потребители** to add an
-account (with a role, and a shop for managers and staff), change someone's
-role or shop, set a new password for them, or remove an account. Changes
-apply immediately, even to someone already logged in. An admin can't demote or remove themselves, so there's always at least one
-admin. Accounts that existed before roles were added are admins.
-
-**Admin log:** changes to shops, accounts and settings are recorded with who
-made them and when, and listed at the bottom of **Настройки** ("Дневник на
-администраторските промени", the latest 200). That covers adding, renaming,
-archiving and restoring shops, adding, changing and removing accounts,
-password resets and own password changes, settings (what changed, from what
-to what) and SMS settings. Passwords and SMS tokens are never written, only
-that they were set, changed or removed. `create-admin.js` logs as itself.
-The log is kept in `system.db`, so it's backed up with the accounts. Changes
-to orders stay in the activity log on the main page.
-
-**Your own password:** anyone can change it by clicking their **username** in
-the header (the current password is required).
-
-**From the command line** (first admin, or if no admin can log in):
+## Running the tests
 
 ```bash
-node create-admin.js username password            # new admin, or reset a password
-node create-admin.js username password --staff    # new staff account
-node create-admin.js username password --manager  # new shop manager (first shop)
-node create-admin.js username password --admin    # also make an existing account admin
+npm test
 ```
+
+Runs the API tests and the backup/restore tests using Node's built-in test
+runner. Every test file gets its own throwaway database in the system temp
+folder, so running tests never touches `data/` or `backups/`, and it's
+safe to run on the shop PC while the app is live.
+
+Browser tests (Playwright) drive the real app in Chromium: login, the
+ticket form, two staff members seeing each other's changes live, the
+"being viewed by" indicator, printing (checks the PDF page sizes), and
+settings. First time only, download the browser:
+
+```bash
+npx playwright install chromium
+```
+
+Then:
+
+```bash
+npm run test:e2e
+```
+
+They start their own copy of the server on port 3100 with a throwaway
+database, so they are also safe to run next to the live app.
+
+This is enforced, not just intended: during tests (`CRAZYPHONE_TEST=1`)
+the app refuses to use a data, backup or NAS folder outside the system temp
+folder, and refuses to send SMS anywhere but the tests' fake services on
+this computer (`lib/test-guard.js`). The real `.env` is never read.
+Traces of failed browser tests also go to the temp folder
+(`crazyphone-test-results`; the path is printed on failure).
+
+### Type checking
+
+```bash
+npm run typecheck
+```
+
+TypeScript checks the server code for mistakes such as a misspelled field
+name, a wrong event payload or an SMS provider that doesn't match the
+shared interface. Nothing is compiled — the app still runs the `.js`
+files as they are, so deployment doesn't change. Types are written in JSDoc
+comments; the shared ones (an order, the SMS provider interface, the order
+events, a backup run) are in `types/app.d.ts`. A file is checked once it
+starts with `// @ts-check` (see `tsconfig.json`) — so far `lib/`,
+`routes/` and the SMS, status and migration modules.
+
+Both suites and the type check run automatically on GitHub (API tests on
+Windows and Linux, Node 22 and 24; browser tests and the type check on Linux) for every pull request and every
+push to `main` — see
+`.github/workflows/test.yml`.
 
 ## Project structure
 
@@ -836,7 +883,7 @@ repair-log/
     tickets.js         Orders, the service label, change history
     reports.js         Справки (managers, admins)
     sms.js             SMS to customers, delivery-state polling, per-shop SMS settings
-    stores.js          The shops: add, rename, prefix (admins)
+    stores.js          The shops: add, rename, prefix, archive (admins)
   lib/               Helpers shared by the routes
     auth.js            Login checks (requireAuth, requireAdmin)
     live.js            Live updates and "who's editing" (server-sent events)
@@ -844,7 +891,7 @@ repair-log/
     tickets-repo.js    All SQL for orders: get, list, create, update, remove
     ticket-events.js   Announces every change to an order
     ticket-listeners.js  After every change: history + live updates
-    system-db.js       system.db: accounts, the list of shops, login sessions
+    system-db.js       system.db: accounts, shops, shared settings, admin log, sessions
     stores.js          The shops, each with its own database (req.store)
     admin-log.js       The admin log: changes to shops, accounts, settings
     settings-diff.js   What changed between two versions of the settings
@@ -892,8 +939,22 @@ repair-log/
       quick-edit.js       Editing one cell from the table
       print.js            Customer copy (PDF), service label, print offer
       main.js             Remaining buttons; starts the app
-    settings.js         Settings page frontend logic
-    reports.js          Reports page frontend logic (incl. the chart)
+    js/settings/        Настройки, loaded in this order:
+      state.js            Shared state, the save-straight-away helper
+      admin-log.js        The admin log, in words
+      shops.js            Магазини: add, rename, prefix, archive
+      accounts.js         Потребители
+      sms-sending.js      How this shop sends SMS
+      lists.js            Statuses, rules, columns, phone models
+      form.js             Filling in, SMS text counter, unsaved changes, save
+      main.js             Start-up
+    js/reports/         Справки, loaded in this order:
+      format.js           Number, money and date formats
+      shops.js            Which shops; the figures by shop
+      chart.js            Revenue and profit by month (chart + table)
+      sections.js         Key figures, status time, open orders, SMS, data check
+      backups.js          The latest backup runs
+      main.js             Period, start-up, loading
     assets/logo.png     Shop logo, used on the customer print
     vendor/              html2canvas + jsPDF (self-hosted, no CDN)
     statuses.js         The built-in status names (shared by server and pages)
@@ -902,5 +963,6 @@ repair-log/
   test/                API + backup/restore tests (npm test), incl. a fake
                          SMS phone so tests never send real SMS
   e2e/                 Browser tests (npm run test:e2e)
-  data/                repair-log.db lives here (created on first run)
+  data/                The databases (created on first run): repair-log.db,
+                         system.db, shop-<id>.db — or in DATA_ROOT/data
 ```
