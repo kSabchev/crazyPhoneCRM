@@ -802,6 +802,16 @@ role or shop, set a new password for them, or remove an account. Changes
 apply immediately, even to someone already logged in. An admin can't demote or remove themselves, so there's always at least one
 admin. Accounts that existed before roles were added are admins.
 
+**Admin log:** changes to shops, accounts and settings are recorded with who
+made them and when, and listed at the bottom of **Настройки** ("Дневник на
+администраторските промени", the latest 200). That covers adding, renaming,
+archiving and restoring shops, adding, changing and removing accounts,
+password resets and own password changes, settings (what changed, from what
+to what) and SMS settings. Passwords and SMS tokens are never written, only
+that they were set, changed or removed. `create-admin.js` logs as itself.
+The log is kept in `system.db`, so it's backed up with the accounts. Changes
+to orders stay in the activity log on the main page.
+
 **Your own password:** anyone can change it by clicking their **username** in
 the header (the current password is required).
 
@@ -836,6 +846,8 @@ repair-log/
     ticket-listeners.js  After every change: history + live updates
     system-db.js       system.db: accounts, the list of shops, login sessions
     stores.js          The shops, each with its own database (req.store)
+    admin-log.js       The admin log: changes to shops, accounts, settings
+    settings-diff.js   What changed between two versions of the settings
     ticket-target.js   Which shop an order id means (the all-shops view)
     combined-db.js     Every shop's data as one database, for all-shops reports
     shop-db.js         A shop's database: schema and setup

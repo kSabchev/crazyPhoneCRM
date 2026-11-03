@@ -7,6 +7,11 @@ const { rateLimit } = require('express-rate-limit');
 const db = require('../lib/system-db'); // accounts
 const stores = require('../lib/stores');
 const { requireAuth, requireAdmin, storeFor, ROLES, NO_SHOP } = require('../lib/auth');
+const { logAdmin } = require('../lib/admin-log');
+
+// A shop's name as it was when logged (names can change later).
+/** @param {number | null | undefined} id */
+const shopName = id => (id ? (stores.get(id) || { name: `#${id}` }).name : null);
 
 const router = express.Router();
 
@@ -106,6 +111,7 @@ router.post('/api/auth/password', requireAuth, (req, res) => {
   const problem = passwordProblem(newPassword);
   if (problem) return res.status(400).json({ error: problem });
   db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(newPassword), req.user.id);
+  logAdmin(req.user.username, 'password_changed', { username: req.user.username });
   res.json({ ok: true });
 });
 
@@ -144,6 +150,7 @@ router.post('/api/users', requireAdmin, (req, res) => {
   }
   const { lastInsertRowid } = db.prepare('INSERT INTO users (username, password_hash, role, store_id) VALUES (?, ?, ?, ?)')
     .run(name, hashPassword(password), role, shop.storeId ?? null);
+  logAdmin(req.user.username, 'user_added', { username: name, role, store: shopName(shop.storeId) }, shop.storeId ?? null);
   res.status(201).json(db.prepare(`SELECT ${USER_FIELDS} FROM users WHERE id = ?`).get(lastInsertRowid));
 });
 
@@ -174,6 +181,12 @@ router.put('/api/users/:id', requireAdmin, (req, res) => {
     if (problem) return res.status(400).json({ error: problem });
   }
 
+  const changes = {};
+  if (role !== undefined && role !== target.role) changes.role = { from: target.role, to: role };
+  if (shop && (shop.storeId ?? null) !== target.store_id) changes.store = { from: shopName(target.store_id), to: shopName(shop.storeId) };
+  if (password !== undefined) changes.password = 'reset';
+  if (Object.keys(changes).length) logAdmin(req.user.username, 'user_changed', { username: target.username, changes });
+
   if (role !== undefined) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, target.id);
   if (shop) db.prepare('UPDATE users SET store_id = ? WHERE id = ?').run(shop.storeId ?? null, target.id);
   if (password !== undefined) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), target.id);
@@ -181,7 +194,7 @@ router.put('/api/users/:id', requireAdmin, (req, res) => {
 });
 
 router.delete('/api/users/:id', requireAdmin, (req, res) => {
-  const target = /** @type {Pick<import('../types/app').UserRow, 'id' | 'role'> | undefined} */ (db.prepare('SELECT id, role FROM users WHERE id = ?').get(req.params.id));
+  const target = /** @type {Pick<import('../types/app').UserRow, 'id' | 'role' | 'username' | 'store_id'> | undefined} */ (db.prepare('SELECT id, role, username, store_id FROM users WHERE id = ?').get(req.params.id));
   if (!target) return res.status(404).json({ error: 'Потребителят не е намерен' });
   if (target.id === req.user.id) return res.status(400).json({ error: 'Не можете да премахнете собствения си профил' });
   if (target.role === 'admin' && adminCount() <= 1) {
@@ -189,6 +202,7 @@ router.delete('/api/users/:id', requireAdmin, (req, res) => {
   }
   // Their open sessions stop working on their next request (requireAuth).
   db.prepare('DELETE FROM users WHERE id = ?').run(target.id);
+  logAdmin(req.user.username, 'user_removed', { username: target.username, role: target.role, store: shopName(target.store_id) });
   res.json({ ok: true });
 });
 

@@ -10,6 +10,8 @@
 //   if one of the flags is given.
 const bcrypt = require('bcrypt');
 const db = require('./lib/system-db'); // accounts (all shops)
+const { logAdmin } = require('./lib/admin-log');
+const BY = 'create-admin.js'; // who, in the admin log
 
 const args = process.argv.slice(2);
 const flags = args.filter(a => a.startsWith('--'));
@@ -37,9 +39,11 @@ const shopOf = (newRole, current) => (newRole === 'admin' ? null : current || fi
 if (existing) {
   db.prepare('UPDATE users SET password_hash = ? WHERE username = ?').run(hash, username);
   if (role) db.prepare('UPDATE users SET role = ?, store_id = ? WHERE username = ?').run(role, shopOf(role, existing.store_id), username);
+  logAdmin(BY, 'user_changed', { username, changes: { password: 'reset', ...(role && role !== existing.role ? { role: { from: existing.role, to: role } } : {}) } });
   console.log(`Password updated for existing user "${username}" (${role || existing.role}).`);
 } else {
   db.prepare('INSERT INTO users (username, password_hash, role, store_id) VALUES (?, ?, ?, ?)')
     .run(username, hash, role || 'admin', shopOf(role || 'admin', null));
+  logAdmin(BY, 'user_added', { username, role: role || 'admin' }, shopOf(role || 'admin', null));
   console.log(`User "${username}" created (${role || 'admin'}).`);
 }

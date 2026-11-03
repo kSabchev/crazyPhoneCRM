@@ -9,6 +9,7 @@ const stores = require('../lib/stores');
 const { requireAdmin } = require('../lib/auth');
 const { getSettings, saveSettings } = require('../lib/settings-store');
 const { broadcastChange } = require('../lib/live');
+const { logAdmin } = require('../lib/admin-log');
 
 const router = express.Router();
 
@@ -70,6 +71,7 @@ router.post('/api/stores', requireAdmin, (req, res) => {
   if (shop.error) return res.status(400).json({ error: shop.error });
   const store = stores.create({ name: /** @type {string} */ (shop.name), prefix: shop.prefix || '' });
   console.log(`[${new Date().toISOString()}] Shop "${store.name}" added by ${req.user.username} (data/shop-${store.id}.db).`);
+  logAdmin(req.user.username, 'shop_added', { name: store.name, prefix: store.prefix }, store.id);
   res.status(201).json(view(store));
 });
 
@@ -80,6 +82,11 @@ router.put('/api/stores/:id', requireAdmin, (req, res) => {
   if (!store) return res.status(404).json({ error: 'Магазинът не е намерен' });
   const shop = checkShop(req.body || {}, store.id);
   if (shop.error) return res.status(400).json({ error: shop.error });
+
+  const changes = {};
+  if (shop.name !== undefined && shop.name !== store.name) changes.name = { from: store.name, to: shop.name };
+  if (shop.prefix !== undefined && shop.prefix !== store.prefix) changes.prefix = { from: store.prefix, to: shop.prefix };
+  if (Object.keys(changes).length) logAdmin(req.user.username, 'shop_changed', { changes }, store.id);
 
   if (shop.name !== undefined) {
     systemDb.prepare('UPDATE stores SET name = ? WHERE id = ?').run(shop.name, store.id);
@@ -107,6 +114,7 @@ router.post('/api/stores/:id/archive', requireAdmin, (req, res) => {
   }
   const archived = /** @type {import('../types/app').Store} */ (stores.setArchived(store.id, true));
   console.log(`[${new Date().toISOString()}] Shop "${store.name}" archived by ${req.user.username}.`);
+  logAdmin(req.user.username, 'shop_archived', { name: store.name }, store.id);
   broadcastChange('settings'); // every screen: the picker changes
   res.json(view(archived));
 });
@@ -120,6 +128,7 @@ router.post('/api/stores/:id/restore', requireAdmin, (req, res) => {
   }
   const restored = /** @type {import('../types/app').Store} */ (stores.setArchived(store.id, false));
   console.log(`[${new Date().toISOString()}] Shop "${store.name}" restored by ${req.user.username}.`);
+  logAdmin(req.user.username, 'shop_restored', { name: store.name }, store.id);
   broadcastChange('settings');
   res.json(view(restored));
 });
