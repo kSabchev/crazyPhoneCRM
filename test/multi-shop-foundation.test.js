@@ -158,3 +158,77 @@ test('upgrading from the first multi-shop version: staff accounts get the first 
     { id: 7, username: 'helper', role: 'staff', store_id: 1 }
   ]);
 });
+
+test('upgrading: the first shop\'s statuses, columns and phone models become everyone\'s', () => {
+  const dataRoot = oldInstallation();
+  const file = path.join(dataRoot, 'data', 'repair-log.db');
+  const db = new Database(file);
+  const saved = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
+  db.prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify({
+    ...saved, statuses: [...saved.statuses, 'чака части'], columns: ['customer', 'status'], devices: ['Nokia 3310']
+  }));
+  db.close();
+
+  const out = inProcess(dataRoot, `
+    const { getSettings } = require('./lib/settings-store');
+    const stores = require('./lib/stores');
+    const second = stores.create({ name: 'Втори' });
+    const a = getSettings(stores.defaultStore().db), b = getSettings(second.db);
+    console.log(JSON.stringify({ a: [a.statuses, a.columns, a.devices, a.shopName], b: [b.statuses, b.columns, b.devices, b.shopName] }));`);
+  assert.ok(out.a[0].includes('чака части'));
+  assert.deepEqual(out.b.slice(0, 3), out.a.slice(0, 3), 'the second shop shares them');
+  assert.deepEqual(out.a.slice(1, 3), [['customer', 'status'], ['Nokia 3310']]);
+  assert.deepEqual([out.a[3], out.b[3]], ['Магазин Център', 'Втори']);
+});
+
+test('backups include every shop, and restore puts any of them back', () => {
+  const dataRoot = oldInstallation();
+  inProcess(dataRoot, `
+    const second = require('./lib/stores').create({ name: 'Лозенец', prefix: 'Л' });
+    second.tickets.create({ customer_name: 'Клиент Лозенец', phone_contact: '0888', date_received: '2026-01-05',
+      date_returned: null, phone_model: 'Pixel', status: 'за сервиз', description: 'x', comment: '', repair_performed: '',
+      loaner_phone: 'не', phone_password: null, pravim: 'circle', kaparo: 'Не', service_price: null, customer_price: null });
+    console.log('{}');`);
+
+  assert.equal(runScript('backup.js', [], dataRoot).status, 0);
+  const files = fs.readdirSync(path.join(dataRoot, 'backups'));
+  const stamp = files.find(f => f.startsWith('repair-log_')).slice('repair-log_'.length);
+  assert.deepEqual(files.filter(f => f.endsWith('.db')).sort(), [`repair-log_${stamp}`, `shop-2_${stamp}`, `system_${stamp}`]);
+  const [run] = JSON.parse(fs.readFileSync(path.join(dataRoot, 'backups', 'backup-log.json'), 'utf8'));
+  assert.equal(run.ok, true);
+  assert.deepEqual(run.shopFiles, [`shop-2_${stamp}`]);
+
+  // The second shop loses its order...
+  const shopFile = path.join(dataRoot, 'data', 'shop-2.db');
+  let db = new Database(shopFile);
+  db.prepare('DELETE FROM tickets').run();
+  db.close();
+
+  const list = runScript('restore.js', [], dataRoot).stdout;
+  assert.match(list, /Shop shop-2 \(data\/shop-2\.db\)/);
+  assert.match(list, new RegExp(`shop-2_${stamp}`));
+  // ..."latest" is still the first shop...
+  assert.match(runScript('restore.js', ['latest'], dataRoot).stdout, new RegExp(`Restored "repair-log_${stamp}"`));
+  // ...and its own backup brings the order back.
+  const res = runScript('restore.js', [`shop-2_${stamp}`], dataRoot);
+  assert.equal(res.status, 0, res.stderr);
+  db = new Database(shopFile, { readonly: true });
+  assert.equal(db.prepare('SELECT customer_name FROM tickets').get().customer_name, 'Клиент Лозенец');
+  db.close();
+  assert.ok(fs.readdirSync(path.join(dataRoot, 'data', 'pre-restore')).some(f => f.startsWith('shop-2_before-restore_')));
+
+  // Anything else in the backups folder is refused.
+  fs.writeFileSync(path.join(dataRoot, 'backups', 'other.db'), '');
+  assert.notEqual(runScript('restore.js', ['other.db'], dataRoot).status, 0);
+});
+
+test('a shop whose database is missing makes the backup fail, naming the shop', () => {
+  const dataRoot = oldInstallation();
+  inProcess(dataRoot, `require('./lib/stores').create({ name: 'Лозенец' }); console.log('{}');`);
+  for (const suffix of ['', '-wal', '-shm']) fs.rmSync(path.join(dataRoot, 'data', `shop-2.db${suffix}`), { force: true });
+
+  assert.notEqual(runScript('backup.js', [], dataRoot).status, 0);
+  const [run] = JSON.parse(fs.readFileSync(path.join(dataRoot, 'backups', 'backup-log.json'), 'utf8'));
+  assert.equal(run.ok, false);
+  assert.match(run.error, /магазин „Лозенец“ не е намерена/);
+});

@@ -129,6 +129,8 @@ export interface BackupRun {
   file: string | null;
   /** The backup of system.db (accounts, shops) made in the same run. */
   systemFile?: string | null;
+  /** The other shops' backups (shop-<id>_<time>.db) made in the same run. */
+  shopFiles?: string[];
   sizeBytes: number | null;
   nas: 'ok' | 'failed' | 'off';
   error: string | null;
