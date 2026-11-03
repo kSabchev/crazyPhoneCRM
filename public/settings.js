@@ -29,6 +29,8 @@ async function init(){
   currentUserId = null;
   currentUsername = me.username;
   allStores = me.stores || [];
+  currentStoreId = me.store.id;
+  allShopsView = !!me.allShops;
   // With several shops, the settings saved here are the current shop's.
   document.getElementById('whoAmI').textContent = allStores.length > 1
     ? `${me.username} · ${me.allShops ? 'всички магазини' : me.store.name}` : me.username;
@@ -56,7 +58,72 @@ async function init(){
   renderAll();
   loadUsers();
   loadSmsSettings();
+  loadShops();
 }
+
+// ---------- Shops ----------
+// Saved straight away, like accounts. Adding or renaming a shop also
+// updates the shop dropdowns of the accounts below.
+function shopError(text){ document.getElementById('shopError').textContent = text || ''; }
+
+async function shopsRequest(url, options){
+  const res = await fetch(url, options);
+  if(res.status === 401 || res.status === 403){ window.location.href = '/'; return null; }
+  const data = await res.json().catch(()=>({}));
+  if(!res.ok){ shopError(data.error || 'Промяната не можа да бъде запазена.'); return null; }
+  shopError('');
+  return data;
+}
+
+async function loadShops(){
+  const shops = await shopsRequest('/api/stores');
+  if(!shops) return;
+  const changed = JSON.stringify(shops.map(s => [s.id, s.name])) !== JSON.stringify(allStores.map(s => [s.id, s.name]));
+  allStores = shops.map(s => ({ id: s.id, name: s.name, prefix: s.prefix }));
+  const el = document.getElementById('shopList');
+  el.innerHTML = shops.map(s => `
+    <div class="editable-row shop-row" data-id="${s.id}">
+      <input type="text" class="shop-name" value="${escapeHtml(s.name)}" maxlength="60" aria-label="Име на магазина">
+      <input type="text" class="shop-prefix" value="${escapeHtml(s.prefix)}" maxlength="5" placeholder="без" aria-label="Префикс">
+      <span class="muted shop-orders">${s.orders} ${s.orders === 1 ? 'поръчка' : 'поръчки'}</span>
+      <button class="row-btn" data-action="save-shop">Запази</button>
+    </div>`).join('');
+  el.querySelectorAll('.shop-row').forEach(row => {
+    row.querySelector('[data-action="save-shop"]').addEventListener('click', async () => {
+      const saved = await shopsRequest(`/api/stores/${row.dataset.id}`, {
+        method: 'PUT', headers: {'Content-Type':'application/json'},
+        body: JSON.stringify({ name: row.querySelector('.shop-name').value, prefix: row.querySelector('.shop-prefix').value })
+      });
+      if(!saved) return;
+      // The shop whose settings are open: its name field shows the new name,
+      // so "Запази промените" later doesn't put the old one back.
+      if(saved.id === currentStoreId && settings && !allShopsView){
+        settings.shopName = saved.name;
+        originalSettings.shopName = saved.name;
+        document.getElementById('shopNameInput').value = saved.name;
+      }
+      loadShops();
+    });
+  });
+  // The account shop dropdowns list the shops too.
+  if(changed){
+    renderNewUserShops(Number(document.getElementById('newUserShop').value) || (allStores[0] && allStores[0].id));
+    loadUsers();
+  }
+}
+
+document.getElementById('addShopBtn').addEventListener('click', async () => {
+  const name = document.getElementById('newShopName').value.trim();
+  const prefix = document.getElementById('newShopPrefix').value.trim();
+  if(!name){ shopError('Въведете име на магазина.'); return; }
+  const created = await shopsRequest('/api/stores', {
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ name, prefix })
+  });
+  if(!created) return;
+  document.getElementById('newShopName').value = '';
+  document.getElementById('newShopPrefix').value = '';
+  loadShops();
+});
 
 // ---------- Accounts ----------
 // Managed separately from the other settings: each change is saved
@@ -64,6 +131,8 @@ async function init(){
 let currentUsername = null;
 let currentUserId = null;
 let allStores = [];
+let currentStoreId = null;   // the shop whose settings this page edits
+let allShopsView = false;    // the all-shops view: shared settings only
 const ROLE_LABELS = { staff: 'служител', shop_manager: 'управител', admin: 'администратор' };
 
 // Managers and staff each work in one shop; admins in all. The shop

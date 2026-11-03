@@ -519,6 +519,11 @@ input.status-color{width:38px;height:32px;padding:2px;border:1px solid var(--lin
 /* ---- Accounts (Настройки → Потребители) ---- */
 .user-row .user-role,.user-row select.user-shop{padding:4px 6px;border:1px solid var(--line);border-radius:3px;font-size:13px;background:var(--panel);}
 .user-row .user-shop{max-width:160px;}
+.shop-row input{padding:6px 8px;border:1px solid var(--line);border-radius:3px;font-size:14px;background:var(--paper);}
+.shop-row .shop-name{flex:1;min-width:0;}
+.shop-row .shop-prefix{width:70px;}
+.shop-row .shop-orders{white-space:nowrap;}
+.shop-add-row #newShopPrefix{max-width:150px;}
 .user-row .user-shop-all{font-size:13px;color:var(--ink-soft);}
 .user-row .row-lock{width:92px;}
 #userList .row-btn.remove{width:92px;}

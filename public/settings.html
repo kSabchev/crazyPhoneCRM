@@ -167,6 +167,23 @@
     </div>
   </div>
 
+  <div class="settings-section" id="shopsSection">
+    <h2>Магазини</h2>
+    <div class="section-sub">
+      Всеки магазин има собствени поръчки, история и SMS; статусите, колоните и моделите са общи.
+      <strong>Префиксът</strong> се показва пред номерата на поръчките (напр. „Л-123“) — полезен, за да се различават
+      поръчките на магазините в изгледа „Всички магазини“. Промените тук се запазват веднага.
+      Магазин не може да бъде изтрит оттук, за да не се загубят поръчките му.
+    </div>
+    <div class="editable-list" id="shopList"></div>
+    <div class="add-row shop-add-row">
+      <input type="text" id="newShopName" placeholder="Име на новия магазин" maxlength="60">
+      <input type="text" id="newShopPrefix" placeholder="Префикс, напр. Л" maxlength="5">
+      <button class="btn secondary" id="addShopBtn">Добави магазин</button>
+    </div>
+    <div class="sms-error" id="shopError" role="alert"></div>
+  </div>
+
   <div class="settings-section" id="usersSection">
     <h2>Потребители</h2>
     <div class="section-sub">

@@ -89,6 +89,7 @@ app.use(require('./routes/auth'));       // login, password, accounts
 app.use(require('./routes/settings'));   // Настройки, phone models
 app.use(require('./routes/tickets'));    // orders, service label, history
 app.use(require('./routes/reports'));    // Справки
+app.use(require('./routes/stores'));     // the shops (Настройки → Магазини)
 app.use(smsRoutes.router);               // SMS to customers
 
 // ---- Scheduled jobs (started by server.js) ----

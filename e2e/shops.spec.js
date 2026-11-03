@@ -234,3 +234,46 @@ test('Справки and Настройки in the all-shops view', async ({ pag
   await expect(page.locator('#smsSendSection')).toBeHidden();
   await expect(page.locator('#shopNameInput')).toBeHidden();
 });
+
+test('Настройки → Магазини lists the shops and saves name and prefix changes', async ({ page }) => {
+  await login(page, 'alice');
+  await page.goto('/settings.html');
+  const rows = page.locator('#shopList .shop-row');
+  await expect(rows).toHaveCount(2);
+  const second = rows.nth(1);
+  await expect(second.locator('.shop-name')).toHaveValue('Магазин Лозенец');
+  await expect(second.locator('.shop-prefix')).toHaveValue('Л');
+
+  // A taken prefix is explained, and nothing is added.
+  await page.fill('#newShopName', 'Трети магазин');
+  await page.fill('#newShopPrefix', 'л');
+  await page.click('#addShopBtn');
+  await expect(page.locator('#shopError')).toContainText('вече се използва от „Магазин Лозенец“');
+  await expect(rows).toHaveCount(2);
+
+  // Renamed (also in the account dropdowns), then back.
+  await second.locator('.shop-name').fill('Лозенец 2');
+  await second.locator('[data-action="save-shop"]').click();
+  await expect(page.locator('#userList .user-row', { hasText: 'dora' }).locator('select.user-shop option:checked')).toHaveText('Лозенец 2');
+  await rows.nth(1).locator('.shop-name').fill('Магазин Лозенец');
+  await rows.nth(1).locator('[data-action="save-shop"]').click();
+  await expect(page.locator('#userList .user-row', { hasText: 'dora' }).locator('select.user-shop option:checked')).toHaveText('Магазин Лозенец');
+  await expect(page.locator('#shopError')).toHaveText('');
+});
+
+test('renaming the open shop in Магазини keeps the name field in step', async ({ page }) => {
+  await login(page, 'alice');
+  await page.goto('/settings.html');
+  const first = page.locator('#shopList .shop-row').first();
+  await first.locator('.shop-name').fill('CrazyPhone Център');
+  await first.locator('[data-action="save-shop"]').click();
+  await expect(page.locator('#shopNameInput')).toHaveValue('CrazyPhone Център');
+  // Saving the other settings now keeps the new name.
+  await page.click('#saveBtn');
+  await expect(page.locator('#saveStatus')).toHaveText('Запазено.');
+  expect((await (await page.request.get('/api/settings')).json()).shopName).toBe('CrazyPhone Център');
+
+  await page.locator('#shopList .shop-row').first().locator('.shop-name').fill('CrazyPhone');
+  await page.locator('#shopList .shop-row').first().locator('[data-action="save-shop"]').click();
+  await expect(page.locator('#shopNameInput')).toHaveValue('CrazyPhone');
+});

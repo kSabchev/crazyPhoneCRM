@@ -525,7 +525,7 @@ crontab -e
 Check `backup.log` occasionally — if the NAS is ever unreachable at backup
 time, the script logs a warning there instead of failing silently.
 
-## Databases (preparing for several shops)
+## Several shops
 
 The data lives in `data/` (in `DATA_ROOT` if set):
 
@@ -560,7 +560,21 @@ list are the same in every shop (on upgrade they start as the first shop's).
 The name, tagline, phone number, customer-print footer and SMS text are each
 shop's own. With several shops, Настройки marks which is which. Each shop
 can also send SMS its own way (see [SMS settings per shop](#several-shops-sms-settings-per-shop)).
-Adding shops from Настройки comes in a later step.
+
+**Adding a shop:** Настройки → **Магазини** (admins). Give it a name and,
+optionally, a prefix for its order numbers (letters and digits, up to 5,
+e.g. "Л" → "#Л-123"; each shop's must differ). It starts with an empty
+database (`data/shop-<id>.db`), the shared statuses and columns, and its own
+order numbers from 1. Then:
+
+1. pick it in the header and set its name, phone, print footer and SMS text
+   in Настройки, and how it sends SMS (Изпращане на SMS);
+2. in Потребители, give its staff and manager accounts this shop.
+
+It's in the nightly backup from then on. A shop's name and prefix can be
+changed in Магазини at any time (renaming it there also renames it on its
+prints). Shops can't be deleted from the app, so their orders are never lost
+by accident. Up to 10 shops (the all-shops reports combine them).
 
 ## Restoring from a backup
 
@@ -796,8 +810,9 @@ repair-log/
     auth.js            Login, logout, your own password, accounts (admins)
     settings.js        Настройки and the phone-model list
     tickets.js         Orders, the service label, change history
-    reports.js         Справки (admins)
-    sms.js             SMS to customers, delivery-state polling
+    reports.js         Справки (managers, admins)
+    sms.js             SMS to customers, delivery-state polling, per-shop SMS settings
+    stores.js          The shops: add, rename, prefix (admins)
   lib/               Helpers shared by the routes
     auth.js            Login checks (requireAuth, requireAdmin)
     live.js            Live updates and "who's editing" (server-sent events)
