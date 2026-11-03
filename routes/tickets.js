@@ -1,5 +1,6 @@
 // @ts-check
 // Orders: list, create, edit, delete, the service label, and the history.
+// In the admins' all-shops view, every shop's orders (lib/ticket-target.js).
 const express = require('express');
 const STATUSES = require('../public/statuses');
 const { buildServiceLabel } = require('../lbx');
@@ -10,18 +11,27 @@ const { applyTransition } = require('../public/status-rules');
 const { getSettings } = require('../lib/settings-store');
 const { localToday, toPrice } = require('../lib/util');
 const { validateTicketInput, normalizePravim, normalizeLoaner, normalizePassword } = require('../lib/ticket-input');
+const { findTicket, present, shopsOf, orderNumber } = require('../lib/ticket-target');
+const stores = require('../lib/stores');
+
+const NOT_FOUND = 'Поръчката не е намерена';
+
 
 const router = express.Router();
 
 router.get('/api/tickets', requireAuth, (req, res) => {
   // With who's viewing each order right now ("👁 name" in the table).
-  res.json(req.store.tickets.list().map(row => ({ ...row, editing_by: getEditingBy(req.store.id, row.id) })));
+  res.json(shopsOf(req).flatMap(store => store.tickets.list()
+    .map(row => present(req, store, { ...row, editing_by: getEditingBy(store.id, row.id) }))));
 });
 
 router.post('/api/tickets', requireAuth, (req, res) => {
   const t = req.body || {};
   const invalid = validateTicketInput(t, { partial: false });
   if (invalid) return res.status(400).json({ error: invalid });
+  // In the all-shops view the new order's shop is chosen in the form.
+  const store = req.allShops ? stores.get(t.storeId) : req.store;
+  if (!store) return res.status(400).json({ error: 'Изберете магазин за поръчката' });
 
   // New orders get the status rules too (e.g. created already refused:
   // nothing to charge) — see public/status-rules.js.
@@ -43,15 +53,16 @@ router.post('/api/tickets', requireAuth, (req, res) => {
     customer_price: toPrice(t.customerPrice)
   }, { today: localToday() });
 
-  const created = req.store.tickets.create(fields);
+  const created = store.tickets.create(fields);
   // History and live updates: lib/ticket-listeners.js.
-  ticketEvents.emit('created', { store: req.store, after: created, user: req.session.username });
-  res.status(201).json(created);
+  ticketEvents.emit('created', { store, after: created, user: req.session.username });
+  res.status(201).json(present(req, store, created));
 });
 
 router.put('/api/tickets/:id', requireAuth, (req, res) => {
-  const existing = req.store.tickets.get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
+  const found = findTicket(req);
+  if (!found) return res.status(404).json({ error: NOT_FOUND });
+  const { store, ticket: existing } = found;
 
   const t = req.body || {};
   const invalid = validateTicketInput(t, { partial: true });
@@ -83,18 +94,19 @@ router.put('/api/tickets/:id', requireAuth, (req, res) => {
   // amounts — see public/status-rules.js.
   next = applyTransition(existing, next, { today: localToday() });
 
-  const updated = req.store.tickets.update(existing.id, next);
-  ticketEvents.emit('updated', { store: req.store, before: existing, after: updated, user: req.session.username });
-  res.json(updated);
+  const updated = store.tickets.update(existing.id, next);
+  ticketEvents.emit('updated', { store, before: existing, after: updated, user: req.session.username });
+  res.json(present(req, store, updated));
 });
 
 // Managers and admins only.
 router.delete('/api/tickets/:id', requireManager, (req, res) => {
-  const existing = req.store.tickets.get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
+  const found = findTicket(req);
+  if (!found) return res.status(404).json({ error: NOT_FOUND });
+  const { store, ticket: existing } = found;
 
-  req.store.tickets.remove(existing.id);
-  ticketEvents.emit('deleted', { store: req.store, before: existing, user: req.session.username });
+  store.tickets.remove(existing.id);
+  ticketEvents.emit('deleted', { store, before: existing, user: req.session.username });
   res.json({ ok: true });
 });
 
@@ -102,29 +114,37 @@ router.delete('/api/tickets/:id', requireManager, (req, res) => {
 // in from print-templates/service-label.lbx. Opening it starts P-touch
 // Editor, which prints it.
 router.get('/api/tickets/:id/service-label.lbx', requireAuth, (req, res) => {
-  const ticket = req.store.tickets.get(req.params.id);
-  if (!ticket) return res.status(404).json({ error: 'Поръчката не е намерена' });
-  const file = buildServiceLabel(ticket, getSettings(req.store.db).shopName);
+  const found = findTicket(req);
+  if (!found) return res.status(404).json({ error: NOT_FOUND });
+  const { store, ticket } = found;
+  const number = orderNumber(store, ticket);
+  const file = buildServiceLabel({ ...ticket, ticket_no: number }, getSettings(store.db).shopName);
   res.set('Content-Type', 'application/octet-stream');
-  res.attachment(`poruchka-${ticket.ticket_no}.lbx`);
+  res.attachment(`poruchka-${number}.lbx`);
   res.send(file);
 });
 
 // ---- History ----
 router.get('/api/tickets/:id/history', requireAuth, (req, res) => {
-  const existing = req.store.tickets.get(req.params.id);
-  if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
-  const rows = /** @type {import('../types/app').AuditRow[]} */ (req.store.db
+  const found = findTicket(req);
+  if (!found) return res.status(404).json({ error: NOT_FOUND });
+  const rows = /** @type {import('../types/app').AuditRow[]} */ (found.store.db
     .prepare('SELECT * FROM audit_log WHERE ticket_id = ? ORDER BY performed_at DESC, id DESC')
-    .all(req.params.id));
+    .all(found.ticket.id));
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
 
+// The newest 200 changes; in the all-shops view, from every shop, each with
+// its shop (store_name, store_prefix).
+const ACTIVITY_LIMIT = 200;
 router.get('/api/audit', requireAuth, (req, res) => {
-  const rows = /** @type {import('../types/app').AuditRow[]} */ (req.store.db
-    .prepare('SELECT * FROM audit_log ORDER BY performed_at DESC, id DESC LIMIT 200')
-    .all());
-  res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
+  const rows = shopsOf(req).flatMap(store =>
+    /** @type {import('../types/app').AuditRow[]} */ (store.db
+      .prepare('SELECT * FROM audit_log ORDER BY performed_at DESC, id DESC LIMIT ?')
+      .all(ACTIVITY_LIMIT))
+      .map(r => ({ ...r, changes: JSON.parse(r.changes), store_id: store.id, store_name: store.name, store_prefix: store.prefix })));
+  rows.sort((a, b) => (a.performed_at < b.performed_at ? 1 : a.performed_at > b.performed_at ? -1 : b.id - a.id));
+  res.json(rows.slice(0, ACTIVITY_LIMIT));
 });
 
 module.exports = router;

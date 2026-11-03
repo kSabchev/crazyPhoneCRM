@@ -46,29 +46,36 @@ router.post('/api/auth/logout', (req, res) => {
 });
 
 router.get('/api/auth/me', requireAuth, (req, res) => {
-  res.json(sessionInfo(req.user, req.store));
+  res.json(sessionInfo(req.user, req.store, req.allShops));
 });
 
 // Who's logged in and the shop they work on. Admins also get every shop,
 // to pick from.
-/** @param {{ username: string, role: string }} user @param {import('../types/app').Store} store */
-function sessionInfo(user, store) {
+/** @param {{ username: string, role: string }} user @param {import('../types/app').Store} store @param {boolean} [allShops] */
+function sessionInfo(user, store, allShops = false) {
   /** @param {import('../types/app').Store} s */
   const shop = s => ({ id: s.id, name: s.name, prefix: s.prefix });
   return {
     username: user.username,
     role: user.role,
     store: shop(store),
-    ...(user.role === 'admin' ? { stores: stores.all().map(shop) } : {})
+    ...(user.role === 'admin' ? { stores: stores.all().map(shop), allShops } : {})
   };
 }
 
-// Admins: work on another shop. Shop accounts always work on their own.
+// Admins: work on another shop, or on all shops ("all"). Shop accounts
+// always work on their own.
 router.post('/api/auth/store', requireAdmin, (req, res) => {
-  const store = stores.get((req.body || {}).storeId);
+  const { storeId } = req.body || {};
+  if (storeId === 'all') {
+    req.session.allShops = true;
+    return res.json(sessionInfo(req.user, req.store, true));
+  }
+  const store = stores.get(storeId);
   if (!store) return res.status(400).json({ error: 'Невалиден магазин' });
   req.session.storeId = store.id;
-  res.json(sessionInfo(req.user, store));
+  req.session.allShops = false;
+  res.json(sessionInfo(req.user, store, false));
 });
 
 // ---- Accounts ----

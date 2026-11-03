@@ -59,8 +59,11 @@ function monthsBetween(from, to) {
   return months;
 }
 
+// ticketNo: with the shop's prefix in the all-shops reports (lib/combined-db.js).
+const shownNo = t => (t.store_prefix ? `${t.store_prefix}-${t.ticket_no}` : t.ticket_no);
+
 function ticketRef(t) {
-  return { id: t.id, ticketNo: t.ticket_no, customerName: t.customer_name, phoneModel: t.phone_model, status: t.status };
+  return { id: t.id, ticketNo: shownNo(t), customerName: t.customer_name, phoneModel: t.phone_model, status: t.status };
 }
 
 function revenueReport(returned, from, to) {
@@ -174,7 +177,7 @@ function workloadReport(open, today) {
   }
   const oldest = open
     .map(t => ({ ...ticketRef(t), daysOpen: daysBetween(t.date_received, today) }))
-    .sort((a, b) => b.daysOpen - a.daysOpen || a.ticketNo - b.ticketNo)
+    .sort((a, b) => b.daysOpen - a.daysOpen || String(a.ticketNo).localeCompare(String(b.ticketNo), undefined, { numeric: true }))
     .slice(0, 10);
 
   return {
@@ -223,7 +226,7 @@ function smsReport(db, from, to) {
       id: m.id,
       createdAt: m.created_at,
       ticketId: m.ticket_id,
-      ticketNo: m.ticket_no,
+      ticketNo: shownNo(m),
       customerName: m.customer_name, // null if the order was deleted since
       phone: m.phone,
       text: m.text,

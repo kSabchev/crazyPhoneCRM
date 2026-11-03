@@ -135,7 +135,7 @@ function render(){
   const visible = settings ? settings.columns : COLUMN_KEYS;
 
   let filtered = tickets.filter(t=>{
-    const matchesQ = !q || [t.customer_name, t.phone_contact, t.phone_model, t.description, ('#'+t.ticket_no)]
+    const matchesQ = !q || [t.customer_name, t.phone_contact, t.phone_model, t.description, ('#'+orderNo(t)), allShops ? t.store_name : '']
       .join(' ').toLowerCase().includes(q);
     const matchesStatus = !statusF || (statusF === '__active__' ? !CLOSED_STATUSES.includes(t.status) : t.status === statusF);
     return matchesQ && matchesStatus;
@@ -164,7 +164,7 @@ function render(){
       const editingBadge = (t.editing_by && t.editing_by !== currentUsername)
         ? `<div class="editing-badge">👁 ${escapeHtml(t.editing_by)}</div>` : '';
       return `<tr data-id="${t.id}">
-        <td class="ticket-no" data-field="number">#${t.ticket_no}${editingBadge}</td>
+        <td class="ticket-no" data-field="number">#${escapeHtml(orderNo(t))}${allShops ? `<div class="shop-tag">${escapeHtml(t.store_name)}</div>` : ''}${editingBadge}</td>
         <td${dv('customer')}>
           <div class="cust-name">${escapeHtml(t.customer_name)}</div>
           <div class="cust-phone${isStandardPhone(t.phone_contact) ? '' : ' phone-nonstandard'}"${isStandardPhone(t.phone_contact) ? '' : ` title="${PHONE_HINT}"`}>${escapeHtml(t.phone_contact)}</div>
@@ -180,7 +180,7 @@ function render(){
         <td${dv('loanerPhone')}>${escapeHtml(t.loaner_phone)}</td>
         <td${dv('pravim')} class="pravim-cell"><span class="pravim-toggle pravim-${t.pravim||'circle'}">${PRAVIM_SYMBOLS[t.pravim||'circle']}</span></td>
         <td${dv('status')} class="status-cell">${
-          quickStatusId === t.id
+          quickStatusId !== null && sameId(quickStatusId, t.id)
             ? statusSelectHtml(t)
             : `<span class="badge" style="color:${fg};background:${bg};" title="Щракнете за смяна на статуса">${escapeHtml(t.status)}</span>`
         }</td>
@@ -211,14 +211,14 @@ function statusSelectHtml(t){
   const options = settings ? settings.statuses.slice() : [];
   // Keep a status that was since removed from settings selectable as-is.
   if(!options.includes(t.status)) options.unshift(t.status);
-  return `<select class="status-select" aria-label="Статус на поръчка #${t.ticket_no}">
+  return `<select class="status-select" aria-label="Статус на поръчка #${escapeHtml(orderNo(t))}">
     ${options.map(s=>`<option value="${escapeHtml(s)}"${s===t.status?' selected':''}>${escapeHtml(s)}</option>`).join('')}
   </select>`;
 }
 
 function startStatusEdit(e, id){
   e.stopPropagation();
-  if(quickStatusId === id) return; // clicks inside the open dropdown
+  if(quickStatusId !== null && sameId(quickStatusId, id)) return; // clicks inside the open dropdown
   quickStatusId = id;
   render();
   const sel = document.querySelector('#tableBody .status-select');
@@ -235,7 +235,7 @@ function cancelStatusEdit(){
 
 async function saveQuickStatus(id, status){
   quickStatusId = null;
-  const t = tickets.find(x=>x.id===id);
+  const t = findTicket(id);
   const previousStatus = t ? t.status : null;
   if(t) t.status = status; // show the new badge straight away
   render();
@@ -269,7 +269,7 @@ const tableBody = document.getElementById('tableBody');
 tableBody.addEventListener('click', (e)=>{
   const row = e.target.closest('tr[data-id]');
   if(!row) return;
-  const id = Number(row.dataset.id);
+  const id = row.dataset.id;
   const cell = e.target.closest('td');
   if(cell && cell.classList.contains('call-cell')){ e.stopPropagation(); return; } // the 📞 link works by itself
   if(cell && cell.dataset.quick) return openQuickEdit(e, id, cell.dataset.quick);
@@ -279,7 +279,7 @@ tableBody.addEventListener('click', (e)=>{
 });
 tableBody.addEventListener('change', (e)=>{
   if(!e.target.matches('.status-select')) return;
-  saveQuickStatus(Number(e.target.closest('tr[data-id]').dataset.id), e.target.value);
+  saveQuickStatus(e.target.closest('tr[data-id]').dataset.id, e.target.value);
 });
 tableBody.addEventListener('keydown', (e)=>{
   if(e.target.matches('.status-select') && e.key === 'Escape') cancelStatusEdit();
@@ -336,7 +336,7 @@ document.getElementById('stats').addEventListener('click', (e)=>{
 // without opening the ticket for editing.
 async function togglePravim(e, id){
   e.stopPropagation();
-  const t = tickets.find(x=>x.id===id);
+  const t = findTicket(id);
   if(!t) return;
   const next = nextPravim(t.pravim || 'circle');
   const res = await fetch(`/api/tickets/${id}`, {

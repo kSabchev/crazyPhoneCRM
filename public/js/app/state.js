@@ -8,6 +8,23 @@ let currentUsername = null;
 let currentRole = null; // 'admin' | 'shop_manager' | 'staff'
 let currentStore = null; // the shop this page works on: { id, name, prefix }
 let allStores = [];      // admins: every shop, to pick from
+let allShops = false;    // admins: the all-shops view (every shop's orders)
+
+// Order ids: numbers, or "<shop id>:<order id>" in the all-shops view (ids
+// repeat between shops). Compared as text, since the page also reads them
+// back from data-id attributes.
+const sameId = (a, b) => String(a) === String(b);
+const findTicket = id => tickets.find(t => sameId(t.id, id));
+
+// The order number as people see it: with the shop's prefix ("Л-123").
+const orderNo = t => (t.store_prefix ? `${t.store_prefix}-${t.ticket_no}` : String(t.ticket_no));
+
+// A shop's own settings (name, phone, footer…) for printing an order: in
+// the all-shops view the order's shop's; otherwise the page's shop's.
+function shopSettingsFor(t){
+  const own = settings && settings.shops && t && settings.shops[t.store_id];
+  return own ? { ...settings, ...own } : settings;
+}
 
 const statusStyles = {
   [STATUSES.FOR_SERVICE]: ['var(--status-forservice)','var(--status-forservice-bg)'],

@@ -21,6 +21,13 @@ function openNew(){
   document.getElementById('f_loaner').value = 'не';
   document.getElementById('f_password').value = '';
   setPravimButton('circle');
+  // In the all-shops view a new order needs its shop.
+  const storeField = document.getElementById('storeField');
+  storeField.style.display = allShops ? '' : 'none';
+  if(allShops){
+    document.getElementById('f_store').innerHTML = '<option value="">— изберете магазин —</option>' +
+      allStores.map(s => `<option value="${s.id}">${escapeHtml(s.name)}</option>`).join('');
+  }
   document.getElementById('deleteBtn').style.display = 'none';
   document.getElementById('printCustomerBtn').style.display = 'none';
   document.getElementById('printServiceBtn').style.display = 'none';
@@ -44,10 +51,11 @@ function setEditOnlyFieldsVisible(visible){
 }
 
 function openEdit(id){
-  const t = tickets.find(x=>x.id === id);
+  const t = findTicket(id);
   if(!t) return;
   editingTicket = t;
-  document.getElementById('modalTitle').textContent = `Поръчка #${t.ticket_no}`;
+  document.getElementById('modalTitle').textContent = `Поръчка #${orderNo(t)}${allShops ? ` — ${t.store_name}` : ''}`;
+  document.getElementById('storeField').style.display = 'none';
   document.getElementById('modalSub').textContent = 'Редактирайте детайлите, обновете статуса или разпечатайте копие.';
   document.getElementById('f_customer').value = t.customer_name;
   document.getElementById('f_phone').value = t.phone_contact;
@@ -161,6 +169,10 @@ function collectForm(){
 
 async function saveTicket(){
   const payload = collectForm();
+  if(allShops && !editingTicket){
+    payload.storeId = Number(document.getElementById('f_store').value) || null;
+    if(!payload.storeId){ alert('Изберете магазин за поръчката.'); return; }
+  }
   if(!payload.customerName || !payload.phoneContact || !payload.phoneModel || !payload.description){
     alert('Моля, попълнете име на клиента, телефон за контакт, модел на телефона и описание на проблема.');
     return;
@@ -229,7 +241,9 @@ const FIELD_LABELS = {
 function describeEntry(entry, includeTicketRef){
   const who = escapeHtml(entry.performed_by);
   const when = fmtUtcTime(entry.performed_at);
-  const ref = includeTicketRef ? `<span class="ticket-ref">#${entry.ticket_no}</span> ` : '';
+  const ref = includeTicketRef
+    ? `<span class="ticket-ref">#${escapeHtml(orderNo(entry))}</span> ${allShops && entry.store_name ? `<span class="shop-tag">${escapeHtml(entry.store_name)}</span> ` : ''}`
+    : '';
 
   let body = '';
   if(entry.action === 'created'){

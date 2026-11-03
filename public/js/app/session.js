@@ -33,22 +33,24 @@ function applyRole(){
 }
 
 // ---------- Shops ----------
-// Admins with more than one shop pick the one the page works on. Picking
-// another reloads the page, so everything on it (orders, settings, live
-// updates) is that shop's.
+// Admins with more than one shop pick the one the page works on, or
+// "Всички магазини": every shop's orders together, each marked with its
+// shop. Picking reloads the page, so everything on it (orders, settings,
+// live updates) matches.
 function renderStoreSwitch(){
   const select = document.getElementById('storeSwitch');
   const show = isAdmin() && allStores.length > 1;
   select.style.display = show ? '' : 'none';
   if(!show) return;
   select.innerHTML = allStores.map(s =>
-    `<option value="${s.id}"${currentStore && s.id === currentStore.id ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+    `<option value="${s.id}"${!allShops && currentStore && s.id === currentStore.id ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('') +
+    `<option value="all"${allShops ? ' selected' : ''}>Всички магазини</option>`;
 }
 document.getElementById('storeSwitch').addEventListener('change', async (e)=>{
   const res = await fetch('/api/auth/store', {
     method: 'POST',
     headers: {'Content-Type':'application/json'},
-    body: JSON.stringify({ storeId: Number(e.target.value) })
+    body: JSON.stringify({ storeId: e.target.value === 'all' ? 'all' : Number(e.target.value) })
   });
   if(res.status === 401){ showLogin(); return; }
   if(!res.ok){
@@ -111,6 +113,7 @@ async function showApp(me, { justLoggedIn = false } = {}){
   currentRole = me.role || 'staff';
   currentStore = me.store || null;
   allStores = me.stores || [];
+  allShops = !!me.allShops;
   applyRole();
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';

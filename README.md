@@ -547,6 +547,14 @@ only ever reach its orders; admins see every shop and pick the one they work
 on in the header (shown once there's more than one shop). Existing staff
 accounts belong to the first shop.
 
+**All shops at once (admins):** "Всички магазини" in the header's shop
+picker lists every shop's orders together, each marked with its shop and
+numbered with the shop's prefix (e.g. "#Л-123"). They can be opened, edited,
+printed (with their own shop's name, phone and footer), sent SMS (from their
+own shop's SMS settings) and deleted as usual; a new order asks for its shop.
+The activity log and Справки then cover every shop. Настройки shows only the
+shared settings there; pick a shop for its own.
+
 **Settings:** statuses, their colours, the table columns and the phone-model
 list are the same in every shop (on upgrade they start as the first shop's).
 The name, tagline, phone number, customer-print footer and SMS text are each
@@ -799,6 +807,8 @@ repair-log/
     ticket-listeners.js  After every change: history + live updates
     system-db.js       system.db: accounts, the list of shops, login sessions
     stores.js          The shops, each with its own database (req.store)
+    ticket-target.js   Which shop an order id means (the all-shops view)
+    combined-db.js     Every shop's data as one database, for all-shops reports
     shop-db.js         A shop's database: schema and setup
     data-dir.js        Where the databases live (DATA_ROOT or the app folder)
     audit.js           Writing the change history

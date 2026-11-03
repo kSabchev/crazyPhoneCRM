@@ -6,6 +6,8 @@ const { buildReport } = require('../reports');
 const { requireAdmin, requireManager } = require('../lib/auth');
 const { localToday, isValidDate, daysBetweenDates } = require('../lib/util');
 const { readBackupLog, KEEP } = require('../lib/backup-log');
+const { combinedDb } = require('../lib/combined-db');
+const stores = require('../lib/stores');
 
 const router = express.Router();
 
@@ -22,7 +24,14 @@ router.get('/api/reports', requireManager, (req, res) => {
   if (daysBetweenDates(from, to) > 10 * 366) {
     return res.status(400).json({ error: 'Периодът е твърде дълъг (най-много 10 години)' });
   }
-  res.json(buildReport(req.store.db, { from, to, today }));
+  if (!req.allShops) return res.json(buildReport(req.store.db, { from, to, today }));
+  // The all-shops view: every shop's data at once.
+  const db = combinedDb(stores.all());
+  try {
+    res.json(buildReport(db, { from, to, today }));
+  } finally {
+    db.close();
+  }
 });
 
 // The latest backup runs (newest first), recorded by backup.js: shown at

@@ -147,6 +147,8 @@ declare module 'express-session' {
     username: string;
     /** Admins: the shop they've picked (lib/auth.js). */
     storeId: number;
+    /** Admins: working on all shops at once (lib/auth.js). */
+    allShops: boolean;
   }
 }
 
@@ -159,6 +161,8 @@ declare global {
       user?: { id: number; username: string; role: Role; store_id: number | null };
       /** The shop this request works on, set with req.user (lib/auth.js). */
       store?: Store;
+      /** Admins' all-shops view (lib/auth.js, lib/ticket-target.js). */
+      allShops?: boolean;
     }
   }
 }

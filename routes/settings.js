@@ -6,12 +6,25 @@ const STATUSES = require('../public/statuses');
 const { requireAuth, requireAdmin } = require('../lib/auth');
 const { broadcastChange } = require('../lib/live');
 const systemDb = require('../lib/system-db');
+const stores = require('../lib/stores');
+const { shopsOf } = require('../lib/ticket-target');
 const { COLUMN_KEYS, HEX_COLOR, getSettings, saveSettings, withStatusColors, withShopPhone } = require('../lib/settings-store');
 
 const router = express.Router();
 
+// Shared settings with the shop's own. In the all-shops view also every
+// shop's own (`shops`, by shop id), for printing each order with its shop's
+// name, phone and footer.
+const OWN_KEYS = ['shopName', 'shopTagline', 'shopPhone', 'printCustomer', 'smsTemplate'];
 router.get('/api/settings', requireAuth, (req, res) => {
-  res.json(withShopPhone(getSettings(req.store.db)));
+  const settings = withShopPhone(getSettings(req.store.db));
+  if (req.allShops) {
+    settings.shops = Object.fromEntries(stores.all().map(store => {
+      const own = withShopPhone(getSettings(store.db));
+      return [store.id, Object.fromEntries(OWN_KEYS.map(k => [k, own[k]]))];
+    }));
+  }
+  res.json(settings);
 });
 
 router.put('/api/settings', requireAdmin, (req, res) => {
@@ -99,6 +112,7 @@ router.put('/api/settings', requireAdmin, (req, res) => {
   // problem description) — nothing about it is configurable.
 
   delete next.shopPhone; // added to responses only (withShopPhone)
+  delete next.shops;     // likewise (the all-shops view)
   const sharedChanged = saveSettings(req.store.db, next);
   // The shop's name is also its name in the list of shops.
   if (next.shopName !== current.shopName) {
@@ -114,7 +128,7 @@ router.put('/api/settings', requireAdmin, (req, res) => {
 // tickets, so the dropdown "learns" new models as they're typed in.
 router.get('/api/devices', requireAuth, (req, res) => {
   const settings = getSettings(req.store.db);
-  const used = req.store.tickets.usedPhoneModels();
+  const used = shopsOf(req).flatMap(store => store.tickets.usedPhoneModels());
 
   const seen = new Map(); // lowercase -> original casing
   for (const d of [...settings.devices, ...used]) {
