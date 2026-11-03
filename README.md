@@ -552,7 +552,9 @@ picker lists every shop's orders together, each marked with its shop and
 numbered with the shop's prefix (e.g. "#Л-123"). They can be opened, edited,
 printed (with their own shop's name, phone and footer), sent SMS (from their
 own shop's SMS settings) and deleted as usual; a new order asks for its shop.
-The activity log and Справки then cover every shop. Настройки shows only the
+The activity log and Справки then cover every shop; Справки also gets a
+**По магазини** table with each shop's revenue, profit, average order, repair
+time, open orders, deposits and SMS side by side, and the total. Настройки shows only the
 shared settings there; pick a shop for its own.
 
 **Settings:** statuses, their colours, the table columns and the phone-model

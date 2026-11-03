@@ -2,7 +2,7 @@
 // Справки (managers and admins): revenue, turnaround, workload, SMS — see
 // ../reports.js. The backup log is for admins only.
 const express = require('express');
-const { buildReport } = require('../reports');
+const { buildReport, shopSummary } = require('../reports');
 const { requireAdmin, requireManager } = require('../lib/auth');
 const { localToday, isValidDate, daysBetweenDates } = require('../lib/util');
 const { readBackupLog, KEEP } = require('../lib/backup-log');
@@ -25,10 +25,20 @@ router.get('/api/reports', requireManager, (req, res) => {
     return res.status(400).json({ error: 'Периодът е твърде дълъг (най-много 10 години)' });
   }
   if (!req.allShops) return res.json(buildReport(req.store.db, { from, to, today }));
-  // The all-shops view: every shop's data at once.
-  const db = combinedDb(stores.all());
+  // The all-shops view: every shop's data at once, plus each shop's
+  // headline figures side by side (byShop; the total is the combined report's).
+  const shops = stores.all();
+  const db = combinedDb(shops);
   try {
-    res.json(buildReport(db, { from, to, today }));
+    const report = buildReport(db, { from, to, today });
+    report.byShop = {
+      shops: shops.map(store => ({
+        id: store.id, name: store.name, prefix: store.prefix,
+        ...shopSummary(buildReport(store.db, { from, to, today }))
+      })),
+      total: shopSummary(report)
+    };
+    res.json(report);
   } finally {
     db.close();
   }

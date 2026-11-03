@@ -224,3 +224,24 @@ test('the combined reports database keeps ids unique across shops, so joins stay
     db.close();
   }
 });
+
+test('reports in the all-shops view break the figures down by shop, matching each shop\'s own', async () => {
+  const combined = (await all.get('/api/reports').expect(200)).body;
+  const { shops, total } = combined.byShop;
+  assert.deepEqual(shops.map(s => [s.id, s.name, s.prefix]), [[center.id, 'CrazyPhone', ''], [lozenets.id, 'Магазин Лозенец', 'Л']]);
+  const [c, l] = shops;
+  assert.deepEqual([c.revenue, c.profit, c.returned], [100, 60, 1]);
+  assert.deepEqual([l.revenue, l.profit, l.returned], [50, 40, 1]);
+  assert.deepEqual([total.revenue, total.profit, total.returned], [150, 100, 2]);
+  // The rows add up to the total.
+  for (const key of ['returned', 'priced', 'revenue', 'cost', 'profit', 'openCount', 'depositsHeld', 'smsSent', 'smsParts']) {
+    assert.equal(shops.reduce((sum, s) => sum + s[key], 0), total[key], key);
+  }
+  // Each row is what that shop's own Справки says.
+  const own = (await inCenter.get('/api/reports').expect(200)).body;
+  assert.equal(c.revenue, own.revenue.totals.revenue);
+  assert.equal(c.openCount, own.workload.openCount);
+  assert.equal(c.medianDays, own.turnaround.medianDays);
+  // A single shop's report has no breakdown.
+  assert.equal(own.byShop, undefined);
+});

@@ -77,6 +77,7 @@ async function load(){
 
 function render(r){
   renderKpis(r);
+  renderByShop(r.byShop);
   renderRevenueChart(r.revenue.months);
   renderRevenueTable(r.revenue);
   renderStatusTime(r.statusTime);
@@ -296,6 +297,29 @@ function renderRevenueTable(revenue){
       <td class="num">${escapeHtml(fmtMoney(t.cost))}</td>
       <td class="num">${escapeHtml(fmtMoney(t.profit))}</td>
     </tr>`;
+}
+
+// ---------- By shop (the all-shops view) ----------
+// One row per shop and the total. A share of the total revenue is shown
+// under each shop's revenue.
+function renderByShop(byShop){
+  const section = document.getElementById('byShopSection');
+  section.style.display = byShop ? '' : 'none';
+  if(!byShop) return;
+  const total = byShop.total;
+  const cells = s => `
+      <td class="num">${s.returned}</td>
+      <td class="num">${escapeHtml(fmtMoney(s.revenue))}${s.share !== undefined ? `<div class="muted">${s.share}%</div>` : ''}</td>
+      <td class="num">${escapeHtml(fmtMoney(s.profit))}</td>
+      <td class="num">${s.averageTicket === null ? '—' : escapeHtml(fmtMoney(s.averageTicket))}</td>
+      <td class="num">${s.medianDays === null ? '—' : `${String(s.medianDays).replace('.', ',')} дни`}</td>
+      <td class="num">${s.openCount}</td>
+      <td class="num">${escapeHtml(fmtMoney(s.depositsHeld))}</td>
+      <td class="num">${s.smsSent}</td>`;
+  document.getElementById('byShopTable').innerHTML = byShop.shops.map(s => {
+    const share = total.revenue > 0 ? Math.round(s.revenue / total.revenue * 100) : undefined;
+    return `<tr data-shop="${s.id}"><td>${escapeHtml(s.name)}${s.prefix ? ` <span class="muted">(${escapeHtml(s.prefix)})</span>` : ''}</td>${cells({ ...s, share })}</tr>`;
+  }).join('') + `<tr class="total-row"><td>Общо</td>${cells(total)}</tr>`;
 }
 
 // ---------- Tables ----------

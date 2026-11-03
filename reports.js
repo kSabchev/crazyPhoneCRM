@@ -255,4 +255,23 @@ function buildReport(db, { from, to, today }) {
   };
 }
 
-module.exports = { buildReport, parseKaparo, monthsBetween, COMPLETED_STATUS, CLOSED_STATUSES };
+// The headline figures of a report, for comparing shops side by side
+// (Справки in the all-shops view: one row per shop, and the total).
+function shopSummary(report) {
+  const t = report.revenue.totals;
+  return {
+    returned: t.returned,
+    priced: t.priced,
+    revenue: t.revenue,
+    cost: t.cost,
+    profit: t.profit,
+    averageTicket: t.averageTicket,
+    medianDays: report.turnaround.medianDays,
+    openCount: report.workload.openCount,
+    depositsHeld: report.workload.depositsHeld.amount,
+    smsSent: report.sms.total,
+    smsParts: report.sms.parts
+  };
+}
+
+module.exports = { buildReport, shopSummary, parseKaparo, monthsBetween, COMPLETED_STATUS, CLOSED_STATUSES };

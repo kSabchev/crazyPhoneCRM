@@ -277,3 +277,27 @@ test('renaming the open shop in Магазини keeps the name field in step', 
   await page.locator('#shopList .shop-row').first().locator('[data-action="save-shop"]').click();
   await expect(page.locator('#shopNameInput')).toHaveValue('CrazyPhone');
 });
+
+// Also on a phone: the report tables scroll inside their box, never the page.
+const pageOverflow = page => page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
+
+test('Справки in the all-shops view breaks the figures down by shop', async ({ page }) => {
+  await login(page, 'alice');
+  await page.goto('/reports.html');
+  await expect(page.locator('#reportsScreen')).toBeVisible();
+  await expect(page.locator('#byShopSection')).toBeHidden(); // one shop: nothing to compare
+  await page.setViewportSize({ width: 390, height: 800 });
+  expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+  await page.setViewportSize({ width: 1280, height: 800 });
+
+  expect((await page.request.post('/api/auth/store', { data: { storeId: 'all' } })).status()).toBe(200);
+  await page.reload();
+  const rows = page.locator('#byShopTable tr');
+  await expect(rows).toHaveCount(3);
+  await expect(rows.nth(0).locator('td').first()).toHaveText('CrazyPhone');
+  await expect(rows.nth(1).locator('td').first()).toHaveText('Магазин Лозенец (Л)');
+  await expect(rows.nth(2)).toHaveClass(/total-row/);
+
+  await page.setViewportSize({ width: 390, height: 800 });
+  expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
+});
