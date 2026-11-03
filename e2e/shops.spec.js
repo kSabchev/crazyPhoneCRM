@@ -301,3 +301,48 @@ test('Справки in the all-shops view breaks the figures down by shop', asy
   await page.setViewportSize({ width: 390, height: 800 });
   expect(await pageOverflow(page)).toBeLessThanOrEqual(0);
 });
+
+test('admins tick which shops Справки covers', async ({ page }) => {
+  await login(page, 'alice');
+  // A single shop's page: the choice starts with that shop.
+  await page.goto('/reports.html');
+  const picks = page.locator('#shopPickList input');
+  await expect(picks).toHaveCount(2);
+  await expect(picks.nth(0)).toBeChecked();
+  await expect(picks.nth(1)).not.toBeChecked();
+  await expect(page.locator('#byShopSection')).toBeHidden();
+
+  // Ticking the second shop reloads every section for both, with the breakdown.
+  const both = page.waitForResponse(r => r.url().includes('/api/reports') && r.url().includes('shops=1,2'));
+  await picks.nth(1).check();
+  expect((await both).status()).toBe(200);
+  await expect(page.locator('#byShopTable tr')).toHaveCount(3);
+
+  // Only the second shop.
+  const second = page.waitForResponse(r => r.url().includes('/api/reports') && /shops=2$/.test(r.url()));
+  await picks.nth(0).uncheck();
+  await second;
+  await expect(page.locator('#byShopSection')).toBeHidden();
+
+  // None: explained, nothing loaded.
+  await picks.nth(1).uncheck();
+  await expect(page.locator('#reportError')).toHaveText('Изберете поне един магазин.');
+  const all = page.waitForResponse(r => r.url().includes('shops=1,2'));
+  await page.click('#pickAllShops');
+  await all;
+  await expect(page.locator('#reportError')).toHaveText('');
+  await expect(page.locator('#byShopTable tr')).toHaveCount(3);
+
+  // The all-shops view starts with every shop ticked.
+  expect((await page.request.post('/api/auth/store', { data: { storeId: 'all' } })).status()).toBe(200);
+  await page.reload();
+  await expect(picks.nth(0)).toBeChecked();
+  await expect(picks.nth(1)).toBeChecked();
+});
+
+test('shop managers get no shop choice in Справки', async ({ page }) => {
+  await login(page, 'vera');
+  await page.goto('/reports.html');
+  await expect(page.locator('#reportsScreen')).toBeVisible();
+  await expect(page.locator('#shopPicks')).toBeHidden();
+});

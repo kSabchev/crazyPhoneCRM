@@ -45,6 +45,9 @@ async function init(){
   // The all-shops view: every shop's figures together.
   const shopName = me.allShops ? 'всички магазини' : me.store.name;
   document.getElementById('whoAmI').textContent = manyShops ? `${me.username} · ${shopName}` : me.username;
+  // Admins with several shops tick which ones the figures cover: to start
+  // with, all of them in the all-shops view, otherwise the current shop.
+  if(me.role === 'admin' && manyShops) renderShopPicks(me.stores, me.allShops ? me.stores.map(s => s.id) : [me.store.id]);
   document.getElementById('backups').style.display = me.role === 'admin' ? '' : 'none';
   document.getElementById('reportsScreen').style.display = 'block';
 
@@ -64,7 +67,9 @@ async function load(){
   const errEl = document.getElementById('reportError');
   errEl.textContent = '';
 
-  const res = await fetch(`/api/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}`);
+  const shops = pickedShops();
+  if(shops && !shops.length){ errEl.textContent = 'Изберете поне един магазин.'; return; }
+  const res = await fetch(`/api/reports?from=${encodeURIComponent(from)}&to=${encodeURIComponent(to)}${shops ? `&shops=${shops.join(',')}` : ''}`);
   if(res.status === 401){ window.location.href = '/'; return; }
   if(!res.ok){
     const data = await res.json().catch(()=>({}));
@@ -299,7 +304,26 @@ function renderRevenueTable(revenue){
     </tr>`;
 }
 
-// ---------- By shop (the all-shops view) ----------
+// ---------- Which shops (admins with several) ----------
+// A ticked shop's data goes into every figure, chart and list below. The
+// report reloads on each change.
+function renderShopPicks(shops, checked){
+  document.getElementById('shopPicks').style.display = '';
+  document.getElementById('shopPickList').innerHTML = shops.map(s => `
+    <label class="shop-pick"><input type="checkbox" value="${s.id}"${checked.includes(s.id) ? ' checked' : ''}> ${escapeHtml(s.name)}</label>`).join('');
+}
+// The ticked shop ids, or null when there's no choice (one shop, managers).
+function pickedShops(){
+  if(document.getElementById('shopPicks').style.display === 'none') return null;
+  return [...document.querySelectorAll('#shopPickList input:checked')].map(i => Number(i.value));
+}
+document.getElementById('shopPickList').addEventListener('change', load);
+document.getElementById('pickAllShops').addEventListener('click', ()=>{
+  document.querySelectorAll('#shopPickList input').forEach(i => { i.checked = true; });
+  load();
+});
+
+// ---------- By shop (several shops) ----------
 // One row per shop and the total. A share of the total revenue is shown
 // under each shop's revenue.
 function renderByShop(byShop){
