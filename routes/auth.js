@@ -1,10 +1,12 @@
 // @ts-check
-// Logging in and out, your own password, and managing accounts (admins).
+// Logging in and out, picking a shop (admins), your own password, and
+// managing accounts (admins).
 const express = require('express');
 const bcrypt = require('bcrypt');
 const { rateLimit } = require('express-rate-limit');
 const db = require('../lib/system-db'); // accounts
-const { requireAuth, requireAdmin } = require('../lib/auth');
+const stores = require('../lib/stores');
+const { requireAuth, requireAdmin, storeFor, ROLES, NO_SHOP } = require('../lib/auth');
 
 const router = express.Router();
 
@@ -31,9 +33,12 @@ router.post('/api/auth/login', loginLimiter, (req, res) => {
     return res.status(401).json({ error: 'Невалидно потребителско име или парола' });
   }
 
+  const store = storeFor(user);
+  if (!store) return res.status(403).json({ error: NO_SHOP });
+
   req.session.userId = user.id;
   req.session.username = user.username;
-  res.json({ username: user.username, role: user.role });
+  res.json(sessionInfo(user, store));
 });
 
 router.post('/api/auth/logout', (req, res) => {
@@ -41,11 +46,32 @@ router.post('/api/auth/logout', (req, res) => {
 });
 
 router.get('/api/auth/me', requireAuth, (req, res) => {
-  res.json({ username: req.user.username, role: req.user.role });
+  res.json(sessionInfo(req.user, req.store));
+});
+
+// Who's logged in and the shop they work on. Admins also get every shop,
+// to pick from.
+/** @param {{ username: string, role: string }} user @param {import('../types/app').Store} store */
+function sessionInfo(user, store) {
+  /** @param {import('../types/app').Store} s */
+  const shop = s => ({ id: s.id, name: s.name, prefix: s.prefix });
+  return {
+    username: user.username,
+    role: user.role,
+    store: shop(store),
+    ...(user.role === 'admin' ? { stores: stores.all().map(shop) } : {})
+  };
+}
+
+// Admins: work on another shop. Shop accounts always work on their own.
+router.post('/api/auth/store', requireAdmin, (req, res) => {
+  const store = stores.get((req.body || {}).storeId);
+  if (!store) return res.status(400).json({ error: 'Невалиден магазин' });
+  req.session.storeId = store.id;
+  res.json(sessionInfo(req.user, store));
 });
 
 // ---- Accounts ----
-const ROLES = ['admin', 'staff'];
 const MIN_PASSWORD = 8;
 const USERNAME = /^[\p{L}\p{N}._-]{3,40}$/u;
 const hashPassword = pw => bcrypt.hashSync(pw, 12);
@@ -75,33 +101,48 @@ router.post('/api/auth/password', requireAuth, (req, res) => {
   res.json({ ok: true });
 });
 
-// Admins: list, add, change and remove accounts.
+// The shop a shop account gets: the one asked for, or else `fallback`.
+// Admins have none (they see every shop).
+/** @returns {{ storeId?: number | null, error?: string }} */
+function shopForRole(role, storeId, fallback) {
+  if (role === 'admin') return { storeId: null };
+  if (storeId === undefined || storeId === null || storeId === '') return { storeId: fallback };
+  const store = stores.get(storeId);
+  return store ? { storeId: store.id } : { error: 'Невалиден магазин' };
+}
+
+const USER_FIELDS = 'id, username, role, store_id, created_at';
+
+// Admins: list, add, change and remove accounts. A shop account without a
+// shop given goes to the shop the admin is working on.
 router.get('/api/users', requireAdmin, (req, res) => {
-  res.json(db.prepare('SELECT id, username, role, created_at FROM users ORDER BY username').all());
+  res.json(db.prepare(`SELECT ${USER_FIELDS} FROM users ORDER BY username`).all());
 });
 
 router.post('/api/users', requireAdmin, (req, res) => {
-  const { username, password, role } = req.body || {};
+  const { username, password, role, storeId } = req.body || {};
   const name = typeof username === 'string' ? username.trim() : '';
   if (!USERNAME.test(name)) {
     return res.status(400).json({ error: 'Потребителското име трябва да е 3–40 знака: букви, цифри, точка, тире или долна черта' });
   }
   if (!ROLES.includes(role)) return res.status(400).json({ error: 'Невалидна роля' });
+  const shop = shopForRole(role, storeId, req.store.id);
+  if (shop.error) return res.status(400).json({ error: shop.error });
   const problem = passwordProblem(password);
   if (problem) return res.status(400).json({ error: problem });
   if (db.prepare('SELECT id FROM users WHERE username = ?').get(name)) {
     return res.status(409).json({ error: `Потребител „${name}“ вече съществува` });
   }
-  const { lastInsertRowid } = db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
-    .run(name, hashPassword(password), role);
-  res.status(201).json(db.prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(lastInsertRowid));
+  const { lastInsertRowid } = db.prepare('INSERT INTO users (username, password_hash, role, store_id) VALUES (?, ?, ?, ?)')
+    .run(name, hashPassword(password), role, shop.storeId ?? null);
+  res.status(201).json(db.prepare(`SELECT ${USER_FIELDS} FROM users WHERE id = ?`).get(lastInsertRowid));
 });
 
 router.put('/api/users/:id', requireAdmin, (req, res) => {
-  const target = /** @type {Pick<import('../types/app').UserRow, 'id' | 'username' | 'role'> | undefined} */ (
-    db.prepare('SELECT id, username, role FROM users WHERE id = ?').get(req.params.id));
+  const target = /** @type {Pick<import('../types/app').UserRow, 'id' | 'username' | 'role' | 'store_id'> | undefined} */ (
+    db.prepare('SELECT id, username, role, store_id FROM users WHERE id = ?').get(req.params.id));
   if (!target) return res.status(404).json({ error: 'Потребителят не е намерен' });
-  const { role, password } = req.body || {};
+  const { role, password, storeId } = req.body || {};
 
   if (role !== undefined) {
     if (!ROLES.includes(role)) return res.status(400).json({ error: 'Невалидна роля' });
@@ -112,14 +153,22 @@ router.put('/api/users/:id', requireAdmin, (req, res) => {
       return res.status(400).json({ error: 'Трябва да остане поне един администратор' });
     }
   }
+  // A new role or shop: an account becoming a shop account keeps its shop,
+  // or else gets the one the admin is working on.
+  let shop = null;
+  if (role !== undefined || storeId !== undefined) {
+    shop = shopForRole(role ?? target.role, storeId, target.store_id ?? req.store.id);
+    if (shop.error) return res.status(400).json({ error: shop.error });
+  }
   if (password !== undefined) {
     const problem = passwordProblem(password);
     if (problem) return res.status(400).json({ error: problem });
   }
 
   if (role !== undefined) db.prepare('UPDATE users SET role = ? WHERE id = ?').run(role, target.id);
+  if (shop) db.prepare('UPDATE users SET store_id = ? WHERE id = ?').run(shop.storeId ?? null, target.id);
   if (password !== undefined) db.prepare('UPDATE users SET password_hash = ? WHERE id = ?').run(hashPassword(password), target.id);
-  res.json(db.prepare('SELECT id, username, role, created_at FROM users WHERE id = ?').get(target.id));
+  res.json(db.prepare(`SELECT ${USER_FIELDS} FROM users WHERE id = ?`).get(target.id));
 });
 
 router.delete('/api/users/:id', requireAdmin, (req, res) => {

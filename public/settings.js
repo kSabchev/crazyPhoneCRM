@@ -28,7 +28,10 @@ async function init(){
   if(me.role !== 'admin'){ window.location.href = '/'; return; }
   currentUserId = null;
   currentUsername = me.username;
-  document.getElementById('whoAmI').textContent = me.username;
+  allStores = me.stores || [];
+  // With several shops, the settings saved here are the current shop's.
+  document.getElementById('whoAmI').textContent = allStores.length > 1 ? `${me.username} · ${me.store.name}` : me.username;
+  renderNewUserShops(me.store.id);
 
   const res = await fetch('/api/settings');
   settings = await res.json();
@@ -44,7 +47,25 @@ async function init(){
 // straight away and isn't part of "Запази промените".
 let currentUsername = null;
 let currentUserId = null;
-const ROLE_LABELS = { admin: 'администратор', staff: 'служител' };
+let allStores = [];
+const ROLE_LABELS = { staff: 'служител', shop_manager: 'управител', admin: 'администратор' };
+
+// Managers and staff each work in one shop; admins in all. The shop
+// dropdowns are only shown when there's more than one shop.
+const manyShops = () => allStores.length > 1;
+function shopOptions(selectedId){
+  return allStores.map(s => `<option value="${s.id}"${s.id === selectedId ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+}
+function renderNewUserShops(currentStoreId){
+  const select = document.getElementById('newUserShop');
+  select.innerHTML = shopOptions(currentStoreId);
+  updateNewUserShop();
+}
+function updateNewUserShop(){
+  const isAdminRole = document.getElementById('newUserRole').value === 'admin';
+  document.getElementById('newUserShop').style.display = manyShops() && !isAdminRole ? '' : 'none';
+}
+document.getElementById('newUserRole').addEventListener('change', updateNewUserShop);
 
 function userError(text){ document.getElementById('userError').textContent = text || ''; }
 
@@ -71,6 +92,9 @@ async function loadUsers(){
       <select class="user-role" ${self ? 'disabled title="Не можете да смените собствената си роля"' : ''}>
         ${Object.entries(ROLE_LABELS).map(([v, l]) => `<option value="${v}"${u.role === v ? ' selected' : ''}>${l}</option>`).join('')}
       </select>
+      ${!manyShops() ? '' : u.role === 'admin'
+        ? '<span class="user-shop user-shop-all">всички магазини</span>'
+        : `<select class="user-shop" title="Магазин">${shopOptions(u.store_id)}</select>`}
       <button class="row-btn" data-action="password">Нова парола</button>
       ${self ? '<span class="row-lock" title="Не можете да премахнете собствения си профил">—</span>'
              : '<button class="row-btn remove" data-action="remove">Премахни</button>'}
@@ -86,6 +110,13 @@ async function loadUsers(){
       });
       loadUsers(); // re-render either way (reverts the dropdown on error)
       return ok;
+    });
+    const shop = row.querySelector('select.user-shop');
+    if(shop) shop.addEventListener('change', async (e) => {
+      await usersRequest(`/api/users/${id}`, {
+        method: 'PUT', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ storeId: Number(e.target.value) })
+      });
+      loadUsers();
     });
     row.querySelector('[data-action="password"]').addEventListener('click', async () => {
       const pw = prompt(`Нова парола за „${name}“ (поне 8 знака):`);
@@ -107,13 +138,16 @@ document.getElementById('addUserBtn').addEventListener('click', async () => {
   const username = document.getElementById('newUserName').value.trim();
   const password = document.getElementById('newUserPassword').value;
   const role = document.getElementById('newUserRole').value;
+  // Without a choice (one shop), the server uses the current shop.
+  const storeId = manyShops() && role !== 'admin' ? Number(document.getElementById('newUserShop').value) : undefined;
   const created = await usersRequest('/api/users', {
-    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, password, role })
+    method: 'POST', headers: {'Content-Type':'application/json'}, body: JSON.stringify({ username, password, role, storeId })
   });
   if(!created) return;
   document.getElementById('newUserName').value = '';
   document.getElementById('newUserPassword').value = '';
   document.getElementById('newUserRole').value = 'staff';
+  updateNewUserShop();
   loadUsers();
 });
 

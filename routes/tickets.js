@@ -3,7 +3,7 @@
 const express = require('express');
 const STATUSES = require('../public/statuses');
 const { buildServiceLabel } = require('../lbx');
-const { requireAuth, requireAdmin } = require('../lib/auth');
+const { requireAuth, requireManager } = require('../lib/auth');
 const { getEditingBy } = require('../lib/live');
 const { ticketEvents } = require('../lib/ticket-events');
 const { applyTransition } = require('../public/status-rules');
@@ -15,7 +15,7 @@ const router = express.Router();
 
 router.get('/api/tickets', requireAuth, (req, res) => {
   // With who's viewing each order right now ("👁 name" in the table).
-  res.json(req.store.tickets.list().map(row => ({ ...row, editing_by: getEditingBy(row.id) })));
+  res.json(req.store.tickets.list().map(row => ({ ...row, editing_by: getEditingBy(req.store.id, row.id) })));
 });
 
 router.post('/api/tickets', requireAuth, (req, res) => {
@@ -88,7 +88,8 @@ router.put('/api/tickets/:id', requireAuth, (req, res) => {
   res.json(updated);
 });
 
-router.delete('/api/tickets/:id', requireAdmin, (req, res) => {
+// Managers and admins only.
+router.delete('/api/tickets/:id', requireManager, (req, res) => {
   const existing = req.store.tickets.get(req.params.id);
   if (!existing) return res.status(404).json({ error: 'Поръчката не е намерена' });
 

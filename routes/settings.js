@@ -91,7 +91,7 @@ router.put('/api/settings', requireAdmin, (req, res) => {
   req.store.db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
     .run(JSON.stringify(next));
 
-  broadcastChange('settings');
+  broadcastChange('settings', req.store.id);
   res.json(withShopPhone(next));
 });
 

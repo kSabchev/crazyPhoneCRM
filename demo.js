@@ -157,8 +157,10 @@ function prepareDemo(db, { systemDb, now = new Date(), count = 180 }) {
   systemDb.transaction(() => {
     systemDb.exec('DELETE FROM users;');
     try { systemDb.exec('DELETE FROM sessions'); } catch (_) { /* store not created yet */ }
-    const addUser = systemDb.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)');
-    for (const u of DEMO_USERS) addUser.run(u.username, bcrypt.hashSync(u.password, 10), u.role);
+    // Shop accounts work in the first shop.
+    const addUser = systemDb.prepare(`INSERT INTO users (username, password_hash, role, store_id)
+      VALUES (?, ?, ?, CASE WHEN ? = 'admin' THEN NULL ELSE (SELECT MIN(id) FROM stores) END)`);
+    for (const u of DEMO_USERS) addUser.run(u.username, bcrypt.hashSync(u.password, 10), u.role, u.role);
   })();
 
   console.log(`Demo mode: database reset with ${count} demo orders. Logins: ${DEMO_USERS.map(u => `${u.username} / ${u.password}`).join(', ')}`);

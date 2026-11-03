@@ -10,24 +10,55 @@ async function checkSession(){
     const res = await fetch('/api/auth/me');
     if(res.ok) data = await res.json();
   } catch(_) { /* server unreachable (e.g. restarting): offer the login form */ }
-  if(data) showApp(data.username, data.role);
+  if(data) showApp(data);
   else showLogin();
 }
 
 // ---------- Roles ----------
-// Admins can delete orders, open Settings and Справки; staff can't. The
-// server enforces this — the page just hides what staff can't use.
+// Admins: every shop, Settings, Справки, deleting orders. Shop managers: one
+// shop, Справки and deleting orders. Staff: one shop, orders only. The
+// server enforces this — the page just hides what the account can't use.
 const isAdmin = () => currentRole === 'admin';
+const canManage = () => currentRole === 'admin' || currentRole === 'shop_manager';
+const ROLE_NAMES = { admin: 'Администратор', shop_manager: 'Управител', staff: 'Служител' };
 
 function applyRole(){
-  for(const id of ['reportsBtn', 'settingsBtn']){
-    document.getElementById(id).style.display = isAdmin() ? '' : 'none';
-  }
+  document.getElementById('reportsBtn').style.display = canManage() ? '' : 'none';
+  document.getElementById('settingsBtn').style.display = isAdmin() ? '' : 'none';
   const who = document.getElementById('whoAmI');
   who.textContent = currentUsername;
-  who.title = `${isAdmin() ? 'Администратор' : 'Служител'} — щракнете за смяна на паролата`;
-  document.getElementById('roleTag').textContent = isAdmin() ? '' : 'служител';
+  who.title = `${ROLE_NAMES[currentRole] || ROLE_NAMES.staff} — щракнете за смяна на паролата`;
+  document.getElementById('roleTag').textContent = isAdmin() ? '' : (ROLE_NAMES[currentRole] || ROLE_NAMES.staff).toLowerCase();
+  renderStoreSwitch();
 }
+
+// ---------- Shops ----------
+// Admins with more than one shop pick the one the page works on. Picking
+// another reloads the page, so everything on it (orders, settings, live
+// updates) is that shop's.
+function renderStoreSwitch(){
+  const select = document.getElementById('storeSwitch');
+  const show = isAdmin() && allStores.length > 1;
+  select.style.display = show ? '' : 'none';
+  if(!show) return;
+  select.innerHTML = allStores.map(s =>
+    `<option value="${s.id}"${currentStore && s.id === currentStore.id ? ' selected' : ''}>${escapeHtml(s.name)}</option>`).join('');
+}
+document.getElementById('storeSwitch').addEventListener('change', async (e)=>{
+  const res = await fetch('/api/auth/store', {
+    method: 'POST',
+    headers: {'Content-Type':'application/json'},
+    body: JSON.stringify({ storeId: Number(e.target.value) })
+  });
+  if(res.status === 401){ showLogin(); return; }
+  if(!res.ok){
+    const data = await res.json().catch(()=>({}));
+    alert(data.error || 'Магазинът не можа да бъде сменен.');
+    renderStoreSwitch(); // back to the current shop
+    return;
+  }
+  window.location.reload();
+});
 
 // ---------- Change your own password ----------
 function openPasswordDialog(){
@@ -72,11 +103,14 @@ function showLogin(){
   document.getElementById('appScreen').style.display = 'none';
 }
 
+// `me`: who's logged in and their shop (/api/auth/me, or the login).
 // `justLoggedIn`: from the login form (rather than reopening the page),
 // when admins are told about any failed backup straight away.
-async function showApp(username, role, { justLoggedIn = false } = {}){
-  currentUsername = username;
-  currentRole = role || 'staff';
+async function showApp(me, { justLoggedIn = false } = {}){
+  currentUsername = me.username;
+  currentRole = me.role || 'staff';
+  currentStore = me.store || null;
+  allStores = me.stores || [];
   applyRole();
   document.getElementById('loginScreen').style.display = 'none';
   document.getElementById('appScreen').style.display = 'block';
@@ -138,7 +172,7 @@ document.getElementById('loginForm').addEventListener('submit', async (e)=>{
   if(res.ok){
     const data = await res.json();
     document.getElementById('loginPass').value = '';
-    showApp(data.username, data.role, { justLoggedIn: true });
+    showApp(data, { justLoggedIn: true });
   } else {
     const data = await res.json().catch(()=>({}));
     errEl.textContent = data.error || 'Неуспешен вход.';

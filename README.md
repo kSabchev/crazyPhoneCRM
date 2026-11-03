@@ -522,6 +522,13 @@ registers `repair-log.db` as the first shop and copies its accounts into
 `repair-log.db`, unused). Everyone has to log in once more, because login
 sessions moved too. Nothing else changes.
 
+**Accounts and shops:** staff and shop managers each belong to one shop and
+only ever reach its orders; admins see every shop and pick the one they work
+on in the header (shown once there's more than one shop). Existing staff
+accounts belong to the first shop. Adding shops from Настройки, and backing
+up every shop's database, come in later steps; until then the app runs the
+one shop it has.
+
 ## Restoring from a backup
 
 `restore.js` restores a chosen backup as the live database. **Stop the app
@@ -703,28 +710,32 @@ box's text options in P-touch Editor (e.g. fit text to frame).
   header shows the same thing across all tickets, for accountability across
   the whole shop.
 
-## Staff accounts
+## Accounts and roles
 
 Give each staff member their own login rather than sharing one account —
 that's what makes the history/activity log meaningful, since every change is
 attributed to whoever was signed in when they made it.
 
-There are two roles:
+There are three roles:
 
-| | Admin (администратор) | Staff (служител) |
-|---|---|---|
-| Create, edit, print orders; change status; send SMS | ✓ | ✓ |
-| See and edit both prices | ✓ | ✓ |
-| **Delete orders** | ✓ | — |
-| **Настройки** (statuses, columns, texts, accounts) | ✓ | — |
-| **Справки** (revenue, profit, SMS usage) | ✓ | — |
+| | Admin (администратор) | Shop manager (управител) | Staff (служител) |
+|---|---|---|---|
+| Shops | **all**: picks one in the header | one | one |
+| Create, edit, print orders; change status; send SMS | ✓ | ✓ | ✓ |
+| See and edit both prices | ✓ | ✓ | ✓ |
+| **Delete orders** | ✓ | ✓ | — |
+| **Справки** (revenue, profit, SMS usage) | ✓ | ✓ (own shop) | — |
+| **Настройки** (statuses, columns, texts, accounts) | ✓ | — | — |
+| Backup log and warnings | ✓ | — | — |
 
-The server enforces this; staff simply don't see those links and buttons.
+The server enforces this; accounts simply don't see the links and buttons
+they can't use. A shop account only ever reaches its own shop's orders,
+history, reports and live updates.
 
 **Managing accounts:** admins use **Настройки → Потребители** to add an
-account (with a role), change someone's role, set a new password for them, or
-remove an account. Changes apply immediately, even to someone already logged
-in. An admin can't demote or remove themselves, so there's always at least one
+account (with a role, and a shop for managers and staff), change someone's
+role or shop, set a new password for them, or remove an account. Changes
+apply immediately, even to someone already logged in. An admin can't demote or remove themselves, so there's always at least one
 admin. Accounts that existed before roles were added are admins.
 
 **Your own password:** anyone can change it by clicking their **username** in
@@ -735,6 +746,7 @@ the header (the current password is required).
 ```bash
 node create-admin.js username password            # new admin, or reset a password
 node create-admin.js username password --staff    # new staff account
+node create-admin.js username password --manager  # new shop manager (first shop)
 node create-admin.js username password --admin    # also make an existing account admin
 ```
 
