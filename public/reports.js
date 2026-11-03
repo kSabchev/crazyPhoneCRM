@@ -42,7 +42,9 @@ async function init(){
   // they work on; the backup log is for admins only.
   if(me.role !== 'admin' && me.role !== 'shop_manager'){ window.location.href = '/'; return; }
   const manyShops = (me.stores || []).length > 1;
-  document.getElementById('whoAmI').textContent = manyShops ? `${me.username} · ${me.store.name}` : me.username;
+  // The all-shops view: every shop's figures together.
+  const shopName = me.allShops ? 'всички магазини' : me.store.name;
+  document.getElementById('whoAmI').textContent = manyShops ? `${me.username} · ${shopName}` : me.username;
   document.getElementById('backups').style.display = me.role === 'admin' ? '' : 'none';
   document.getElementById('reportsScreen').style.display = 'block';
 

@@ -20,12 +20,12 @@ const quickEditInputFor = cfg => document.getElementById(cfg.kind === 'text' ? '
 
 function openQuickEdit(e, id, field){
   e.stopPropagation();
-  const t = tickets.find(x=>x.id===id);
+  const t = findTicket(id);
   const cfg = QUICK_EDIT_FIELDS[field];
   if(!t || !cfg) return;
   quickEdit = { id, field };
   document.getElementById('quickEditTitle').textContent = cfg.title;
-  document.getElementById('quickEditSub').textContent = `Поръчка #${t.ticket_no} — ${t.customer_name}, ${t.phone_model}`;
+  document.getElementById('quickEditSub').textContent = `Поръчка #${orderNo(t)} — ${t.customer_name}, ${t.phone_model}`;
   document.getElementById('quickEditHint').textContent = cfg.kind === 'text'
     ? 'Ctrl+Enter запазва, Esc затваря' : 'Enter запазва, Esc затваря';
 

@@ -30,10 +30,17 @@ async function init(){
   currentUsername = me.username;
   allStores = me.stores || [];
   // With several shops, the settings saved here are the current shop's.
-  document.getElementById('whoAmI').textContent = allStores.length > 1 ? `${me.username} · ${me.store.name}` : me.username;
+  document.getElementById('whoAmI').textContent = allStores.length > 1
+    ? `${me.username} · ${me.allShops ? 'всички магазини' : me.store.name}` : me.username;
+  // The all-shops view: only what every shop shares. A shop's own settings
+  // need that shop picked on the main page.
+  if(me.allShops){
+    document.querySelectorAll('.settings-section[data-scope="shop"]').forEach(s => { s.style.display = 'none'; });
+    document.getElementById('allShopsNote').style.display = '';
+  }
   renderNewUserShops(me.store.id);
   // With several shops, say which sections are shared and which are this shop's.
-  if(allStores.length > 1){
+  if(allStores.length > 1 && !me.allShops){
     document.querySelectorAll('.settings-section[data-scope] h2').forEach(h => {
       const shared = h.parentElement.dataset.scope === 'shared';
       h.insertAdjacentHTML('beforeend', ` <span class="scope-tag${shared ? ' scope-shared' : ''}">${

@@ -115,9 +115,9 @@ async function openSmsPrompt(ticketId){
   if(!res.ok) return;
   const p = await res.json();
   if(!p.enabled) return;
-  const t = tickets.find(x=>x.id===ticketId);
+  const t = findTicket(ticketId);
   smsTicketId = ticketId;
-  document.getElementById('smsSub').textContent = t ? `Поръчка #${t.ticket_no} — ${t.customer_name}, ${t.phone_model}` : '';
+  document.getElementById('smsSub').textContent = t ? `Поръчка #${orderNo(t)} — ${t.customer_name}, ${t.phone_model}` : '';
   document.getElementById('smsText').value = p.text;
   const error = document.getElementById('smsError');
   const confirmBtn = document.getElementById('smsConfirmBtn');
@@ -140,7 +140,7 @@ async function openSmsPrompt(ticketId){
   // Fresh check of the phone, so it's clear before sending whether it can work.
   const s = await refreshPhoneStatus(true);
   const info = s && describePhoneStatus(s);
-  if(smsTicketId !== ticketId) return; // window closed meanwhile
+  if(smsTicketId === null || !sameId(smsTicketId, ticketId)) return; // window closed meanwhile
   phoneLine.textContent = info ? `📱 ${info.lines[0]}` : '';
   phoneLine.className = `sms-phone-status${info ? ' sms-phone-' + info.cls : ''}`;
 }
@@ -166,7 +166,7 @@ async function confirmSms(){
   if(res && res.status === 401){ closeSmsPrompt(); showLogin(); return; }
   if(res && res.ok){
     closeSmsPrompt();
-    if(editingTicket && editingTicket.id === id){
+    if(editingTicket && sameId(editingTicket.id, id)){
       loadTicketSms(id);
       loadTicketHistory(id);
     }
@@ -191,7 +191,7 @@ async function loadTicketSms(ticketId){
   const res = await fetch(`/api/tickets/${ticketId}/sms`);
   if(!res.ok) return;
   const list = await res.json();
-  if(!editingTicket || editingTicket.id !== ticketId) return;
+  if(!editingTicket || !sameId(editingTicket.id, ticketId)) return;
   document.getElementById('smsList').innerHTML = list.length
     ? list.map(m=>`
       <div class="sms-entry sms-${escapeHtml(m.state.toLowerCase())}">

@@ -50,7 +50,7 @@ test('admins pick the shop in the header, and work on its orders', async ({ page
   await login(page, 'alice');
   const picker = page.locator('#storeSwitch');
   await expect(picker).toBeVisible();
-  await expect(picker.locator('option')).toHaveText(['CrazyPhone', 'Магазин Лозенец']);
+  await expect(picker.locator('option')).toHaveText(['CrazyPhone', 'Магазин Лозенец', 'Всички магазини']);
   await expect(picker).toHaveValue('1');
   const inFirst = await createTicketViaApi(page);
 
@@ -173,4 +173,64 @@ test('admins set where a shop\'s SMS go from, in its Настройки', async 
   await page.selectOption('#smsMode', 'env');
   await page.click('#smsSaveBtn');
   await expect(page.locator('#smsSaveStatus')).toHaveText('Запазено. SMS: телефон.');
+});
+
+test('the all-shops view lists every shop\'s orders, editable, and new ones go to the chosen shop', async ({ page, browser }) => {
+  // One order in each shop.
+  await login(page, 'alice');
+  const inFirst = await createTicketViaApi(page);
+  const ctx = await browser.newContext();
+  const dora = await ctx.newPage();
+  await login(dora, 'dora');
+  const inSecond = await createTicketViaApi(dora);
+
+  await page.locator('#storeSwitch').selectOption('all');
+  await expect(page.locator('#storeSwitch')).toHaveValue('all'); // after the page reloads
+  await showAllStatuses(page);
+  const second = row(page, inSecond.customer_name);
+  await expect(row(page, inFirst.customer_name).locator('.shop-tag')).toHaveText('CrazyPhone');
+  await expect(second.locator('.shop-tag')).toHaveText('Магазин Лозенец');
+  await expect(second.locator('.ticket-no')).toContainText(`#Л-${inSecond.ticket_no}`);
+
+  // Edited in place, in its own shop: dora sees the change.
+  await second.locator('.ticket-no').click();
+  await expect(page.locator('#modalTitle')).toHaveText(`Поръчка #Л-${inSecond.ticket_no} — Магазин Лозенец`);
+  await page.fill('#f_comment', 'от всички магазини');
+  await page.click('#saveBtn');
+  await expect.poll(async () => {
+    const list = await (await dora.request.get('/api/tickets')).json();
+    return list.find(t => t.customer_name === inSecond.customer_name).comment;
+  }).toBe('от всички магазини');
+
+  // A new order needs its shop.
+  const name = uniqueName();
+  await page.click('#newTicketBtn');
+  await expect(page.locator('#storeField')).toBeVisible();
+  await page.fill('#f_customer', name);
+  await page.fill('#f_phone', '0888 123 456');
+  await page.fill('#f_model', 'Pixel 9');
+  await page.fill('#f_desc', 'Не зарежда');
+  page.once('dialog', d => d.accept());
+  await page.click('#saveBtn');
+  await expect(page.locator('#overlay')).toHaveClass(/\bopen\b/); // asked to pick a shop
+  await page.selectOption('#f_store', { label: 'Магазин Лозенец' });
+  await page.click('#saveBtn');
+  await expect(row(page, name).locator('.shop-tag')).toHaveText('Магазин Лозенец');
+  const doraList = await (await dora.request.get('/api/tickets')).json();
+  expect(doraList.map(t => t.customer_name)).toContain(name);
+  await ctx.close();
+});
+
+test('Справки and Настройки in the all-shops view', async ({ page }) => {
+  await login(page, 'alice');
+  expect((await page.request.post('/api/auth/store', { data: { storeId: 'all' } })).status()).toBe(200);
+  await page.goto('/reports.html');
+  await expect(page.locator('#whoAmI')).toHaveText('alice · всички магазини');
+  await page.goto('/settings.html');
+  await expect(page.locator('#whoAmI')).toHaveText('alice · всички магазини');
+  await expect(page.locator('#allShopsNote')).toBeVisible();
+  // Only what every shop shares.
+  await expect(page.locator('.settings-section', { hasText: 'Статуси' }).first()).toBeVisible();
+  await expect(page.locator('#smsSendSection')).toBeHidden();
+  await expect(page.locator('#shopNameInput')).toBeHidden();
 });

@@ -6,6 +6,7 @@ const LOGO_SRC = '/assets/logo.png';
 // The customer copy has a fixed layout matching the shop's paper service
 // card, rather than the configurable field-list the service copy uses.
 function buildCustomerPrintDoc(t){
+  const settings = shopSettingsFor(t); // the order's shop's name, phone, footer
   const tagline = settings.shopTagline
     ? `<div class="card-tagline">${escapeHtml(settings.shopTagline)}</div>` : '';
 
@@ -58,7 +59,7 @@ function buildCustomerPrintDoc(t){
       </div>
       <div class="card-order-no">
         ${settings.shopPhone ? `<div class="card-doc-title">тел. ${escapeHtml(settings.shopPhone)}</div>` : ''}
-        <div>№ ${t.ticket_no}</div>
+        <div>№ ${escapeHtml(orderNo(t))}</div>
       </div>
     </div>
     <div class="card-body">${topRows}${descriptionRow}${bottomRows}</div>
@@ -107,7 +108,7 @@ let printOfferAfter = null;
 function openPrintOffer(ticket, afterClose){
   printOfferTicket = ticket;
   printOfferAfter = afterClose || null;
-  document.getElementById('printOfferTitle').textContent = `Поръчка #${ticket.ticket_no} е създадена`;
+  document.getElementById('printOfferTitle').textContent = `Поръчка #${orderNo(ticket)} е създадена`;
   document.getElementById('printOfferSub').textContent = `${ticket.customer_name}, ${ticket.phone_model}`;
   document.querySelectorAll('#printOfferOverlay [data-print]').forEach(btn => btn.classList.remove('done'));
   document.getElementById('printOfferOverlay').classList.add('open');
@@ -151,7 +152,7 @@ async function printCopy(kind, ticket = editingTicket){
     // it downloads, and opening it in P-touch Editor prints it.
     const a = document.createElement('a');
     a.href = `/api/tickets/${ticket.id}/service-label.lbx`;
-    a.download = `poruchka-${ticket.ticket_no}.lbx`;
+    a.download = `poruchka-${orderNo(ticket)}.lbx`;
     document.body.appendChild(a);
     a.click();
     a.remove();
