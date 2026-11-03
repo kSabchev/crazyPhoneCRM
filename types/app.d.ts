@@ -39,9 +39,14 @@ export interface UserRow {
   id: number;
   username: string;
   password_hash: string;
-  role: 'admin' | 'staff';
+  role: Role;
+  /** The shop of a shop account (staff, shop manager); null for admins. */
+  store_id: number | null;
   created_at: string;
 }
+
+/** admin: every shop; shop_manager: one shop, with Справки and deleting orders; staff: one shop. */
+export type Role = 'admin' | 'shop_manager' | 'staff';
 
 /** A change-history entry (the audit_log table); `changes` is JSON text. */
 export interface AuditRow {
@@ -135,6 +140,8 @@ declare module 'express-session' {
   interface SessionData {
     userId: number;
     username: string;
+    /** Admins: the shop they've picked (lib/auth.js). */
+    storeId: number;
   }
 }
 
@@ -144,7 +151,7 @@ declare global {
   namespace Express {
     interface Request {
       /** The logged-in user, set by requireAuth / requireAdmin (lib/auth.js). */
-      user?: { id: number; username: string; role: 'admin' | 'staff' };
+      user?: { id: number; username: string; role: Role; store_id: number | null };
       /** The shop this request works on, set with req.user (lib/auth.js). */
       store?: Store;
     }

@@ -67,9 +67,9 @@ function openEdit(id){
   setPravimButton(t.pravim || 'circle');
   setEditOnlyFieldsVisible(true);
   document.getElementById('topActions').style.display = 'flex';
-  document.querySelector('#topActions [data-action="delete"]').style.display = isAdmin() ? '' : 'none';
+  document.querySelector('#topActions [data-action="delete"]').style.display = canManage() ? '' : 'none';
   markPhoneField();
-  document.getElementById('deleteBtn').style.display = isAdmin() ? 'inline-block' : 'none';
+  document.getElementById('deleteBtn').style.display = canManage() ? 'inline-block' : 'none';
   document.getElementById('printCustomerBtn').style.display = 'inline-block';
   document.getElementById('printServiceBtn').style.display = 'inline-block';
   document.getElementById('overlay').classList.add('open');

@@ -64,7 +64,7 @@ test('upgrading: the existing database becomes the first shop, and its accounts 
   assert.deepEqual(s.shops, [{ id: 1, name: 'Магазин Център', prefix: '', db_file: 'repair-log.db', sms: '{}' }]);
   assert.deepEqual(s.users, [
     { id: 3, username: 'owner', role: 'admin', store_id: null },
-    { id: 7, username: 'helper', role: 'staff', store_id: null }
+    { id: 7, username: 'helper', role: 'staff', store_id: 1 } // staff belong to the first shop
   ]);
   assert.deepEqual(s.orders, ['Стар клиент'], 'orders stay in the shop database');
 
@@ -142,4 +142,19 @@ test('backups include system.db, and restore puts either database back', () => {
   assert.ok(restored.prepare("SELECT 1 FROM users WHERE username = 'helper'").get());
   restored.close();
   assert.ok(fs.readdirSync(path.join(dataRoot, 'data', 'pre-restore')).some(f => f.startsWith('system_before-restore_')));
+});
+
+test('upgrading from the first multi-shop version: staff accounts get the first shop', () => {
+  const dataRoot = oldInstallation();
+  inProcess(dataRoot, SNAPSHOT);
+  // As system.db was then: accounts without a shop, no changes applied yet.
+  const sys = new Database(path.join(dataRoot, 'data', 'system.db'));
+  sys.prepare('UPDATE users SET store_id = NULL').run();
+  sys.pragma('user_version = 0');
+  sys.close();
+
+  assert.deepEqual(inProcess(dataRoot, SNAPSHOT).users, [
+    { id: 3, username: 'owner', role: 'admin', store_id: null },
+    { id: 7, username: 'helper', role: 'staff', store_id: 1 }
+  ]);
 });

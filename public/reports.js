@@ -38,9 +38,12 @@ async function init(){
   const meRes = await fetch('/api/auth/me');
   if(!meRes.ok){ window.location.href = '/'; return; }
   const me = await meRes.json();
-  // Справки (revenue, profit) is for admins only.
-  if(me.role !== 'admin'){ window.location.href = '/'; return; }
-  document.getElementById('whoAmI').textContent = me.username;
+  // Справки (revenue, profit) is for managers and admins, about the shop
+  // they work on; the backup log is for admins only.
+  if(me.role !== 'admin' && me.role !== 'shop_manager'){ window.location.href = '/'; return; }
+  const manyShops = (me.stores || []).length > 1;
+  document.getElementById('whoAmI').textContent = manyShops ? `${me.username} · ${me.store.name}` : me.username;
+  document.getElementById('backups').style.display = me.role === 'admin' ? '' : 'none';
   document.getElementById('reportsScreen').style.display = 'block';
 
   const { from, to } = presetRange('year');
@@ -48,7 +51,7 @@ async function init(){
   document.getElementById('toInput').value = to;
   setActivePreset('year');
   load();
-  loadBackups();
+  if(me.role === 'admin') loadBackups();
 }
 
 let lastReport = null;

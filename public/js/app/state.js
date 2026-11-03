@@ -5,7 +5,9 @@ let editingTicket = null;
 let settings = null;
 let liveEvents = null;
 let currentUsername = null;
-let currentRole = null; // 'admin' | 'staff'
+let currentRole = null; // 'admin' | 'shop_manager' | 'staff'
+let currentStore = null; // the shop this page works on: { id, name, prefix }
+let allStores = [];      // admins: every shop, to pick from
 
 const statusStyles = {
   [STATUSES.FOR_SERVICE]: ['var(--status-forservice)','var(--status-forservice-bg)'],

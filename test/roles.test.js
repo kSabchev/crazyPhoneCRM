@@ -19,8 +19,11 @@ test.before(async () => {
 test('existing accounts are admins; login and /me report the role', async () => {
   assert.equal(systemDb.prepare("SELECT role FROM users WHERE username = 'tester'").get().role, 'admin');
   const res = await request(app).post('/api/auth/login').send({ username: 'ivan', password: 'staffpass1' }).expect(200);
-  assert.deepEqual(res.body, { username: 'ivan', role: 'staff' });
-  assert.deepEqual((await staff.get('/api/auth/me').expect(200)).body, { username: 'ivan', role: 'staff' });
+  const shop = { id: 1, name: 'CrazyPhone', prefix: '' };
+  assert.deepEqual(res.body, { username: 'ivan', role: 'staff', store: shop });
+  assert.deepEqual((await staff.get('/api/auth/me').expect(200)).body, { username: 'ivan', role: 'staff', store: shop });
+  // Admins also get every shop, to pick from.
+  assert.deepEqual((await admin.get('/api/auth/me').expect(200)).body, { username: 'tester', role: 'admin', store: shop, stores: [shop] });
 });
 
 test('staff work with orders as before, including both prices', async () => {
@@ -47,7 +50,7 @@ test('staff can\'t delete orders, save settings, see reports or manage accounts'
   for (const send of forbidden) {
     const res = await send();
     assert.equal(res.status, 403, `${res.req.method} ${res.req.path}`);
-    assert.match(res.body.error, /Само администратор/);
+    assert.match(res.body.error, /Само (управител или )?администратор/);
   }
   // The order is still there.
   assert.ok((await admin.get('/api/tickets')).body.some(x => x.id === t.id));
@@ -148,7 +151,7 @@ test('account routes need a login', async () => {
   await request(app).post('/api/auth/password').send({}).expect(401);
 });
 
-test('create-admin.js makes admins by default, staff with --staff, and keeps roles on reset', () => {
+test('create-admin.js makes admins by default, staff and managers with a flag, and keeps roles on reset', () => {
   const run = (...args) => spawnSync(process.execPath, [path.join(ROOT, 'create-admin.js'), ...args], {
     cwd: ROOT, env: { ...process.env, DATA_ROOT: dataRoot }, encoding: 'utf8'
   });
@@ -156,7 +159,16 @@ test('create-admin.js makes admins by default, staff with --staff, and keeps rol
   assert.match(run('cli-staff', 'password1', '--staff').stdout, /created \(staff\)/);
   assert.match(run('cli-staff', 'password2').stdout, /updated .*\(staff\)/);
   assert.match(run('cli-staff', 'password2', '--admin').stdout, /updated .*\(admin\)/);
+  assert.match(run('cli-manager', 'password1', '--manager').stdout, /created \(shop_manager\)/);
+  assert.match(run('cli-boss', 'password1', '--staff').stdout, /created \(staff\)/);
   assert.equal(run('x', 'password1', '--owner').status, 1);
-  const roles = Object.fromEntries(systemDb.prepare("SELECT username, role FROM users WHERE username LIKE 'cli-%'").all().map(r => [r.username, r.role]));
-  assert.deepEqual(roles, { 'cli-admin': 'admin', 'cli-staff': 'admin' });
+  // Shop accounts made here work in the first shop; admins in all.
+  const accounts = Object.fromEntries(systemDb.prepare("SELECT username, role, store_id FROM users WHERE username LIKE 'cli-%'").all()
+    .map(r => [r.username, [r.role, r.store_id]]));
+  assert.deepEqual(accounts, {
+    'cli-admin': ['admin', null],
+    'cli-staff': ['admin', null],
+    'cli-manager': ['shop_manager', 1],
+    'cli-boss': ['staff', 1]
+  });
 });

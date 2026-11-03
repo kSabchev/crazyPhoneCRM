@@ -1,6 +1,6 @@
 // Started by Playwright (see playwright.config.js): runs the real server.js
-// against a fresh temp database with two staff logins, so browser tests
-// never touch real data. SMS goes to a fake phone gateway (port 3199) that
+// against a fresh temp database with two shops and a login for each role,
+// so browser tests never touch real data. SMS goes to a fake phone gateway (port 3199) that
 // only records what it was asked to send — inspect it at /__sent.
 const fs = require('fs');
 const os = require('os');
@@ -22,11 +22,19 @@ const FAKE_SMS_PORT = 3199;
 
   const bcrypt = require('bcrypt');
   const db = require('../lib/system-db'); // accounts
+  const stores = require('../lib/stores');
 
-  // alice is an admin, bob a staff member — so both views are tested.
-  for (const [username, role] of [['alice', 'admin'], ['bob', 'staff']]) {
-    db.prepare('INSERT INTO users (username, password_hash, role) VALUES (?, ?, ?)')
-      .run(username, bcrypt.hashSync('secret123', 4), role);
+  // The first shop, where the tests work, and a second one.
+  const first = stores.defaultStore();
+  const second = stores.create({ name: 'Магазин Лозенец', prefix: 'Л' });
+
+  // alice is an admin (all shops), bob staff and vera the manager of the
+  // first shop, dora staff in the second — so every view is tested.
+  for (const [username, role, shop] of [
+    ['alice', 'admin', null], ['bob', 'staff', first], ['vera', 'shop_manager', first], ['dora', 'staff', second]
+  ]) {
+    db.prepare('INSERT INTO users (username, password_hash, role, store_id) VALUES (?, ?, ?, ?)')
+      .run(username, bcrypt.hashSync('secret123', 4), role, shop ? shop.id : null);
   }
 
   require('../server');

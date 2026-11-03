@@ -21,7 +21,7 @@ const kpi = (page, label) => page.locator('.kpi', { has: page.locator('.kpi-labe
 test('the header link opens reports, which default to this year', async ({ page }) => {
   await page.click('#reportsBtn');
   await expect(page).toHaveURL(/reports\.html$/);
-  await expect(page.locator('#whoAmI')).toHaveText('alice');
+  await expect(page.locator('#whoAmI')).toHaveText('alice · CrazyPhone'); // the test server has two shops
   const year = new Date().getFullYear();
   await expect(page.locator('#fromInput')).toHaveValue(`${year}-01-01`);
   await expect(page.locator('#presets .active')).toHaveText('Тази година');

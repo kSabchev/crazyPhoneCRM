@@ -1,14 +1,15 @@
 // @ts-check
-// Справки (admins): revenue, turnaround, workload, SMS — see ../reports.js.
+// Справки (managers and admins): revenue, turnaround, workload, SMS — see
+// ../reports.js. The backup log is for admins only.
 const express = require('express');
 const { buildReport } = require('../reports');
-const { requireAdmin } = require('../lib/auth');
+const { requireAdmin, requireManager } = require('../lib/auth');
 const { localToday, isValidDate, daysBetweenDates } = require('../lib/util');
 const { readBackupLog, KEEP } = require('../lib/backup-log');
 
 const router = express.Router();
 
-router.get('/api/reports', requireAdmin, (req, res) => {
+router.get('/api/reports', requireManager, (req, res) => {
   const today = localToday();
   const from = req.query.from || `${today.slice(0, 4)}-01-01`;
   const to = req.query.to || today;

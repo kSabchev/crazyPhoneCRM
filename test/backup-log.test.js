@@ -98,7 +98,7 @@ test('admins see the backup log; staff and visitors do not', async () => {
   assert.equal(body.keep, KEEP);
   assert.equal(body.runs[0].error, 'грешка');
 
-  systemDb.prepare("INSERT INTO users (username, password_hash, role) VALUES ('staff1', ?, 'staff')")
+  systemDb.prepare("INSERT INTO users (username, password_hash, role, store_id) VALUES ('staff1', ?, 'staff', 1)")
     .run(require('bcrypt').hashSync('secret123', 4));
   const staff = await login(request.agent(app), 'staff1');
   await staff.get('/api/backups').expect(403);
