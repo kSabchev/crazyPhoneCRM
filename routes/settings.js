@@ -8,6 +8,8 @@ const { broadcastChange } = require('../lib/live');
 const systemDb = require('../lib/system-db');
 const stores = require('../lib/stores');
 const { shopsOf } = require('../lib/ticket-target');
+const { logAdmin, readAdminLog } = require('../lib/admin-log');
+const { diffSettings } = require('../lib/settings-diff');
 const { COLUMN_KEYS, HEX_COLOR, getSettings, saveSettings, withStatusColors, withShopPhone } = require('../lib/settings-store');
 
 const router = express.Router();
@@ -113,7 +115,9 @@ router.put('/api/settings', requireAdmin, (req, res) => {
 
   delete next.shopPhone; // added to responses only (withShopPhone)
   delete next.shops;     // likewise (the all-shops view)
+  const changes = diffSettings(current, next);
   const sharedChanged = saveSettings(req.store.db, next);
+  if (Object.keys(changes).length) logAdmin(req.user.username, 'settings_changed', { changes }, req.store.id);
   // The shop's name is also its name in the list of shops.
   if (next.shopName !== current.shopName) {
     systemDb.prepare('UPDATE stores SET name = ? WHERE id = ?').run(next.shopName, req.store.id);
@@ -137,6 +141,11 @@ router.get('/api/devices', requireAuth, (req, res) => {
   }
   const merged = [...seen.values()].sort((a, b) => a.localeCompare(b));
   res.json(merged);
+});
+
+// The admin log (lib/admin-log.js), newest first: bottom of Настройки.
+router.get('/api/admin-log', requireAdmin, (req, res) => {
+  res.json(readAdminLog());
 });
 
 module.exports = router;

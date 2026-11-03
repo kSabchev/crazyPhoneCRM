@@ -200,3 +200,39 @@ test('Настройки lists the automatic status rules, with each status in i
   await row.locator('input.status-color').fill('#123456');
   await expect(items.nth(1).locator('.badge')).toHaveCSS('background-color', 'rgb(18, 52, 86)');
 });
+
+test('Настройки shows the admin log, updated after each change', async ({ page }) => {
+  await page.goto('/settings.html'); // logged in as alice (beforeEach)
+  const log = page.locator('#adminLog');
+  await expect(page.locator('#adminLogSection')).toBeVisible();
+
+  const tagline = await page.locator('#shopTaglineInput').inputValue();
+  await page.fill('#shopTaglineInput', 'слоган за дневника');
+  await page.click('#saveBtn');
+  const entry = log.locator('.admin-log-entry').first();
+  await expect(entry).toContainText('alice');
+  await expect(entry).toContainText('Промени настройките: слоган:');
+  await expect(entry).toContainText('„слоган за дневника“');
+
+  // An account change shows too.
+  const name = `log${Date.now().toString(36)}`;
+  await page.fill('#newUserName', name);
+  await page.fill('#newUserPassword', 'goodpassword');
+  await page.click('#addUserBtn');
+  await expect(log.locator('.admin-log-entry').first()).toContainText(`Добави профил „${name}“ (служител`);
+  page.once('dialog', d => d.accept());
+  await page.locator('#userList .user-row', { hasText: name }).locator('[data-action="remove"]').click();
+  await expect(log.locator('.admin-log-entry').first()).toContainText(`Премахна профил „${name}“`);
+
+  await page.fill('#shopTaglineInput', tagline);
+  await page.click('#saveBtn');
+  await expect(page.locator('#saveStatus')).toHaveText('Запазено.');
+});
+
+test('staff and managers never reach the admin log', async ({ browser }) => {
+  const ctx = await browser.newContext(); // not alice's session
+  const page = await ctx.newPage();
+  await login(page, 'vera');
+  expect((await page.request.get('/api/admin-log')).status()).toBe(403);
+  await ctx.close();
+});

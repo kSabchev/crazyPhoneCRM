@@ -6,6 +6,7 @@ const sms = require('../sms');
 const { requireAuth, requireAdmin } = require('../lib/auth');
 const systemDb = require('../lib/system-db');
 const { broadcastChange } = require('../lib/live');
+const { logAdmin } = require('../lib/admin-log');
 const { ticketEvents } = require('../lib/ticket-events');
 const { getSettings } = require('../lib/settings-store');
 const { asyncRoute } = require('../lib/util');
@@ -45,6 +46,21 @@ function smsSettingsView(store) {
   };
 }
 
+// What changed, for the admin log: values from → to, but for the token and
+// the password only "set", "changed" or "removed".
+function smsSettingsChanges(before, after) {
+  const changes = {};
+  for (const key of ['mode', ...sms.SHOP_KEYS]) {
+    const from = before[key] ?? (key === 'mode' ? 'env' : '');
+    const to = after[key] ?? (key === 'mode' ? 'env' : '');
+    if (from === to) continue;
+    changes[key] = sms.SECRET_KEYS.includes(key)
+      ? { secret: !from ? 'set' : !to ? 'removed' : 'changed' }
+      : { from, to };
+  }
+  return changes;
+}
+
 const LIMITS = { SMSAPI_TOKEN: 500, SMSAPI_SENDER: 11, SMS_GATEWAY_URL: 300, SMS_GATEWAY_USER: 100, SMS_GATEWAY_PASSWORD: 200 };
 
 router.get('/api/sms/shop-settings', requireAdmin, (req, res) => {
@@ -82,6 +98,8 @@ router.put('/api/sms/shop-settings', requireAdmin, (req, res) => {
   }
 
   systemDb.prepare('UPDATE stores SET sms = ? WHERE id = ?').run(JSON.stringify(next), req.store.id);
+  const changes = smsSettingsChanges(req.store.sms || {}, next);
+  if (Object.keys(changes).length) logAdmin(req.user.username, 'sms_settings_changed', { changes }, req.store.id);
   const store = /** @type {import('../types/app').Store} */ (stores.get(req.store.id)); // refreshed
   sms.resetPhoneStatusCache(store);
   broadcastChange('settings', store.id); // the shop's screens re-check SMS
