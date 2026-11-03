@@ -135,6 +135,7 @@ function connectLiveUpdates(){
       if(editingTicket && smsEnabled) loadTicketSms(editingTicket.id);
     } else if(e.data === 'settings'){
       loadSettings().then(()=>{ loadDevices(); render(); });
+      loadSmsConfig(); // the shop's SMS settings may have changed
     } else if(e.data === 'backups'){
       refreshBackups('new'); // a backup has run (backups.js)
     }

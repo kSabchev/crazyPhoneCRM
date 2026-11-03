@@ -85,12 +85,15 @@ export interface ServiceStatus {
 }
 
 /** One way of sending SMS (sms-demo.js, smsapi.js, gateway.js). */
+/** Where a provider reads its settings: .env, or a shop's own (sms.js smsEnv). */
+export type SmsEnv = Record<string, string | undefined>;
+
 export interface SmsProvider {
-  /** Settings from .env, or a falsy value when this provider isn't set up. */
-  config(): unknown;
-  send(phone: string, text: string): Promise<{ gatewayId: string | null; state: SmsState }>;
-  state(gatewayId: string): Promise<{ state: SmsState | null; error: string | null } | null>;
-  serviceStatus(): Promise<ServiceStatus>;
+  /** Its settings, or a falsy value when this provider isn't set up. */
+  config(env?: SmsEnv): unknown;
+  send(phone: string, text: string, env?: SmsEnv): Promise<{ gatewayId: string | null; state: SmsState }>;
+  state(gatewayId: string, env?: SmsEnv): Promise<{ state: SmsState | null; error: string | null } | null>;
+  serviceStatus(env?: SmsEnv): Promise<ServiceStatus>;
 }
 
 // ---- Shops (lib/stores.js) ----
@@ -101,8 +104,8 @@ export interface Store {
   name: string;
   /** Shown before the shop's order numbers (e.g. "Л"); '' for none. */
   prefix: string;
-  /** The shop's SMS settings (per-shop SMS comes in a later step). */
-  sms: Record<string, unknown>;
+  /** The shop's SMS settings: { mode: 'env' | 'own' | 'off', ...its own keys } (sms.js). */
+  sms: Record<string, any>;
   db: import('better-sqlite3').Database;
   tickets: ReturnType<typeof import('../lib/tickets-repo').ticketsRepo>;
 }

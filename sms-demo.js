@@ -11,7 +11,8 @@
 const DELIVER_AFTER_MS = 5000;
 let counter = 0;
 
-const config = () => process.env.DEMO_MODE === 'true';
+/** @param {import('./types/app').SmsEnv} [env] */
+const config = (env = process.env) => env.DEMO_MODE === 'true';
 
 // The id carries the send time and the number's ending, so the state can
 // be worked out later without keeping anything in memory.
@@ -21,8 +22,8 @@ async function send(phone) {
   return { gatewayId: `demo-${Date.now()}-${++counter}-${fails}`, state: 'Pending' };
 }
 
-/** @param {string} gatewayId @param {number} [now] @returns {ReturnType<SmsProvider['state']>} */
-async function state(gatewayId, now = Date.now()) {
+/** @param {string} gatewayId @param {import('./types/app').SmsEnv} [_env] @param {number} [now] @returns {ReturnType<SmsProvider['state']>} */
+async function state(gatewayId, _env, now = Date.now()) {
   const m = /^demo-(\d+)-\d+-([fd])$/.exec(String(gatewayId || ''));
   if (!m) return null;
   if (now - Number(m[1]) < DELIVER_AFTER_MS) return { state: 'Pending', error: null };

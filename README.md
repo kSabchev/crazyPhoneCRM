@@ -159,6 +159,23 @@ There are two ways to send the SMS; set up **one** of them:
 
 If both are configured, SMSAPI.bg is used.
 
+### Several shops: SMS settings per shop
+
+The settings in `.env` apply to every shop unless a shop sets its own. In
+**Настройки → Изпращане на SMS** (admins, for the shop they're working on):
+
+- **Както е зададено в .env** (default): as above.
+- **Собствени настройки**: the shop's own SMSAPI token and sender name, or
+  its own phone (address, username, password). Nothing comes from `.env`
+  then, except the SMSAPI address. As in `.env`, SMSAPI wins if both are
+  filled in.
+- **Изключени**: no SMS from that shop; the app doesn't offer to send.
+
+Each shop's header pill shows its own phone or service. The token and the
+phone's password are never shown again once saved; leave the field empty to
+keep them. They're stored in `data/system.db`, so, like `.env`, its backups
+should be kept private.
+
 ### Option 1: SMSAPI.bg
 
 1. Create an account at [smsapi.bg](https://www.smsapi.bg/). A test account
@@ -533,8 +550,9 @@ accounts belong to the first shop.
 **Settings:** statuses, their colours, the table columns and the phone-model
 list are the same in every shop (on upgrade they start as the first shop's).
 The name, tagline, phone number, customer-print footer and SMS text are each
-shop's own. With several shops, Настройки marks which is which. Adding shops
-from Настройки, and SMS settings per shop, come in later steps.
+shop's own. With several shops, Настройки marks which is which. Each shop
+can also send SMS its own way (see [SMS settings per shop](#several-shops-sms-settings-per-shop)).
+Adding shops from Настройки comes in a later step.
 
 ## Restoring from a backup
 
