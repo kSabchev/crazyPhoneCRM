@@ -16,12 +16,12 @@ test.before(async () => {
 
 test('admins list the shops, with how many orders each has', async () => {
   await admin.post('/api/tickets').send(validTicket()).expect(201);
-  assert.deepEqual((await admin.get('/api/stores').expect(200)).body, [{ id: 1, name: 'CrazyPhone', prefix: '', orders: 1 }]);
+  assert.deepEqual((await admin.get('/api/stores').expect(200)).body, [{ id: 1, name: 'CrazyPhone', prefix: '', archived: false, orders: 1 }]);
 });
 
 test('adding a shop gives it an empty database, its settings and a place in the picker', async () => {
   const shop = (await admin.post('/api/stores').send({ name: ' Магазин Лозенец ', prefix: 'Л' }).expect(201)).body;
-  assert.deepEqual(shop, { id: 2, name: 'Магазин Лозенец', prefix: 'Л', orders: 0 });
+  assert.deepEqual(shop, { id: 2, name: 'Магазин Лозенец', prefix: 'Л', archived: false, orders: 0 });
   assert.ok(fs.existsSync(path.join(dataRoot, 'data', 'shop-2.db')));
 
   const me = (await admin.get('/api/auth/me')).body;

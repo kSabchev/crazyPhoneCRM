@@ -78,17 +78,32 @@ async function shopsRequest(url, options){
 async function loadShops(){
   const shops = await shopsRequest('/api/stores');
   if(!shops) return;
-  const changed = JSON.stringify(shops.map(s => [s.id, s.name])) !== JSON.stringify(allStores.map(s => [s.id, s.name]));
-  allStores = shops.map(s => ({ id: s.id, name: s.name, prefix: s.prefix }));
+  // The account dropdowns offer only the shops in use.
+  const inUse = shops.filter(s => !s.archived);
+  const changed = JSON.stringify(inUse.map(s => [s.id, s.name])) !== JSON.stringify(allStores.map(s => [s.id, s.name]));
+  allStores = inUse.map(s => ({ id: s.id, name: s.name, prefix: s.prefix }));
   const el = document.getElementById('shopList');
   el.innerHTML = shops.map(s => `
-    <div class="editable-row shop-row" data-id="${s.id}">
+    <div class="editable-row shop-row${s.archived ? ' shop-archived' : ''}" data-id="${s.id}">
       <input type="text" class="shop-name" value="${escapeHtml(s.name)}" maxlength="60" aria-label="Име на магазина">
       <input type="text" class="shop-prefix" value="${escapeHtml(s.prefix)}" maxlength="5" placeholder="без" aria-label="Префикс">
-      <span class="muted shop-orders">${s.orders} ${s.orders === 1 ? 'поръчка' : 'поръчки'}</span>
+      <span class="muted shop-orders">${s.archived ? 'архивиран · ' : ''}${s.orders} ${s.orders === 1 ? 'поръчка' : 'поръчки'}</span>
       <button class="row-btn" data-action="save-shop">Запази</button>
+      ${s.archived
+        ? '<button class="row-btn" data-action="restore-shop">Възстанови</button>'
+        : '<button class="row-btn" data-action="archive-shop">Архивирай</button>'}
     </div>`).join('');
   el.querySelectorAll('.shop-row').forEach(row => {
+    const name = () => row.querySelector('.shop-name').value.trim();
+    const archive = row.querySelector('[data-action="archive-shop"]');
+    if(archive) archive.addEventListener('click', async () => {
+      if(!confirm(`Да се архивира ли „${name()}“? Магазинът изчезва от избора и списъците; поръчките и историята му се пазят и могат да се виждат в Справки. Може да бъде възстановен по всяко време.`)) return;
+      if(await shopsRequest(`/api/stores/${row.dataset.id}/archive`, { method: 'POST' })) loadShops();
+    });
+    const restore = row.querySelector('[data-action="restore-shop"]');
+    if(restore) restore.addEventListener('click', async () => {
+      if(await shopsRequest(`/api/stores/${row.dataset.id}/restore`, { method: 'POST' })) loadShops();
+    });
     row.querySelector('[data-action="save-shop"]').addEventListener('click', async () => {
       const saved = await shopsRequest(`/api/stores/${row.dataset.id}`, {
         method: 'PUT', headers: {'Content-Type':'application/json'},

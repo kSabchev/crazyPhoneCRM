@@ -47,7 +47,11 @@ async function init(){
   document.getElementById('whoAmI').textContent = manyShops ? `${me.username} · ${shopName}` : me.username;
   // Admins with several shops tick which ones the figures cover: to start
   // with, all of them in the all-shops view, otherwise the current shop.
-  if(me.role === 'admin' && manyShops) renderShopPicks(me.stores, me.allShops ? me.stores.map(s => s.id) : [me.store.id]);
+  // Archived shops can be ticked too, to see their figures.
+  const archived = (me.archivedStores || []).map(s => ({ ...s, archived: true }));
+  if(me.role === 'admin' && (manyShops || archived.length)){
+    renderShopPicks([...me.stores, ...archived], me.allShops ? me.stores.map(s => s.id) : [me.store.id]);
+  }
   document.getElementById('backups').style.display = me.role === 'admin' ? '' : 'none';
   document.getElementById('reportsScreen').style.display = 'block';
 
@@ -310,7 +314,7 @@ function renderRevenueTable(revenue){
 function renderShopPicks(shops, checked){
   document.getElementById('shopPicks').style.display = '';
   document.getElementById('shopPickList').innerHTML = shops.map(s => `
-    <label class="shop-pick"><input type="checkbox" value="${s.id}"${checked.includes(s.id) ? ' checked' : ''}> ${escapeHtml(s.name)}</label>`).join('');
+    <label class="shop-pick${s.archived ? ' shop-pick-archived' : ''}"><input type="checkbox" value="${s.id}"${checked.includes(s.id) ? ' checked' : ''}> ${escapeHtml(s.name)}${s.archived ? ' <span class="muted">(архивиран)</span>' : ''}</label>`).join('');
 }
 // The ticked shop ids, or null when there's no choice (one shop, managers).
 function pickedShops(){
@@ -319,7 +323,10 @@ function pickedShops(){
 }
 document.getElementById('shopPickList').addEventListener('change', load);
 document.getElementById('pickAllShops').addEventListener('click', ()=>{
-  document.querySelectorAll('#shopPickList input').forEach(i => { i.checked = true; });
+  // Every shop in use (archived ones stay as they are).
+  document.querySelectorAll('#shopPickList input').forEach(i => {
+    if(!i.closest('.shop-pick-archived')) i.checked = true;
+  });
   load();
 });
 

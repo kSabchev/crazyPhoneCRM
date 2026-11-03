@@ -580,8 +580,15 @@ order numbers from 1. Then:
 
 It's in the nightly backup from then on. A shop's name and prefix can be
 changed in Магазини at any time (renaming it there also renames it on its
-prints). Shops can't be deleted from the app, so their orders are never lost
-by accident. Up to 10 shops (the all-shops reports combine them).
+prints). Up to 10 shops in use (the all-shops reports combine them).
+
+**Archiving a shop:** shops are never deleted, so their orders can't be lost,
+but a shop that closes can be **archived** in Магазини. It disappears from
+the picker, the all-shops lists, new orders and the account dropdowns; its
+database stays, is still backed up, and can still be ticked in Справки
+(marked "архивиран"). Its accounts must be moved to another shop or removed
+first, and the last shop in use can't be archived. **Възстанови** brings it
+back as it was. Archived shops don't count towards the 10.
 
 ## Restoring from a backup
 

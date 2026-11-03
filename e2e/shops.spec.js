@@ -346,3 +346,41 @@ test('shop managers get no shop choice in Справки', async ({ page }) => {
   await expect(page.locator('#reportsScreen')).toBeVisible();
   await expect(page.locator('#shopPicks')).toBeHidden();
 });
+
+test('admins archive a shop in Магазини, and restore it', async ({ page }) => {
+  await login(page, 'alice');
+  await page.goto('/settings.html');
+  const rows = page.locator('#shopList .shop-row');
+
+  // A shop with accounts can't be archived (dora works in Лозенец).
+  page.once('dialog', d => d.accept());
+  await rows.nth(1).locator('[data-action="archive-shop"]').click();
+  await expect(page.locator('#shopError')).toContainText('профилите му: dora');
+
+  // A new, empty shop can.
+  await page.fill('#newShopName', 'Временен');
+  await page.fill('#newShopPrefix', 'В');
+  await page.click('#addShopBtn');
+  const temp = rows.filter({ has: page.locator('.shop-name[value="Временен"]') });
+  await expect(temp).toHaveCount(1);
+  page.once('dialog', d => d.accept());
+  await temp.locator('[data-action="archive-shop"]').click();
+  await expect(temp).toHaveClass(/shop-archived/);
+  await expect(temp.locator('.shop-orders')).toContainText('архивиран');
+  // Not offered for accounts…
+  await expect(page.locator('#newUserShop option', { hasText: 'Временен' })).toHaveCount(0);
+  // …nor in the picker; but it can be ticked in Справки.
+  await page.goto('/');
+  await expect(page.locator('#storeSwitch option', { hasText: 'Временен' })).toHaveCount(0);
+  await page.goto('/reports.html');
+  const pick = page.locator('.shop-pick', { hasText: 'Временен' });
+  await expect(pick).toContainText('(архивиран)');
+  await expect(pick.locator('input')).not.toBeChecked();
+
+  await page.goto('/settings.html');
+  await temp.locator('[data-action="restore-shop"]').click();
+  await expect(temp).not.toHaveClass(/shop-archived/);
+  page.once('dialog', d => d.accept());
+  await temp.locator('[data-action="archive-shop"]').click(); // leave it archived for the tests after
+  await expect(temp).toHaveClass(/shop-archived/);
+});

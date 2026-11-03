@@ -23,7 +23,7 @@ test('existing accounts are admins; login and /me report the role', async () => 
   assert.deepEqual(res.body, { username: 'ivan', role: 'staff', store: shop });
   assert.deepEqual((await staff.get('/api/auth/me').expect(200)).body, { username: 'ivan', role: 'staff', store: shop });
   // Admins also get every shop, to pick from.
-  assert.deepEqual((await admin.get('/api/auth/me').expect(200)).body, { username: 'tester', role: 'admin', store: shop, stores: [shop], allShops: false });
+  assert.deepEqual((await admin.get('/api/auth/me').expect(200)).body, { username: 'tester', role: 'admin', store: shop, stores: [shop], archivedStores: [], allShops: false });
 });
 
 test('staff work with orders as before, including both prices', async () => {
