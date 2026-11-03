@@ -144,7 +144,8 @@ async function loadBackups(){
     ? runs.map(r => `<tr class="${r.ok ? 'backup-row-ok' : 'backup-row-failed'}">
         <td class="nowrap">${escapeHtml(fmtIsoTime(r.startedAt))}</td>
         <td><span class="backup-status ${r.ok ? 'backup-status-ok' : 'backup-status-failed'}">${r.ok ? '✓ успешно' : '✗ неуспешно'}</span></td>
-        <td class="backup-file">${r.file ? escapeHtml(r.file) : '—'}</td>
+        <td class="backup-file">${r.file ? escapeHtml(r.file) : '—'}${(r.shopFiles || []).length
+          ? `<div class="muted">+ ${r.shopFiles.length === 1 ? 'още 1 магазин' : `още ${r.shopFiles.length} магазина`}</div>` : ''}</td>
         <td class="num nowrap">${fmtBytes(r.sizeBytes)}</td>
         <td>${escapeHtml(NAS_LABEL[r.nas] || '—')}</td>
         <td class="backup-details">${r.error ? escapeHtml(r.error) : '—'}</td>

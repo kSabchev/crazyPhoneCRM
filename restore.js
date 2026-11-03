@@ -10,10 +10,13 @@
 // Usage:
 //   node restore.js                          List available backups
 //   node restore.js <filename>                Restore that specific backup
-//   node restore.js latest                    Restore the most recent shop backup
+//   node restore.js latest                    Restore the most recent backup
+//                                            of the first shop
 //
-// Backups named system_… are of system.db (accounts and shops); restoring
-// one replaces system.db. "latest" never picks one of those.
+// The name says which database a backup replaces:
+//   repair-log_…   the first shop (data/repair-log.db)
+//   system_…       accounts, shops, shared settings (data/system.db)
+//   shop-<id>_…    another shop (data/shop-<id>.db)
 
 require('./env');
 const path = require('path');
@@ -23,8 +26,7 @@ const Database = require('better-sqlite3');
 // Same DATA_ROOT rule as the app (lib/data-dir.js).
 const BASE_DIR = process.env.DATA_ROOT ? path.resolve(process.env.DATA_ROOT) : __dirname;
 
-const DB_PATH = path.join(BASE_DIR, 'data', 'repair-log.db');
-const SYSTEM_PATH = path.join(BASE_DIR, 'data', 'system.db');
+const DATA_DIR = path.join(BASE_DIR, 'data');
 const BACKUP_DIR = path.join(BASE_DIR, 'backups');
 const PRE_RESTORE_DIR = path.join(BASE_DIR, 'data', 'pre-restore');
 
@@ -37,6 +39,23 @@ function listBackups(prefix = 'repair-log_') {
     .filter(f => f.startsWith(prefix) && f.endsWith('.db'))
     .sort() // filenames are ISO timestamps, so this sorts chronologically
     .reverse();
+}
+
+// The database a backup file replaces ("shop-2_2026-….db" -> "shop-2"),
+// or null for a file that isn't one of ours.
+function databaseOf(filename) {
+  const m = /^(repair-log|system|shop-\d+)_\d{4}-\d{2}-\d{2}T[\d-]+\.db$/.exec(filename);
+  return m ? m[1] : null;
+}
+
+// Backups of the other shops, grouped by database: { 'shop-2': [...] }.
+function otherShopBackups() {
+  const groups = {};
+  for (const f of listBackups('shop-')) {
+    const name = databaseOf(f);
+    if (name) (groups[name] = groups[name] || []).push(f);
+  }
+  return groups;
 }
 
 function sleepSync(ms) {
@@ -86,7 +105,12 @@ async function main() {
       return;
     }
     console.log(`Available backups (newest first), in ${BACKUP_DIR}:\n`);
+    console.log(`The first shop (data/repair-log.db):\n`);
     backups.forEach(f => console.log('  ' + f));
+    for (const [name, files] of Object.entries(otherShopBackups())) {
+      console.log(`\nShop ${name} (data/${name}.db):\n`);
+      files.forEach(f => console.log('  ' + f));
+    }
     const systemBackups = listBackups('system_');
     if (systemBackups.length) {
       console.log(`\nAccounts and shops (system.db) — restore only if accounts were lost:\n`);
@@ -118,10 +142,13 @@ async function main() {
   // file operation on the main file alone (or deleting the sidecar
   // files) can silently discard real, uncommitted data. Going through
   // db.backup() always captures the true, complete, current state.
-  // system_… backups replace system.db; everything else the shop database.
-  const isSystem = filename.startsWith('system_');
-  const targetPath = isSystem ? SYSTEM_PATH : DB_PATH;
-  const label = isSystem ? 'system' : 'repair-log';
+  // The name says which database it replaces (databaseOf).
+  const label = databaseOf(filename);
+  if (!label) {
+    console.error(`ERROR: "${filename}" is not a backup made by backup.js.`);
+    process.exit(1);
+  }
+  const targetPath = path.join(DATA_DIR, `${label}.db`);
 
   if (fs.existsSync(targetPath)) {
     fs.mkdirSync(PRE_RESTORE_DIR, { recursive: true });

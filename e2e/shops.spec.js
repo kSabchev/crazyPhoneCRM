@@ -130,3 +130,15 @@ test('the shop picker fits the header on a phone', async ({ page }) => {
   const overflow = await page.evaluate(() => document.documentElement.scrollWidth - document.documentElement.clientWidth);
   expect(overflow).toBeLessThanOrEqual(0);
 });
+
+test('Настройки says which sections are shared and which are the shop\'s own', async ({ page }) => {
+  await login(page, 'alice');
+  await page.goto('/settings.html');
+  const tag = h2 => page.locator('.settings-section h2', { hasText: h2 }).locator('.scope-tag');
+  await expect(tag('Статуси')).toHaveText('общо за всички магазини');
+  await expect(tag('Колони в таблицата')).toHaveText('общо за всички магазини');
+  await expect(tag('Предложения за модели телефони')).toHaveText('общо за всички магазини');
+  await expect(tag('Име на сервиза')).toHaveText('само за CrazyPhone');
+  await expect(tag('SMS до клиента')).toHaveText('само за CrazyPhone');
+  await expect(page.locator('#shopPhoneInput')).toBeVisible();
+});

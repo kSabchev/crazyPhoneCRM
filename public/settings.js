@@ -32,6 +32,14 @@ async function init(){
   // With several shops, the settings saved here are the current shop's.
   document.getElementById('whoAmI').textContent = allStores.length > 1 ? `${me.username} · ${me.store.name}` : me.username;
   renderNewUserShops(me.store.id);
+  // With several shops, say which sections are shared and which are this shop's.
+  if(allStores.length > 1){
+    document.querySelectorAll('.settings-section[data-scope] h2').forEach(h => {
+      const shared = h.parentElement.dataset.scope === 'shared';
+      h.insertAdjacentHTML('beforeend', ` <span class="scope-tag${shared ? ' scope-shared' : ''}">${
+        shared ? 'общо за всички магазини' : `само за ${escapeHtml(me.store.name)}`}</span>`);
+    });
+  }
 
   const res = await fetch('/api/settings');
   settings = await res.json();
@@ -176,6 +184,7 @@ function currentDraft(){
     ...settings,
     shopName: document.getElementById('shopNameInput').value.trim() || settings.shopName,
     shopTagline: document.getElementById('shopTaglineInput').value.trim(),
+    phone: document.getElementById('shopPhoneInput').value.trim(),
     printCustomer: {
       footer: document.getElementById('custFooter').value
     },
@@ -195,7 +204,7 @@ function stableJson(value){
 
 function hasUnsavedChanges(){
   if(!settings || !originalSettings) return false;
-  return stableJson(currentDraft()) !== stableJson({ ...originalSettings, shopTagline: originalSettings.shopTagline || '' });
+  return stableJson(currentDraft()) !== stableJson({ ...originalSettings, shopTagline: originalSettings.shopTagline || '', phone: originalSettings.phone || '' });
 }
 
 const UNSAVED_MESSAGE = 'Имате незапазени промени в настройките. Да се напусне ли страницата без запазване?';
@@ -228,6 +237,10 @@ document.getElementById('logoutBtn').addEventListener('click', async ()=>{
 function renderAll(){
   document.getElementById('shopNameInput').value = settings.shopName;
   document.getElementById('shopTaglineInput').value = settings.shopTagline || '';
+  // Without its own number the shop uses SHOP_PHONE from .env (shopPhone).
+  const phone = document.getElementById('shopPhoneInput');
+  phone.value = settings.phone || '';
+  phone.placeholder = !settings.phone && settings.shopPhone ? `${settings.shopPhone} (от .env)` : 'напр. 0888 123 456';
   renderStatusList();
   renderColumnGrid();
   document.getElementById('custFooter').value = settings.printCustomer.footer;
@@ -380,6 +393,7 @@ document.getElementById('resetBtn').addEventListener('click', ()=>{
 document.getElementById('saveBtn').addEventListener('click', async ()=>{
   settings.shopName = document.getElementById('shopNameInput').value.trim() || settings.shopName;
   settings.shopTagline = document.getElementById('shopTaglineInput').value.trim();
+  settings.phone = document.getElementById('shopPhoneInput').value.trim();
   settings.printCustomer.footer = document.getElementById('custFooter').value;
   settings.smsTemplate = document.getElementById('smsTemplateInput').value.trim() || settings.smsTemplate;
 

@@ -1,10 +1,12 @@
 // @ts-check
-// The shop's settings (Настройки) and the phone-model suggestion list.
+// Настройки — the shared settings and the current shop's own (see
+// lib/settings-store.js) — and the phone-model suggestion list.
 const express = require('express');
 const STATUSES = require('../public/statuses');
 const { requireAuth, requireAdmin } = require('../lib/auth');
 const { broadcastChange } = require('../lib/live');
-const { COLUMN_KEYS, HEX_COLOR, getSettings, withStatusColors, withShopPhone } = require('../lib/settings-store');
+const systemDb = require('../lib/system-db');
+const { COLUMN_KEYS, HEX_COLOR, getSettings, saveSettings, withStatusColors, withShopPhone } = require('../lib/settings-store');
 
 const router = express.Router();
 
@@ -26,6 +28,14 @@ router.put('/api/settings', requireAdmin, (req, res) => {
 
   if (body.shopTagline !== undefined) {
     next.shopTagline = typeof body.shopTagline === 'string' ? body.shopTagline.trim() : current.shopTagline;
+  }
+
+  // The shop's own phone number; empty means SHOP_PHONE from .env.
+  if (body.phone !== undefined) {
+    if (typeof body.phone !== 'string' || body.phone.trim().length > 40) {
+      return res.status(400).json({ error: 'Невалиден телефон на магазина' });
+    }
+    next.phone = body.phone.trim();
   }
 
   if (body.statuses !== undefined) {
@@ -88,10 +98,15 @@ router.put('/api/settings', requireAdmin, (req, res) => {
   // The service copy is a fixed small label (shop name, order number,
   // problem description) — nothing about it is configurable.
 
-  req.store.db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
-    .run(JSON.stringify(next));
+  delete next.shopPhone; // added to responses only (withShopPhone)
+  const sharedChanged = saveSettings(req.store.db, next);
+  // The shop's name is also its name in the list of shops.
+  if (next.shopName !== current.shopName) {
+    systemDb.prepare('UPDATE stores SET name = ? WHERE id = ?').run(next.shopName, req.store.id);
+  }
 
-  broadcastChange('settings', req.store.id);
+  // Shared settings: every shop's screens; otherwise just this shop's.
+  broadcastChange('settings', sharedChanged ? null : req.store.id);
   res.json(withShopPhone(next));
 });
 

@@ -44,7 +44,7 @@ test('a backup that could not be made is recorded as failed, with the reason', (
   assert.notEqual(backup(dataRoot).status, 0);
   const [run] = logOf(dataRoot);
   assert.equal(run.ok, false);
-  assert.match(run.error, /Базата данни не е намерена/);
+  assert.match(run.error, /Базата данни на поръчките не е намерена/);
   assert.equal(run.file, null);
 });
 

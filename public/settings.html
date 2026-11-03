@@ -24,7 +24,7 @@
     </div>
   </header>
 
-  <div class="settings-section">
+  <div class="settings-section" data-scope="shop">
     <h2>Име на сервиза</h2>
     <div class="section-sub">Показва се на разпечатките, заедно с логото.</div>
     <div class="field">
@@ -35,9 +35,13 @@
       <label for="shopTaglineInput">Слоган</label>
       <input type="text" id="shopTaglineInput" placeholder="напр. аксесоари и сервиз">
     </div>
+    <div class="field">
+      <label for="shopPhoneInput">Телефон (горе на разпечатката за клиента)</label>
+      <input type="text" id="shopPhoneInput" maxlength="40" placeholder="напр. 0888 123 456">
+    </div>
   </div>
 
-  <div class="settings-section">
+  <div class="settings-section" data-scope="shared">
     <h2>Статуси</h2>
     <div class="section-sub">Възможните статуси за всяка поръчка. Пренаредете със стрелките — редът тук е редът, показван в падащите менюта. Цветът се избира от квадратчето до всеки статус. Системните статуси (🔒) задействат автоматични действия и не могат да бъдат премахнати.</div>
     <div class="editable-list" id="statusList"></div>
@@ -54,19 +58,19 @@
     <ul class="rule-list" id="ruleList"></ul>
   </div>
 
-  <div class="settings-section">
+  <div class="settings-section" data-scope="shared">
     <h2>Колони в таблицата</h2>
     <div class="section-sub">Изберете кои колони да се показват в основната таблица. Номерът на поръчката винаги се показва.</div>
     <div class="checkbox-grid" id="columnGrid"></div>
   </div>
 
-  <div class="settings-section">
+  <div class="settings-section" data-scope="shop">
     <h2>Разпечатка за клиента</h2>
     <div class="section-sub">
       Полетата на тази разпечатка са фиксирани — съответстват на хартиената сервизна
       карта на сервиза (номер, клиент, модел и марка, описание на повредата, оборотен
       телефон, капаро, цена, дата на приемане). Телефонът на сервиза в горния край
-      идва от настройката SHOP_PHONE в .env. Тук можете да редактирате само текста на
+      се задава по-горе, при името. Тук можете да редактирате само текста на
       предупреждението в долния край.
     </div>
     <div class="field">
@@ -75,7 +79,7 @@
     </div>
   </div>
 
-  <div class="settings-section">
+  <div class="settings-section" data-scope="shop">
     <h2>SMS до клиента</h2>
     <div class="section-sub">
       Текстът, предложен за изпращане, когато поръчка стане „чака клиент“ (винаги се пита преди изпращане и текстът може да се промени).
@@ -97,7 +101,7 @@
     </div>
   </div>
 
-  <div class="settings-section">
+  <div class="settings-section" data-scope="shared">
     <h2>Предложения за модели телефони</h2>
     <div class="section-sub">
       Началният списък с модели, предлагани при въвеждане. Моделите, използвани в реални

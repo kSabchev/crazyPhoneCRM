@@ -8,6 +8,7 @@
 // wipe real data.
 const bcrypt = require('bcrypt');
 const DEFAULT_SETTINGS = require('./default-settings');
+const { sharedPart } = require('./lib/settings-store');
 const { toInternationalBg, renderTemplate } = require('./sms');
 const { FOR_SERVICE, IN_SERVICE, WAITING, COMPLETED, REFUSED, FORGOTTEN, CLOSED } = require('./public/statuses');
 
@@ -67,6 +68,7 @@ function prepareDemo(db, { systemDb, now = new Date(), count = 180 }) {
 
     db.prepare('UPDATE settings SET data = ?, updated_at = datetime(\'now\') WHERE id = 1')
       .run(JSON.stringify({ ...DEFAULT_SETTINGS, demoData: true }));
+    systemDb.prepare('UPDATE shared_settings SET data = ? WHERE id = 1').run(JSON.stringify(sharedPart(DEFAULT_SETTINGS)));
 
 
     const insert = db.prepare(`

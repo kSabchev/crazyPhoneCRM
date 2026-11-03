@@ -39,8 +39,8 @@ cp .env.example .env
 ```
 
 Open `.env` and set `SESSION_SECRET` to a long random string, and
-`SHOP_PHONE` to the shop's phone number (printed on the customer card). You can
-generate one with:
+`SHOP_PHONE` to the shop's phone number (printed on the customer card; each
+shop can also set its own in Настройки). You can generate the secret with:
 
 ```bash
 node -e "console.log(require('crypto').randomBytes(32).toString('hex'))"
@@ -512,9 +512,12 @@ time, the script logs a warning there instead of failing silently.
 
 The data lives in `data/` (in `DATA_ROOT` if set):
 
-- `system.db` — login accounts, the list of shops, login sessions.
-- `repair-log.db` — the first shop's orders, change history, SMS and
-  settings (the same file as before; further shops will get their own).
+- `system.db` — login accounts, the list of shops, the settings every shop
+  shares (statuses and their colours, table columns, phone models), login
+  sessions.
+- `repair-log.db` — the first shop's orders, change history, SMS and own
+  settings (the same file as before).
+- `shop-<id>.db` — each further shop's, likewise.
 
 **Upgrading from a version without `system.db`:** on first start the app
 registers `repair-log.db` as the first shop and copies its accounts into
@@ -525,9 +528,13 @@ sessions moved too. Nothing else changes.
 **Accounts and shops:** staff and shop managers each belong to one shop and
 only ever reach its orders; admins see every shop and pick the one they work
 on in the header (shown once there's more than one shop). Existing staff
-accounts belong to the first shop. Adding shops from Настройки, and backing
-up every shop's database, come in later steps; until then the app runs the
-one shop it has.
+accounts belong to the first shop.
+
+**Settings:** statuses, their colours, the table columns and the phone-model
+list are the same in every shop (on upgrade they start as the first shop's).
+The name, tagline, phone number, customer-print footer and SMS text are each
+shop's own. With several shops, Настройки marks which is which. Adding shops
+from Настройки, and SMS settings per shop, come in later steps.
 
 ## Restoring from a backup
 
@@ -550,10 +557,12 @@ node restore.js latest          # restores the most recent shop backup
 node restore.js <filename>      # restores a specific one
 ```
 
-Each backup is two files with the same time stamp: `repair-log_….db` (the
-orders) and `system_….db` (accounts and the list of shops). Restoring a
-`system_…` file replaces `data/system.db`; do that only if accounts were
-lost. `latest` never picks one.
+Each backup run makes one file per database, all with the same time stamp:
+`repair-log_….db` (the first shop), `system_….db` (accounts, shops, shared
+settings) and `shop-<id>_….db` for every further shop. The name says which
+database a file replaces when restored. Restore a `system_…` file only if
+accounts or shared settings were lost. `latest` always means the first
+shop's newest backup.
 
 It never destroys the current database outright: before restoring, it
 safely backs up whatever's currently live into `data/pre-restore/`, so a
@@ -583,7 +592,8 @@ Click **Settings** in the header to configure:
   Ticket # always shows, for reference.
 - **Customer print copy** — the footer warning text (liability, the
   1-month pickup limit, the 3-month warranty). The fields on the card are
-  fixed; the shop phone at the top comes from `SHOP_PHONE` in `.env`.
+  fixed; the shop phone at the top is set under the shop's name (or else
+  comes from `SHOP_PHONE` in `.env`).
 - **Service print copy** — same, for the job sheet the repair technician
   gets. Keep customer price off this one if you don't want the technician
   seeing what the customer is charged.

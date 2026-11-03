@@ -3,7 +3,7 @@ const assert = require('node:assert/strict');
 const request = require('supertest');
 const { loadApp, login } = require('./helpers');
 
-const { app, db } = loadApp();
+const { app, systemDb } = loadApp();
 let agent;
 
 test.before(async () => {
@@ -52,9 +52,10 @@ test('built-in statuses can be reordered but not removed', async () => {
 
 test('a shop that removed a built-in status earlier gets it back', async () => {
   const SYSTEM = require('../public/statuses').SYSTEM;
-  const row = JSON.parse(db.prepare('SELECT data FROM settings WHERE id = 1').get().data);
+  // Statuses are shared by every shop (system.db).
+  const row = JSON.parse(systemDb.prepare('SELECT data FROM shared_settings WHERE id = 1').get().data);
   row.statuses = ['за сервиз', 'в сервиз', 'издаден', 'чака части']; // no чака клиент, отказан, забравен
-  db.prepare('UPDATE settings SET data = ? WHERE id = 1').run(JSON.stringify(row));
+  systemDb.prepare('UPDATE shared_settings SET data = ? WHERE id = 1').run(JSON.stringify(row));
 
   const s = (await agent.get('/api/settings')).body;
   assert.deepEqual(s.statuses, ['за сервиз', 'в сервиз', 'издаден', 'чака части', 'чака клиент', 'отказан', 'забравен']);
@@ -93,6 +94,20 @@ test('the shop phone comes from SHOP_PHONE and is never saved', async () => {
     await agent.put('/api/settings').send({ ...s, shopPhone: 'hacked' }).expect(200);
     delete process.env.SHOP_PHONE;
     assert.equal((await agent.get('/api/settings')).body.shopPhone, '');
+  } finally {
+    delete process.env.SHOP_PHONE;
+  }
+});
+
+test('a shop\'s own phone number is saved, and replaces SHOP_PHONE', async () => {
+  process.env.SHOP_PHONE = '0888 000 000';
+  try {
+    let s = (await agent.put('/api/settings').send({ phone: ' 02 123 4567 ' }).expect(200)).body;
+    assert.equal(s.phone, '02 123 4567');
+    assert.equal(s.shopPhone, '02 123 4567');
+    s = (await agent.put('/api/settings').send({ phone: '' }).expect(200)).body;
+    assert.equal(s.shopPhone, '0888 000 000', 'empty: SHOP_PHONE again');
+    await agent.put('/api/settings').send({ phone: 'x'.repeat(41) }).expect(400);
   } finally {
     delete process.env.SHOP_PHONE;
   }
