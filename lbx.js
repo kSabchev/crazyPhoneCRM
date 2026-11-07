@@ -4,7 +4,7 @@
 // take a template designed in P-touch Editor (print-templates/) — so the
 // roll, label size, fonts and positions are whatever the shop set there —
 // and only swap the placeholder text boxes ({shop}, {order}, {issue},
-// {password}) for the ticket's values.
+// {password}, {model}, {customer}) for the ticket's values.
 const fs = require('fs');
 const path = require('path');
 const zlib = require('zlib');
@@ -107,6 +107,10 @@ function escapeXml(s) {
   return s.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;').replace(/"/g, '&quot;');
 }
 
+// P-touch Editor's own line-break encoding isn't something we can rely on
+// here, so multi-line text is printed as one line.
+const oneLine = text => String(text || '').replace(/\s*[\r\n]+\s*/g, ' ').trim();
+
 // Placeholder names are matched case-insensitively; "pasword" is accepted
 // too since the shop's first template was saved with that spelling.
 function placeholderValues(ticket, shopName) {
@@ -114,9 +118,9 @@ function placeholderValues(ticket, shopName) {
   return {
     shop: shopName || '',
     order: `№ ${ticket.ticket_no}`,
-    // P-touch Editor's own line-break encoding isn't something we can rely
-    // on here, so a multi-line description is printed as one line.
-    issue: String(ticket.description || '').replace(/\s*[\r\n]+\s*/g, ' ').trim(),
+    issue: oneLine(ticket.description),
+    model: oneLine(ticket.phone_model),
+    customer: oneLine(ticket.customer_name),
     password,
     pasword: password
   };
@@ -162,4 +166,4 @@ function buildServiceLabel(ticket, shopName, templatePath = TEMPLATE_PATH) {
   return writeZip(entries);
 }
 
-module.exports = { buildServiceLabel, readZip, writeZip, fillLabelXml, TEMPLATE_PATH };
+module.exports = { buildServiceLabel, readZip, writeZip, fillLabelXml, placeholderValues, TEMPLATE_PATH };

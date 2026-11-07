@@ -71,6 +71,28 @@ test('a multi-line description is printed on one line', async () => {
   assert.ok(xml.includes('<pt:data>Не зарежда Счупен дисплей</pt:data>'));
 });
 
+test('{model} and {customer} text boxes get the phone model and the customer\'s name', () => {
+  const { fillLabelXml } = require('../lbx');
+  // Text boxes as P-touch Editor saves them: the text split into runs.
+  const box = text => `<text:text><pt:data>${text}</pt:data>` +
+    `<text:stringItem charLen="3"><ts:stringItem/></text:stringItem>` +
+    `<text:stringItem charLen="${text.length - 3}"><ts:stringItem/></text:stringItem></text:text>`;
+  const xml = fillLabelXml(box('{model}') + box('{Customer}') + box('{model}'), {
+    model: 'Samsung Galaxy S24', customer: 'Иван Петров'
+  });
+  assert.equal((xml.match(/<pt:data>Samsung Galaxy S24<\/pt:data>/g) || []).length, 2, 'every box with it');
+  assert.ok(xml.includes('<pt:data>Иван Петров</pt:data>'));
+  assertRunLengthsMatch(xml);
+});
+
+test('the label\'s values come from the order: model and customer each on one line', () => {
+  const { placeholderValues } = require('../lbx');
+  const v = placeholderValues({ ticket_no: 7, phone_model: 'iPhone 15\r\nPro', customer_name: ' Мария Иванова ', description: 'x' }, 'CrazyPhone');
+  assert.equal(v.model, 'iPhone 15 Pro');
+  assert.equal(v.customer, 'Мария Иванова');
+  assert.equal(v.order, '№ 7');
+});
+
 test('an unknown ticket gives 404 and the label needs a login', async () => {
   await agent.get('/api/tickets/999999/service-label.lbx').expect(404);
   await request(app).get('/api/tickets/1/service-label.lbx').expect(401);
