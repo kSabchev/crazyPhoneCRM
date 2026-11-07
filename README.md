@@ -170,7 +170,8 @@ The label's layout comes from `print-templates/service-label.lbx`, designed
 in P-touch Editor — the label roll and length, fonts, sizes and positions
 are all whatever is set there. The app only replaces text boxes containing
 exactly these placeholders (curly braces included, any letter case):
-`{shop}`, `{order}`, `{issue}`, `{password}` (a box whose value is empty,
+`{shop}`, `{order}`, `{issue}` (the problem), `{model}` (the phone model),
+`{customer}` (the customer's name), `{password}` (a box whose value is empty,
 e.g. no unlock code, is left off). To change the look, open the template in
 P-touch Editor, edit it, keep the placeholder texts, and save it over the
 same file — no restart needed. A long problem description makes a longer
