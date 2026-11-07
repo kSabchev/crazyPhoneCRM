@@ -254,6 +254,7 @@ There are three roles:
 | Create, edit, print orders; change status; send SMS | ✓ | ✓ | ✓ |
 | See and edit both prices | ✓ | ✓ | ✓ |
 | **Delete orders** | ✓ | ✓ | — |
+| **Дневник на промените** (activity log; each order's own history is for everyone) | ✓ | ✓ (own shop) | — |
 | **Справки** (revenue, profit, SMS usage) | ✓ | ✓ (own shop) | — |
 | **Настройки** (statuses, columns, texts, accounts) | ✓ | — | — |
 | Backup log and warnings | ✓ | — | — |

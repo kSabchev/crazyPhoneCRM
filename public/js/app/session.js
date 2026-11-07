@@ -15,8 +15,9 @@ async function checkSession(){
 }
 
 // ---------- Roles ----------
-// Admins: every shop, Settings, Справки, deleting orders. Shop managers: one
-// shop, Справки and deleting orders. Staff: one shop, orders only. The
+// Admins: every shop, Settings, Справки, the activity log, deleting orders.
+// Shop managers: one shop, Справки, the activity log and deleting orders.
+// Staff: one shop, orders (with each one's history) only. The
 // server enforces this — the page just hides what the account can't use.
 const isAdmin = () => currentRole === 'admin';
 const canManage = () => currentRole === 'admin' || currentRole === 'shop_manager';
@@ -24,6 +25,8 @@ const ROLE_NAMES = { admin: 'Администратор', shop_manager: 'Упр�
 
 function applyRole(){
   document.getElementById('reportsBtn').style.display = canManage() ? '' : 'none';
+  // The activity log too; staff see each order's own history.
+  document.getElementById('activityLogBtn').style.display = canManage() ? '' : 'none';
   document.getElementById('settingsBtn').style.display = isAdmin() ? '' : 'none';
   const who = document.getElementById('whoAmI');
   who.textContent = currentUsername;

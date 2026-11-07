@@ -138,7 +138,7 @@ test('the activity log combines every shop, newest first, each with its shop', a
   const times = entries.map(e => e.performed_at);
   assert.deepEqual(times, [...times].sort().reverse());
   // A shop's own log has only its own.
-  assert.ok((await boris.get('/api/audit').expect(200)).body.every(e => e.store_name === 'Магазин Лозенец'));
+  assert.ok((await inCenter.get('/api/audit').expect(200)).body.every(e => e.store_name === 'CrazyPhone'));
 });
 
 test('settings in the all-shops view carry every shop\'s own, for printing', async () => {

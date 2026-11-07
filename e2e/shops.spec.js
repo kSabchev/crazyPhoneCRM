@@ -10,6 +10,7 @@ test('shop managers see Справки and the delete buttons, but not Наст�
   await expect(page.locator('#reportsBtn')).toBeVisible();
   await expect(page.locator('#settingsBtn')).toBeHidden();
   await expect(page.locator('#storeSwitch')).toBeHidden();
+  await expect(page.locator('#activityLogBtn')).toBeVisible();
 
   const t = await createTicketViaApi(page);
   await page.reload();

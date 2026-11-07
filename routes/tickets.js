@@ -134,10 +134,11 @@ router.get('/api/tickets/:id/history', requireAuth, (req, res) => {
   res.json(rows.map(r => ({ ...r, changes: JSON.parse(r.changes) })));
 });
 
-// The newest 200 changes; in the all-shops view, from every shop, each with
-// its shop (store_name, store_prefix).
+// The activity log ("Дневник на промените", managers and admins): the
+// newest 200 changes; in the all-shops view, from every shop, each with its
+// shop (store_name, store_prefix). Staff see each order's own history only.
 const ACTIVITY_LIMIT = 200;
-router.get('/api/audit', requireAuth, (req, res) => {
+router.get('/api/audit', requireManager, (req, res) => {
   const rows = shopsOf(req).flatMap(store =>
     /** @type {import('../types/app').AuditRow[]} */ (store.db
       .prepare('SELECT * FROM audit_log ORDER BY performed_at DESC, id DESC LIMIT ?')
