@@ -71,8 +71,10 @@ test('shop accounts only see and change their own shop\'s orders', async () => {
 
   const history = (await boris.get(`/api/tickets/${borisOrder.id}/history`).expect(200)).body;
   assert.ok(history.every(h => h.performed_by === 'boris'), JSON.stringify(history));
-  const activity = (await ana.get('/api/audit').expect(200)).body;
-  assert.ok(activity.length > 0 && activity.every(h => h.performed_by === 'ana'), JSON.stringify(activity));
+  // The activity log: managers, their own shop's only; staff don't get it.
+  const activity = (await vera.get('/api/audit').expect(200)).body;
+  assert.ok(activity.length > 0 && activity.every(h => h.store_name === 'Магазин Лозенец'), JSON.stringify(activity));
+  await ana.get('/api/audit').expect(403);
 
   // The phone-model suggestions learn from the shop's own orders only.
   const devices = (await boris.get('/api/devices').expect(200)).body;

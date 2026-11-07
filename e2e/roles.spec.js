@@ -3,11 +3,13 @@
 const { test, expect } = require('@playwright/test');
 const { login, createTicketViaApi, row, uniqueName } = require('./helpers');
 
-test('staff don\'t see Справки, Настройки or the delete buttons', async ({ page }) => {
+test('staff don\'t see Справки, Настройки, the activity log or the delete buttons', async ({ page }) => {
   await login(page, 'bob');
   await expect(page.locator('#roleTag')).toHaveText('служител');
   await expect(page.locator('#reportsBtn')).toBeHidden();
   await expect(page.locator('#settingsBtn')).toBeHidden();
+  await expect(page.locator('#activityLogBtn')).toBeHidden();
+  expect((await page.request.get('/api/audit')).status()).toBe(403);
 
   const t = await createTicketViaApi(page);
   await page.reload();
